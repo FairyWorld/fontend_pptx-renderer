@@ -432,6 +432,9 @@ unique observed packages, failure type, native-oracle readiness, dependency dept
 ID. It does not generate a weighted quality percentage. `unknown`, stable `verified`, and externally
 `blocked` rows remain visible in the ledger but do not enter the executable queue. An open issue only
 contributes demand after the issue snapshot explicitly records a current reproduction.
+Selecting anything other than the first executable row requires `work-packet --selection-reason`;
+the resulting packet records both the original rank and the reason, such as a previously committed
+release goal.
 
 Promotion uses the `accept` command only after the capability registry says `renderMode=native` and
 the candidate implementation is committed. The command requires a clean tracked tree, matching

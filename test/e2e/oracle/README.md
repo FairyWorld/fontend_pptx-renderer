@@ -31,6 +31,8 @@ failed structural checks, or an unresolved manual-review row blocks promotion. C
 and report rejected packages instead of losing all other observations; use `--fail-on-rejected` for
 a strict nonzero exit after the report is written. Unknown, verified, and externally blocked rows
 remain in the ledger for observation but are not selected as the next implementation cohort.
+When a committed goal deliberately selects a lower-ranked cohort, pass `--selection-reason`; the
+work packet records the override instead of silently hiding the global ordering.
 
 ## Current Implemented Pieces
 

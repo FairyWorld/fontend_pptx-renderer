@@ -8,6 +8,7 @@ from oracle.capability_ranking import (
     build_ledger_rows,
     build_work_packet,
     rank_capabilities,
+    select_ranked_capability,
 )
 
 
@@ -113,6 +114,25 @@ def test_ranking_rejects_invalid_or_duplicate_rows():
         rank_capabilities([row("cap.a", observed=-1)])
     with pytest.raises(ValueError, match="failure kind"):
         rank_capabilities([row("cap.a", failure="mystery")])
+
+
+def test_non_top_selection_requires_and_records_a_reason():
+    ranked = rank_capabilities([row("cap.a", observed=2), row("cap.b", observed=1)])
+
+    with pytest.raises(ValueError, match="selection reason"):
+        select_ranked_capability(ranked, "cap.b")
+
+    selected, selection = select_ranked_capability(
+        ranked,
+        "cap.b",
+        "active-goal:prove-adjustment-cohort",
+    )
+    assert selected.capability_id == "cap.b"
+    assert selection == {
+        "rank": 2,
+        "topRanked": False,
+        "reason": "active-goal:prove-adjustment-cohort",
+    }
 
 
 def test_work_packet_contains_one_bounded_donut_matrix():

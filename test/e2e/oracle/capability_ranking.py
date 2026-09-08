@@ -113,6 +113,28 @@ def rank_capabilities(rows: list[LedgerRow] | tuple[LedgerRow, ...]) -> tuple[Ra
     return tuple(sorted(ranked, key=lambda item: item.priority_key))
 
 
+def select_ranked_capability(
+    ranked: tuple[RankedCapability, ...],
+    capability_id: str,
+    reason: str | None = None,
+) -> tuple[RankedCapability, dict[str, Any]]:
+    for index, item in enumerate(ranked):
+        if item.capability_id != capability_id:
+            continue
+        rank = index + 1
+        normalized_reason = reason.strip() if isinstance(reason, str) else ""
+        if rank > 1 and not normalized_reason:
+            raise ValueError(
+                f"non-top capability selection requires a selection reason: {capability_id}"
+            )
+        return item, {
+            "rank": rank,
+            "topRanked": rank == 1,
+            "reason": normalized_reason or "top-ranked-capability",
+        }
+    raise ValueError(f"capability is not present in executable ranking: {capability_id}")
+
+
 def ledger_row_to_dict(row: LedgerRow) -> dict[str, Any]:
     return {
         "capabilityId": row.capability_id,

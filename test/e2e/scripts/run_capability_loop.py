@@ -41,6 +41,7 @@ from oracle.capability_ranking import (  # noqa: E402
     ledger_row_to_dict,
     rank_capabilities,
     ranked_capability_to_dict,
+    select_ranked_capability,
 )
 from oracle.provenance import detect_renderer_git_state  # noqa: E402
 
@@ -259,10 +260,13 @@ def command_work_packet(args: argparse.Namespace) -> int:
         raise CapabilityLoopError("ledger rows must be a list")
     rows = tuple(ledger_row_from_dict(value) for value in values if isinstance(value, Mapping))
     ranked = rank_capabilities(rows)
-    selected = next((item for item in ranked if item.capability_id == args.capability), None)
-    if selected is None:
-        raise CapabilityLoopError(f"capability is not present in ledger: {args.capability}")
+    selected, selection = select_ranked_capability(
+        ranked,
+        args.capability,
+        args.selection_reason,
+    )
     packet = build_work_packet(selected, registry)
+    packet["selection"] = selection
     packet["ledgerSha256"] = _sha256(ledger_path)
     output = _path(
         args.out,
@@ -378,6 +382,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common_contract_arguments(work_packet)
     work_packet.add_argument("--ledger", required=True)
     work_packet.add_argument("--capability", required=True)
+    work_packet.add_argument("--selection-reason")
     work_packet.add_argument("--out")
     work_packet.set_defaults(handler=command_work_packet)
 
