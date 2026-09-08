@@ -220,7 +220,8 @@ use the python-pptx generator. It currently defines 130 cases: 51 text, 31 shape
 static 3D, 20 composite, and 21 chart cases. The static 3D matrix covers flat opt-out, picture and
 shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white contour, wide/tall
 aspect ratios, a non-identity group, and the light rotation plus implicit defaults observed in the
-local `model-platform` corpus.
+local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
+outline and outer shadow so the 3D effect is not tested in isolation from its actual container.
 The CJK text matrix at IDs 0040-0051 covers square/no-wrap behavior, omitted and explicit autofit
 modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, and centered
 text inside a parent shape.

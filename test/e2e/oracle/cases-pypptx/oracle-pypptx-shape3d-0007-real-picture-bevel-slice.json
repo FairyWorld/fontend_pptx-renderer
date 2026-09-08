@@ -21,7 +21,8 @@
       "a:sp3d.extrusionH=implicit-zero",
       "a:sp3d.bevelT=default-circle",
       "a:sp3d.bevelT.size=25400x19050",
-      "a:sp3d.contourClr=FFFFFF"
+      "a:sp3d.contourClr=FFFFFF",
+      "a:effectLst.outerShdw=55000,18000,5400000"
     ]
   }
 }

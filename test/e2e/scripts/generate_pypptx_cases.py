@@ -1151,6 +1151,28 @@ def _build_shape3d_cases() -> list[CaseDef]:
             _emu(4.0),
         )
         picture.name = "Real-corpus static 3D picture slice"
+        sp_pr = picture._element.spPr
+        solid_fill = etree.Element(qn("a:solidFill"))
+        white_fill = etree.SubElement(solid_fill, qn("a:srgbClr"), val="FFFFFF")
+        etree.SubElement(white_fill, qn("a:shade"), val="85000")
+        line = etree.Element(qn("a:ln"), w="88900", cap="sq")
+        line_fill = etree.SubElement(line, qn("a:solidFill"))
+        etree.SubElement(line_fill, qn("a:srgbClr"), val="FFFFFF")
+        etree.SubElement(line, qn("a:miter"), lim="800000")
+        effect_list = etree.Element(qn("a:effectLst"))
+        shadow = etree.SubElement(
+            effect_list,
+            qn("a:outerShdw"),
+            blurRad="55000",
+            dist="18000",
+            dir="5400000",
+            algn="tl",
+            rotWithShape="0",
+        )
+        shadow_color = etree.SubElement(shadow, qn("a:srgbClr"), val="000000")
+        etree.SubElement(shadow_color, qn("a:alpha"), val="40000")
+        for element in (solid_fill, line, effect_list):
+            _insert_before_ext_lst(sp_pr, element)
         _apply_bounded_shape3d(
             picture,
             light_rig="twoPt",
@@ -1175,6 +1197,7 @@ def _build_shape3d_cases() -> list[CaseDef]:
             "a:sp3d.bevelT=default-circle",
             "a:sp3d.bevelT.size=25400x19050",
             "a:sp3d.contourClr=FFFFFF",
+            "a:effectLst.outerShdw=55000,18000,5400000",
         ],
     )
 

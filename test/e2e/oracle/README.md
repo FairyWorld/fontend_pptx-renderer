@@ -173,7 +173,8 @@ ground-truth export. It defines 130 cases under `oracle/cases-pypptx/` with the
 - **Static DrawingML 3D** (7 cases): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
-  `model-platform` picture tuple including light rotation and implicit defaults
+  `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
+  shadow
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
