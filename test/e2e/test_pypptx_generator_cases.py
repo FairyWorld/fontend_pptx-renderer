@@ -318,6 +318,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0004-wide-bevel",
         "oracle-pypptx-shape3d-0005-tall-bevel",
         "oracle-pypptx-shape3d-0006-grouped-bevel",
+        "oracle-pypptx-shape3d-0007-real-picture-bevel-slice",
     }
 
 
@@ -358,7 +359,11 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         ), name
         expected_light_rig = (
             "twoPt"
-            if name == "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel"
+            if name
+            in {
+                "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel",
+                "oracle-pypptx-shape3d-0007-real-picture-bevel-slice",
+            }
             else "threePt"
         )
         assert target.xpath(
@@ -366,11 +371,12 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
             namespaces=ns,
             rig=expected_light_rig,
         ), name
-        assert target.xpath(
-            "boolean(p:spPr/a:sp3d[@extrusionH='0']/a:bevelT"
-            "[@w='127000'][@h='127000'][@prst='circle'])",
-            namespaces=ns,
-        ), name
+        if name != "oracle-pypptx-shape3d-0007-real-picture-bevel-slice":
+            assert target.xpath(
+                "boolean(p:spPr/a:sp3d[@extrusionH='0']/a:bevelT"
+                "[@w='127000'][@h='127000'][@prst='circle'])",
+                namespaces=ns,
+            ), name
         assert not target.xpath(
             "p:spPr/a:scene3d/a:camera/a:rot | p:spPr/a:sp3d/a:bevelB",
             namespaces=ns,
@@ -397,6 +403,22 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
 
     grouped = roots["oracle-pypptx-shape3d-0006-grouped-bevel"]
     assert len(grouped.xpath(".//p:grpSp/p:sp[p:spPr/a:sp3d]", namespaces=ns)) == 1
+
+    real_picture = roots["oracle-pypptx-shape3d-0007-real-picture-bevel-slice"]
+    assert real_picture.xpath(
+        "boolean(.//p:pic/p:spPr/a:scene3d/a:lightRig[@rig='twoPt'][@dir='t']"
+        "/a:rot[@lat='0'][@lon='0'][@rev='7200000'])",
+        namespaces=ns,
+    )
+    assert real_picture.xpath(
+        "boolean(.//p:pic/p:spPr/a:sp3d[not(@extrusionH)][not(@contourW)]"
+        "/a:bevelT[@w='25400'][@h='19050'][not(@prst)])",
+        namespaces=ns,
+    )
+    assert real_picture.xpath(
+        "boolean(.//p:pic/p:spPr/a:sp3d/a:contourClr/a:srgbClr[@val='FFFFFF'])",
+        namespaces=ns,
+    )
 
 
 def test_static_shape3d_case_json_records_exact_scope(tmp_path: Path):

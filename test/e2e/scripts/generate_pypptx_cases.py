@@ -171,27 +171,41 @@ def _apply_bounded_shape3d(
     shape,
     *,
     light_rig: str = "threePt",
+    light_rotation: tuple[int, int, int] | None = None,
+    bevel_width_emu: int = 127000,
+    bevel_height_emu: int = 127000,
+    bevel_preset: str | None = "circle",
+    explicit_zero_extrusion: bool = True,
     contour_width_emu: int | None = None,
-    contour_color: str = "FFFFFF",
+    contour_color: str | None = None,
 ) -> None:
     """Insert the exact static 3D tuple used by the bounded renderer cohort."""
     sp_pr = shape._element.spPr
     scene3d = etree.Element(qn("a:scene3d"))
     etree.SubElement(scene3d, qn("a:camera"), prst="orthographicFront")
-    etree.SubElement(scene3d, qn("a:lightRig"), rig=light_rig, dir="t")
+    light_rig_node = etree.SubElement(scene3d, qn("a:lightRig"), rig=light_rig, dir="t")
+    if light_rotation is not None:
+        lat, lon, rev = light_rotation
+        etree.SubElement(
+            light_rig_node,
+            qn("a:rot"),
+            lat=str(lat),
+            lon=str(lon),
+            rev=str(rev),
+        )
 
-    sp3d_attrs = {"extrusionH": "0"}
+    sp3d_attrs = {"extrusionH": "0"} if explicit_zero_extrusion else {}
     if contour_width_emu is not None:
         sp3d_attrs["contourW"] = str(contour_width_emu)
     sp3d = etree.Element(qn("a:sp3d"), **sp3d_attrs)
-    etree.SubElement(
-        sp3d,
-        qn("a:bevelT"),
-        w="127000",
-        h="127000",
-        prst="circle",
-    )
-    if contour_width_emu is not None:
+    bevel_attrs = {
+        "w": str(bevel_width_emu),
+        "h": str(bevel_height_emu),
+    }
+    if bevel_preset is not None:
+        bevel_attrs["prst"] = bevel_preset
+    etree.SubElement(sp3d, qn("a:bevelT"), **bevel_attrs)
+    if contour_color is not None:
         contour_clr = etree.SubElement(sp3d, qn("a:contourClr"))
         etree.SubElement(contour_clr, qn("a:srgbClr"), val=contour_color)
 
@@ -1034,7 +1048,11 @@ def _build_shape3d_cases() -> list[CaseDef]:
         shape.fill.solid()
         shape.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
         shape.line.fill.background()
-        _apply_bounded_shape3d(shape, contour_width_emu=12700 if contour else None)
+        _apply_bounded_shape3d(
+            shape,
+            contour_width_emu=12700 if contour else None,
+            contour_color="FFFFFF" if contour else None,
+        )
 
     _add(
         "roundrect-bevel-contour",
@@ -1120,6 +1138,43 @@ def _build_shape3d_cases() -> list[CaseDef]:
             "group.nonIdentityScale",
             "a:scene3d.camera=orthographicFront",
             "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _build_real_picture_slice(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        picture = slide.shapes.add_picture(
+            _shape3d_fixture_image(),
+            _emu(3.0),
+            _emu(1.75),
+            _emu(7.333),
+            _emu(4.0),
+        )
+        picture.name = "Real-corpus static 3D picture slice"
+        _apply_bounded_shape3d(
+            picture,
+            light_rig="twoPt",
+            light_rotation=(0, 0, 7200000),
+            bevel_width_emu=25400,
+            bevel_height_emu=19050,
+            bevel_preset=None,
+            explicit_zero_extrusion=False,
+            contour_color="FFFFFF",
+        )
+
+    _add(
+        "real-picture-bevel-slice",
+        _build_real_picture_slice,
+        features=[
+            "p:pic",
+            "realCorpus=model-platform",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=twoPt:t",
+            "a:scene3d.lightRig.rot=0,0,7200000",
+            "a:sp3d.extrusionH=implicit-zero",
+            "a:sp3d.bevelT=default-circle",
+            "a:sp3d.bevelT.size=25400x19050",
+            "a:sp3d.contourClr=FFFFFF",
         ],
     )
 

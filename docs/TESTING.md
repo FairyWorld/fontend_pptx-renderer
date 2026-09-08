@@ -216,10 +216,11 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, bounded static DrawingML 3D, composite, and chart interaction cases,
-use the python-pptx generator. It currently defines 129 cases: 51 text, 31 shape-adjustment, 6
+use the python-pptx generator. It currently defines 130 cases: 51 text, 31 shape-adjustment, 7
 static 3D, 20 composite, and 21 chart cases. The static 3D matrix covers flat opt-out, picture and
 shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white contour, wide/tall
-aspect ratios, and a non-identity group.
+aspect ratios, a non-identity group, and the light rotation plus implicit defaults observed in the
+local `model-platform` corpus.
 The CJK text matrix at IDs 0040-0051 covers square/no-wrap behavior, omitted and explicit autofit
 modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, and centered
 text inside a parent shape.
