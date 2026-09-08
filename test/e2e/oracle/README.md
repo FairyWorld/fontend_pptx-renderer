@@ -171,8 +171,8 @@ ground-truth export. It defines 129 cases under `oracle/cases-pypptx/` with the
   placeholder inheritance, plus a 12-case CJK wrap/autofit/line-spacing interaction matrix
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Static DrawingML 3D** (6 cases): flat picture opt-out plus a bounded
-  `orthographicFront`/`threePt:t`/circle-top-bevel matrix across picture, rect, roundRect,
-  contour, wide/tall, and grouped-shape contexts
+  `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
+  roundRect, contour, wide/tall, and grouped-shape contexts
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 

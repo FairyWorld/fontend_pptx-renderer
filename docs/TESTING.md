@@ -218,7 +218,8 @@ This generates/reuses ground truth for all SmartArt layouts available on the loc
 For text, shape-adjustment, bounded static DrawingML 3D, composite, and chart interaction cases,
 use the python-pptx generator. It currently defines 129 cases: 51 text, 31 shape-adjustment, 6
 static 3D, 20 composite, and 21 chart cases. The static 3D matrix covers flat opt-out, picture and
-shape containers, rect/roundRect, white contour, wide/tall aspect ratios, and a non-identity group.
+shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white contour, wide/tall
+aspect ratios, and a non-identity group.
 The CJK text matrix at IDs 0040-0051 covers square/no-wrap behavior, omitted and explicit autofit
 modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, and centered
 text inside a parent shape.

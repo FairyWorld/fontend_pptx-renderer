@@ -170,6 +170,7 @@ def _insert_before_ext_lst(parent, child) -> None:
 def _apply_bounded_shape3d(
     shape,
     *,
+    light_rig: str = "threePt",
     contour_width_emu: int | None = None,
     contour_color: str = "FFFFFF",
 ) -> None:
@@ -177,7 +178,7 @@ def _apply_bounded_shape3d(
     sp_pr = shape._element.spPr
     scene3d = etree.Element(qn("a:scene3d"))
     etree.SubElement(scene3d, qn("a:camera"), prst="orthographicFront")
-    etree.SubElement(scene3d, qn("a:lightRig"), rig="threePt", dir="t")
+    etree.SubElement(scene3d, qn("a:lightRig"), rig=light_rig, dir="t")
 
     sp3d_attrs = {"extrusionH": "0"}
     if contour_width_emu is not None:
@@ -991,7 +992,8 @@ def _build_shape3d_cases() -> list[CaseDef]:
         )
         picture.name = "Static 3D picture"
         if apply_3d:
-            _apply_bounded_shape3d(picture)
+            # `twoPt:t` matches the real p:pic slice observed in model-platform.
+            _apply_bounded_shape3d(picture, light_rig="twoPt")
 
     _add(
         "flat-optout",
@@ -1004,7 +1006,7 @@ def _build_shape3d_cases() -> list[CaseDef]:
         features=[
             "p:pic",
             "a:scene3d.camera=orthographicFront",
-            "a:scene3d.lightRig=threePt:t",
+            "a:scene3d.lightRig=twoPt:t",
             "a:sp3d.extrusionH=0",
             "a:sp3d.bevelT=circle",
         ],

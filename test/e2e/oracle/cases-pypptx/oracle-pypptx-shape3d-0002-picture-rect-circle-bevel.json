@@ -15,7 +15,7 @@
     "features": [
       "p:pic",
       "a:scene3d.camera=orthographicFront",
-      "a:scene3d.lightRig=threePt:t",
+      "a:scene3d.lightRig=twoPt:t",
       "a:sp3d.extrusionH=0",
       "a:sp3d.bevelT=circle"
     ]

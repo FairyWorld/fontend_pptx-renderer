@@ -356,9 +356,15 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
             "boolean(p:spPr/a:scene3d/a:camera[@prst='orthographicFront'])",
             namespaces=ns,
         ), name
+        expected_light_rig = (
+            "twoPt"
+            if name == "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel"
+            else "threePt"
+        )
         assert target.xpath(
-            "boolean(p:spPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'])",
+            "boolean(p:spPr/a:scene3d/a:lightRig[@rig=$rig][@dir='t'])",
             namespaces=ns,
+            rig=expected_light_rig,
         ), name
         assert target.xpath(
             "boolean(p:spPr/a:sp3d[@extrusionH='0']/a:bevelT"
@@ -409,7 +415,7 @@ def test_static_shape3d_case_json_records_exact_scope(tmp_path: Path):
         "features": [
             "p:pic",
             "a:scene3d.camera=orthographicFront",
-            "a:scene3d.lightRig=threePt:t",
+            "a:scene3d.lightRig=twoPt:t",
             "a:sp3d.extrusionH=0",
             "a:sp3d.bevelT=circle",
         ],
