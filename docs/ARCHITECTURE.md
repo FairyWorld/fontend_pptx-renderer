@@ -86,13 +86,14 @@ optional and external.
 
 ## OOXML Geometry Compilation Boundary
 
-The handwritten `src/shapes/presets.ts` registry remains the default preset-geometry engine. The
-M0-M2 tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML geometry
+The handwritten `src/shapes/presets.ts` registry remains the compatibility geometry engine. The
+M0-M3 tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML geometry
 addendum, implements the complete guide-formula contract, compiles all unique definitions into
 renderer-independent plain data, and emits deterministic SVG paths. The generator also writes a
-tree-shakeable production allowlist to `src/shapes/generated/ooxmlPresetGeometryPilot.ts`.
+tree-shakeable production subset to `src/shapes/generated/ooxmlPresetGeometrySubset.ts`.
 `src/shapes/ooxmlGeometryRuntime.ts` evaluates that data before the handwritten lookup.
-The allowlist currently contains only `flowChartTerminator`.
+The subset contains 20 zero-adjustment, single-path flowchart definitions. Other shapes continue
+through the handwritten registry.
 
 The compiled IR retains ordered adjustment/calculated guides, adjustment handles, connection
 sites, text rectangles, path coordinate systems, path styling metadata, and the six DrawingML
@@ -102,7 +103,7 @@ evaluates the complete corpus at square, wide, and tall extents.
 
 Path emission scales each declared path coordinate space into the shape extent and converts
 DrawingML visual-angle arcs into SVG ellipse segments. Full circles are split at serialization,
-and output rounding is confined to that boundary. The runtime pilot supports the same 17 formula
+and output rounding is confined to that boundary. The runtime subset supports the same 17 formula
 operators and predefined guides as the build-time evaluator. SVG fill/theme resolution, browser
 masks, connector markers, picture/media ownership, effects, and render lifecycle stay in their
 existing render modules. Generated paths retain the current per-node geometry cache and are not
@@ -114,7 +115,7 @@ alternative definitions because it does not yet verify their bytes or native Pow
 evidence. A later override gate must verify the local source bytes and hash, confirm the
 requested shape exists, and resolve native-oracle metadata before activation. Production
 migration is per shape or shape family, so the existing handwritten implementation remains
-active for shapes that have not passed that gate. Expanding the production allowlist requires
+active for shapes that have not passed that gate. Expanding the production subset requires
 formula/IR parity, SVG structure, parent renderer, picture clip, browser, package, and current
 native PowerPoint oracle evidence for the selected shape family.
 

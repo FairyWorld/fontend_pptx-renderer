@@ -62,9 +62,9 @@ Coverage areas:
 
 ## OOXML Geometry Compiler Gate
 
-The full-corpus compiler and emitter remain development tooling. A generated production allowlist
-currently routes only `flowChartTerminator` through `src/shapes/ooxmlGeometryRuntime.ts`; other
-presets remain handwritten. Focused tests cover every guide-formula operator, PowerPoint numeric
+The full-corpus compiler and emitter remain development tooling. A generated production subset
+routes 20 zero-adjustment, single-path flowcharts through `src/shapes/ooxmlGeometryRuntime.ts`;
+other presets remain handwritten. Focused tests cover every guide-formula operator, PowerPoint numeric
 deviations, predefined guides, ordered guide rebinding, adjustment overrides, every IR section,
 all six path commands, path-coordinate scaling, non-circular elliptical arcs, positive/negative
 sweeps, full circles, serialization rounding, runtime/build-time parity, and error boundaries.
@@ -83,7 +83,7 @@ pnpm geometry:check
 catalog bytes, complete IR structural SHA-256, and default evaluation plus SVG emission of all
 186 unique shapes at 216x216, 400x180, and 180x400. Each emitted profile requires all 319 paths
 to be non-empty, rejects non-finite output, and has its own SHA-256. The command also verifies the
-generated production-pilot module byte-for-byte. These checks establish deterministic compilation
+generated production-subset module byte-for-byte. These checks establish deterministic compilation
 and path serialization. Browser and native PowerPoint equivalence remain separate per-shape gates.
 
 Report native comparisons with the exact source revision, case IDs, environment, errors,
@@ -379,7 +379,8 @@ bytes, finite IR evaluation, and deterministic SVG emission. It runs in CI befor
 build.
 
 The generated catalog is evidence about source coverage; it is not renderer acceptance. The
-production allowlist is a separate generated module and currently contains one accepted pilot.
+production subset is a separate generated module and currently contains 20 accepted flowchart
+definitions with one path and no adjustment guides.
 Before adding a definition, add tests for formula semantics and path topology plus browser checks
 for both ordinary shapes and picture clips. Then compare square, wide, and tall shapes and
 relevant adjustment bounds against native PowerPoint ground truth. Group, flip, rotation,

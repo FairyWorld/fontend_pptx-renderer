@@ -1,10 +1,11 @@
 # OOXML Geometry Source Contract
 
-This directory contains the M0 source contract, M1 compiler/evaluator, and M2 SVG path emitter
-for the spec-compiled preset geometry engine. The build-time modules are development tooling.
-The generator writes an explicit production allowlist consumed by
-`src/shapes/ooxmlGeometryRuntime.ts`; only `flowChartTerminator` is currently routed through it,
-while every other shape uses the handwritten implementation in `src/shapes/presets.ts`.
+This directory contains the M0 source contract, M1 compiler/evaluator, M2 SVG path emitter, and M3
+production-subset gate for the spec-compiled preset geometry engine. The build-time modules are
+development tooling. The generator writes an explicit production subset consumed by
+`src/shapes/ooxmlGeometryRuntime.ts`; 20 zero-adjustment, single-path flowchart shapes currently
+use it, while excluded flowcharts and every other shape use the handwritten implementation in
+`src/shapes/presets.ts`.
 
 ## Pinned source
 
@@ -44,7 +45,7 @@ sites, and text-rectangle presence. M1 records a SHA-256 fingerprint of the comp
 IR and confirms that all unique definitions evaluate at square, wide, and tall extents. M2 adds
 a SHA-256 fingerprint of the emitted SVG path data for the same profiles. The catalog is not
 bundled into the renderer. The same command generates
-`src/shapes/generated/ooxmlPresetGeometryPilot.ts`; both generated outputs are checked for byte
+`src/shapes/generated/ooxmlPresetGeometrySubset.ts`; both generated outputs are checked for byte
 drift. Generated files are excluded from Prettier so `geometry:generate` remains their only
 byte-format authority.
 
@@ -130,7 +131,16 @@ are rounded to six decimal places only when serialized.
 and 180x400. It rejects empty or non-finite output and fingerprints each complete profile. These
 gates prove deterministic emission, not visual equivalence with PowerPoint.
 
-The production allowlist currently routes `flowChartTerminator` after formula/IR parity, SVG,
-parent-renderer, browser, picture-clip, and current native PowerPoint oracle checks. Expanding the
-allowlist requires the same evidence for each shape or family. Renderer-owned theme fill, masks,
-markers, effects, and resource lifecycle remain outside the geometry engine.
+## M3 production subset
+
+The generated runtime subset contains these native-validated shape IDs: 61-64, 67, 69-76, 79,
+81-85, and 88. They map to 20 ECMA definitions with one path and no adjustment guides. Runtime
+generation rejects missing names, duplicates, adjustment guides, and multiple paths so an
+unsupported definition cannot enter production by editing the name list alone.
+
+Shape IDs 65, 66, 68, 77, 78, 80, 86, and 87 remain handwritten because their ECMA definitions
+contain multiple paths. Preserving those definitions requires path-specific fill, stroke, and
+layer ordering in the production adapter. Expanding the subset requires formula/IR parity, SVG,
+parent-renderer, browser, picture-clip, and current native PowerPoint oracle evidence for every
+new shape or family. Renderer-owned theme fill, masks, markers, effects, and resource lifecycle
+remain outside the geometry engine.

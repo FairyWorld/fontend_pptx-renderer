@@ -9,6 +9,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
+  deterministic SVG emitter, and a generated runtime subset with source-hash verification.
 - Added browser rendering for licensed EOT/MTX fonts embedded in PowerPoint files, with
   bounded face, byte, and processing budgets plus host-font fallback for rejected faces.
 - Added `fontFaces` options to `PptxViewer` and headless `renderSlide()` so host applications can
@@ -20,6 +22,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Route 20 zero-adjustment, single-path flowchart presets through the generated OOXML runtime
+  after build-time, browser, picture-clip, and native PowerPoint comparison gates.
+- Report per-slide oracle runtime failures separately from visual metrics, retry transient batch
+  failures, and serialize browser startup and cancellation cleanup.
 - The python-pptx corpus generator now supports native PDF export on macOS, repeatable exact/glob
   case filters, and SHA-256 artifact records while keeping cached case metadata synchronized.
 - Map Office percentage line and paragraph spacing through its native line unit, trim outer

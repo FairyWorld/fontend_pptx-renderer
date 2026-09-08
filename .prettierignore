@@ -8,4 +8,4 @@ test/e2e/
 *.jpg
 pnpm-lock.yaml
 scripts/ooxml-geometry/generated/
-src/shapes/generated/ooxmlPresetGeometryPilot.ts
+src/shapes/generated/ooxmlPresetGeometrySubset.ts

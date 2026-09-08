@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateOoxmlGuideFormula,
   getOoxmlPresetShapePaths,
-  ooxmlPresetPilotShapeNames,
-  ooxmlPresetPilotSourceSha256,
+  ooxmlPresetRuntimeShapeNames,
+  ooxmlPresetRuntimeSourceSha256,
 } from '../../../src/shapes/ooxmlGeometryRuntime';
 import {
   compilePresetShapeDefinitions,
@@ -15,10 +15,45 @@ import { loadPinnedPresetShapeDefinitions } from '../../../scripts/ooxml-geometr
 import sourceManifest from '../../../scripts/ooxml-geometry/source-manifest.json';
 import sourceReconciliation from '../../../scripts/ooxml-geometry/source-reconciliation.json';
 
-describe('OOXML preset geometry runtime pilot', () => {
-  it('keeps the production allowlist explicit and leaves other presets on handwritten geometry', () => {
-    expect(ooxmlPresetPilotShapeNames).toEqual(['flowChartTerminator']);
-    expect(ooxmlPresetPilotSourceSha256).toBe(sourceManifest.presetShapeDefinitions.sha256);
+const runtimeFlowchartShapeNames = [
+  'flowChartProcess',
+  'flowChartAlternateProcess',
+  'flowChartDecision',
+  'flowChartInputOutput',
+  'flowChartDocument',
+  'flowChartTerminator',
+  'flowChartPreparation',
+  'flowChartManualInput',
+  'flowChartManualOperation',
+  'flowChartConnector',
+  'flowChartOffpageConnector',
+  'flowChartPunchedCard',
+  'flowChartPunchedTape',
+  'flowChartCollate',
+  'flowChartExtract',
+  'flowChartMerge',
+  'flowChartOnlineStorage',
+  'flowChartDelay',
+  'flowChartMagneticTape',
+  'flowChartDisplay',
+] as const;
+
+describe('OOXML preset geometry runtime subset', () => {
+  it('keeps the production subset explicit and leaves other presets on handwritten geometry', () => {
+    expect(ooxmlPresetRuntimeShapeNames).toEqual(runtimeFlowchartShapeNames);
+    expect(ooxmlPresetRuntimeSourceSha256).toBe(sourceManifest.presetShapeDefinitions.sha256);
+    for (const shapeName of [
+      'flowChartPredefinedProcess',
+      'flowChartInternalStorage',
+      'flowChartMultidocument',
+      'flowChartSummingJunction',
+      'flowChartOr',
+      'flowChartSort',
+      'flowChartMagneticDisk',
+      'flowChartMagneticDrum',
+    ]) {
+      expect(getOoxmlPresetShapePaths(shapeName, 400, 280)).toBeNull();
+    }
     expect(getOoxmlPresetShapePaths('rect', 400, 280)).toBeNull();
     expect(getOoxmlPresetShapePaths('unknownShape', 400, 280)).toBeNull();
   });
@@ -48,7 +83,7 @@ describe('OOXML preset geometry runtime pilot', () => {
     },
   );
 
-  it('emits the approved pilot deterministically and accepts case-insensitive lookup', () => {
+  it('emits the original accepted shape deterministically and accepts case-insensitive lookup', () => {
     const expected =
       'M64.351852,0 L335.648148,0 A64.351852,140 0 0,1 335.648148,280 L64.351852,280 A64.351852,140 0 0,1 64.351852,0 Z';
 
@@ -59,18 +94,21 @@ describe('OOXML preset geometry runtime pilot', () => {
   it('matches the build-time compiler and emitter at square, wide, and tall extents', async () => {
     const source = await loadPinnedPresetShapeDefinitions(process.cwd(), sourceManifest);
     const ir = compilePresetShapeDefinitions(source.xml, sourceManifest, sourceReconciliation);
-    const shape = ir.shapes.find(({ name }: { name: string }) => name === 'flowChartTerminator');
-    expect(shape).toBeDefined();
 
-    for (const dimensions of [
-      { width: 216, height: 216 },
-      { width: 400, height: 180 },
-      { width: 180, height: 400 },
-    ]) {
-      const buildTime = emitPresetShapePaths(evaluatePresetShape(shape, dimensions)).paths;
-      expect(
-        getOoxmlPresetShapePaths('flowChartTerminator', dimensions.width, dimensions.height),
-      ).toEqual(buildTime);
+    for (const shapeName of runtimeFlowchartShapeNames) {
+      const shape = ir.shapes.find(({ name }: { name: string }) => name === shapeName);
+      expect(shape, `${shapeName} must exist in the pinned IR`).toBeDefined();
+      for (const dimensions of [
+        { width: 216, height: 216 },
+        { width: 400, height: 180 },
+        { width: 180, height: 400 },
+      ]) {
+        const buildTime = emitPresetShapePaths(evaluatePresetShape(shape, dimensions)).paths;
+        expect(
+          getOoxmlPresetShapePaths(shapeName, dimensions.width, dimensions.height),
+          `${shapeName} at ${dimensions.width}x${dimensions.height}`,
+        ).toEqual(buildTime);
+      }
     }
   }, 20_000);
 

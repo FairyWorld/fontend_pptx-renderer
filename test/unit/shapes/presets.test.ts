@@ -206,8 +206,8 @@ describe('getPresetShapePath', () => {
 
   it('renders flowChartCollate with dedicated hourglass geometry (oracle-full-shapeid-0079)', () => {
     const d = getPresetShapePath('flowChartCollate', 200, 100);
-    expect(d).not.toBe('M0,0 L200,0 L200,100 L0,100 Z');
-    expect(d).toContain('Z M');
+    // ECMA-376 defines one self-crossing contour that visits the center twice.
+    expect(d).toBe('M0,0 L200,0 L100,50 L200,100 L0,100 L100,50 Z');
   });
 
   it('renders curvedUpArrow using arc-derived start point for wide layouts', () => {
@@ -1083,7 +1083,7 @@ describe('getMultiPathPreset', () => {
     expect(d).toContain('200,140');
   });
 
-  it('routes flowChartTerminator through the deterministic OOXML pilot', () => {
+  it('routes flowChartTerminator through the deterministic OOXML runtime subset', () => {
     expect(getPresetShapePath('flowChartTerminator', 400, 280)).toBe(
       'M64.351852,0 L335.648148,0 A64.351852,140 0 0,1 335.648148,280 L64.351852,280 A64.351852,140 0 0,1 64.351852,0 Z',
     );
@@ -1096,11 +1096,11 @@ describe('getMultiPathPreset', () => {
 
   it('renders flowChartInputOutput with w/5 offset parallelogram (oracle-full-shapeid-0064)', () => {
     const d = getPresetShapePath('flowChartInputOutput', 500, 300);
-    // OOXML: path w=5 h=5, offset = w/5 = 100
-    expect(d).toContain('M100,0');
+    // ECMA-376 path order starts at the bottom-left, then uses the w/5 top inset.
+    expect(d).toContain('M0,300');
+    expect(d).toContain('L100,0');
     expect(d).toContain('L500,0');
     expect(d).toContain('L400,300');
-    expect(d).toContain('L0,300');
   });
 
   it('renders flowChartPredefinedProcess with OOXML w/8 side bands (oracle-full-shapeid-0065)', () => {

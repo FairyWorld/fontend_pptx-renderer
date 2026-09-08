@@ -40,7 +40,7 @@ function extractPathNumbers(path: string): number[] {
 }
 
 describe('ShapeRenderer', () => {
-  it('renders the approved OOXML geometry pilot through the parent shape renderer', () => {
+  it('renders the approved OOXML geometry subset through the parent shape renderer', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -57,6 +57,29 @@ describe('ShapeRenderer', () => {
     expect(el.querySelector('path')?.getAttribute('d')).toBe(
       'M64.351852,0 L335.648148,0 A64.351852,140 0 0,1 335.648148,280 L64.351852,280 A64.351852,140 0 0,1 64.351852,0 Z',
     );
+  });
+
+  it.each([
+    ['flowChartProcess', 'L400,280'],
+    ['flowChartDocument', 'C'],
+    ['flowChartMagneticTape', 'A'],
+  ])('renders generated %s geometry through the parent shape renderer', (shapeType, command) => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="Flowchart"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3810000" cy="2667000"/></a:xfrm>
+          <a:prstGeom prst="${shapeType}"><a:avLst/></a:prstGeom>
+        </p:spPr>
+      </p:sp>`;
+
+    const path = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext())
+      .querySelector('path')
+      ?.getAttribute('d');
+
+    expect(path).toContain(command);
+    expect(path).not.toMatch(/NaN|Infinity/);
   });
 
   it('renders wordArtVert as upright stacked text instead of sideways vertical text', () => {

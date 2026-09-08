@@ -10,7 +10,7 @@ import {
 } from '../../../scripts/ooxml-geometry/path-emitter.mjs';
 import {
   buildPathEmissionContract,
-  buildRuntimePilotModule,
+  buildRuntimeGeometryModule,
 } from '../../../scripts/ooxml-geometry/generate.mjs';
 import { loadPinnedPresetShapeDefinitions } from '../../../scripts/ooxml-geometry/source-validator.mjs';
 import sourceManifest from '../../../scripts/ooxml-geometry/source-manifest.json';
@@ -352,23 +352,66 @@ describe('OOXML evaluated-path SVG emitter', () => {
   });
 });
 
-describe('OOXML runtime pilot generation', () => {
+describe('OOXML runtime subset generation', () => {
+  const singlePathIr = {
+    source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+    shapes: [
+      {
+        name: 'singlePathCandidate',
+        adjustmentGuides: [],
+        calculatedGuides: [],
+        paths: [{ commands: [] }],
+      },
+    ],
+  };
+
+  it('rejects a requested definition that is missing from the pinned source', () => {
+    expect(() => buildRuntimeGeometryModule(singlePathIr, ['missingCandidate'])).toThrow(
+      /missing from source/i,
+    );
+  });
+
+  it('rejects duplicate production-subset names', () => {
+    expect(() =>
+      buildRuntimeGeometryModule(singlePathIr, ['singlePathCandidate', 'singlePathCandidate']),
+    ).toThrow(/must be unique/i);
+  });
+
   it('rejects multi-path definitions until the production adapter preserves every path', () => {
     expect(() =>
-      buildRuntimePilotModule(
+      buildRuntimeGeometryModule(
         {
           source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
           shapes: [
             {
-              name: 'multiPathPilot',
+              name: 'multiPathCandidate',
               adjustmentGuides: [],
               calculatedGuides: [],
               paths: [{ commands: [] }, { commands: [] }],
             },
           ],
         },
-        ['multiPathPilot'],
+        ['multiPathCandidate'],
       ),
     ).toThrow(/exactly one path/i);
+  });
+
+  it('rejects adjustment-bearing definitions until adjustment bounds have a production gate', () => {
+    expect(() =>
+      buildRuntimeGeometryModule(
+        {
+          source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+          shapes: [
+            {
+              name: 'adjustedCandidate',
+              adjustmentGuides: [{ name: 'adj', formula: { operator: 'val', operands: [] } }],
+              calculatedGuides: [],
+              paths: [{ commands: [] }],
+            },
+          ],
+        },
+        ['adjustedCandidate'],
+      ),
+    ).toThrow(/adjustment guides/i);
   });
 });

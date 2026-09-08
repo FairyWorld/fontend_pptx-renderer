@@ -1,7 +1,7 @@
 import {
-  OOXML_PRESET_GEOMETRY_PILOT,
+  OOXML_PRESET_GEOMETRY_DEFINITIONS,
   OOXML_PRESET_GEOMETRY_SOURCE_SHA256,
-} from './generated/ooxmlPresetGeometryPilot';
+} from './generated/ooxmlPresetGeometrySubset';
 
 type OoxmlFormulaOperator =
   | '*/'
@@ -142,15 +142,16 @@ const FORMULA_ARITIES: Readonly<Record<OoxmlFormulaOperator, number>> = Object.f
   val: 1,
 });
 
-const pilotDefinitions = OOXML_PRESET_GEOMETRY_PILOT as unknown as readonly OoxmlPresetDefinition[];
-const pilotByName = new Map(
-  pilotDefinitions.map((definition) => [definition.name.toLowerCase(), definition]),
+const runtimeDefinitions =
+  OOXML_PRESET_GEOMETRY_DEFINITIONS as unknown as readonly OoxmlPresetDefinition[];
+const runtimeByName = new Map(
+  runtimeDefinitions.map((definition) => [definition.name.toLowerCase(), definition]),
 );
 
-export const ooxmlPresetPilotShapeNames: readonly string[] = Object.freeze(
-  pilotDefinitions.map(({ name }) => name),
+export const ooxmlPresetRuntimeShapeNames: readonly string[] = Object.freeze(
+  runtimeDefinitions.map(({ name }) => name),
 );
-export const ooxmlPresetPilotSourceSha256 = OOXML_PRESET_GEOMETRY_SOURCE_SHA256;
+export const ooxmlPresetRuntimeSourceSha256 = OOXML_PRESET_GEOMETRY_SOURCE_SHA256;
 
 function finiteNumber(value: number, context: string): number {
   if (!Number.isFinite(value)) throw new Error(`${context} must be finite`);
@@ -543,7 +544,7 @@ export function getOoxmlPresetShapePaths(
   height: number,
   adjustments: ReadonlyMap<string, number> = new Map(),
 ): OoxmlEmittedPresetPath[] | null {
-  const definition = pilotByName.get(shapeType.toLowerCase());
+  const definition = runtimeByName.get(shapeType.toLowerCase());
   if (!definition) return null;
   const normalizedWidth = positiveNumber(width, `${definition.name} width`);
   const normalizedHeight = positiveNumber(height, `${definition.name} height`);
