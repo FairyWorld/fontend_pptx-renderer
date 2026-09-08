@@ -307,6 +307,42 @@
       "textRectangles": 181
     }
   },
+  "pathEmission": {
+    "precision": 6,
+    "profiles": [
+      {
+        "emittedPaths": 319,
+        "emittedShapes": 186,
+        "height": 216,
+        "name": "square",
+        "nonEmptyPaths": 319,
+        "nonFiniteTokens": 0,
+        "sha256": "5046dd9a441dfa2a0625e6efea55727a64d25d66b8dea774fdebdf001f945394",
+        "width": 216
+      },
+      {
+        "emittedPaths": 319,
+        "emittedShapes": 186,
+        "height": 180,
+        "name": "wide",
+        "nonEmptyPaths": 319,
+        "nonFiniteTokens": 0,
+        "sha256": "46d8ab97f90d5d2e1abf1861cbc347ec1bf61ca09ad865b9d92aca6f024738d2",
+        "width": 400
+      },
+      {
+        "emittedPaths": 319,
+        "emittedShapes": 186,
+        "height": 400,
+        "name": "tall",
+        "nonEmptyPaths": 319,
+        "nonFiniteTokens": 0,
+        "sha256": "0c06126330e44bd412b553d2f224bf405541603b92328ccca875a6c1986a072a",
+        "width": 180
+      }
+    ],
+    "schemaVersion": 1
+  },
   "reconciliation": {
     "entries": [
       {

@@ -1083,6 +1083,17 @@ describe('getMultiPathPreset', () => {
     expect(d).toContain('200,140');
   });
 
+  it('routes flowChartTerminator through the deterministic OOXML pilot', () => {
+    expect(getPresetShapePath('flowChartTerminator', 400, 280)).toBe(
+      'M64.351852,0 L335.648148,0 A64.351852,140 0 0,1 335.648148,280 L64.351852,280 A64.351852,140 0 0,1 64.351852,0 Z',
+    );
+  });
+
+  it('keeps degenerate flowChartTerminator dimensions on the legacy compatibility path', () => {
+    expect(() => getPresetShapePath('flowChartTerminator', 0, 280)).not.toThrow();
+    expect(getPresetShapePath('flowChartTerminator', 0, 280)).toContain('A0,140');
+  });
+
   it('renders flowChartInputOutput with w/5 offset parallelogram (oracle-full-shapeid-0064)', () => {
     const d = getPresetShapePath('flowChartInputOutput', 500, 300);
     // OOXML: path w=5 h=5, offset = w/5 = 100

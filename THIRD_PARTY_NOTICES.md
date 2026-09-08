@@ -23,9 +23,10 @@ MPL-2.0 terms that apply to the covered `mtx-decompressor` source files.
 
 The development tooling contains an unchanged copy of
 `OfficeOpenXML-DrawingMLGeometries.zip` from ECMA-376 Part 1, 5th edition (2016).
-It is used to validate and generate preset-shape metadata and is excluded from the
-published npm package and runtime bundles. The machine-readable provenance manifest is
-included in the package; it does not contain the copied ECMA archive.
+It is used to validate and generate preset-shape metadata. The archive itself is excluded
+from the published npm package and runtime bundles. The package includes the machine-readable
+provenance manifest and a generated runtime pilot containing a mechanical representation of
+one preset definition; neither artifact contains the source archive.
 
 - Standard: <https://ecma-international.org/publications-and-standards/standards/ecma-376/>
 - Copyright policy:
@@ -33,6 +34,7 @@ included in the package; it does not contain the copied ECMA archive.
 - Copyright notice: [`licenses/ECMA-text-copyright-notice.txt`](licenses/ECMA-text-copyright-notice.txt)
 - Source provenance: [`scripts/ooxml-geometry/source-manifest.json`](scripts/ooxml-geometry/source-manifest.json)
 
-Copyright © Ecma International. The repository copy is preserved unchanged. Generated
-implementation metadata and renderer code remain licensed under this project's Apache-2.0
-license; the ECMA notice continues to apply to the copied standard material.
+Copyright © Ecma International. The repository copy is preserved unchanged. The ECMA notice
+and copyright policy apply to material copied or mechanically derived from the standard.
+Independently authored renderer and evaluation code remains licensed under this project's
+Apache-2.0 license.

@@ -574,10 +574,11 @@ All commonly used OOXML `DrawingML` preset shapes, organized by category:
 | **Multi-path 3D** |   33+ | Bevel, cube, can, ribbons — multi-layer SVG with 3D appearance |
 
 Custom geometry (`<a:custGeom>`) supports numeric move, line, quadratic/cubic Bézier, arc,
-and close commands, including multiple paths and inferred source extents. The development-only
-spec compiler now evaluates the complete preset-shape formula corpus into renderer-independent
-IR. It is not routed into production preset or custom-geometry rendering yet, so symbolic
-`gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
+and close commands, including multiple paths and inferred source extents. The pinned OOXML
+compiler evaluates the complete preset-shape formula corpus into renderer-independent IR and SVG
+paths. `flowChartTerminator` is the first production preset routed through its generated runtime
+allowlist; every other preset retains the handwritten implementation. Symbolic `gdLst` formulas
+in arbitrary `<a:custGeom>` content remain unsupported.
 
 ### Text — 7-Level Style Inheritance
 
@@ -711,6 +712,7 @@ pnpm build        # Production build
 pnpm test:package # Verify package entries, packlist boundaries, and notice links
 pnpm test:browser # Real Chromium checks for standalone, charts, and PDF.js
 pnpm dev:e2e      # Dev server + Python E2E API server
+pnpm geometry:check # Verify pinned OOXML geometry compile/evaluate/emit output
 pnpm lint         # ESLint
 pnpm typecheck    # tsc --noEmit
 pnpm knip         # Dead code / unused exports detection

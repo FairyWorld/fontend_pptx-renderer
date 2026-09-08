@@ -9,6 +9,7 @@
  */
 
 import { shapeArc } from './shapeArc';
+import { getOoxmlPresetShapePaths } from './ooxmlGeometryRuntime';
 
 type PresetShapeGenerator = (w: number, h: number, adjustments?: Map<string, number>) => string;
 
@@ -6580,6 +6581,12 @@ export function getPresetShapePath(
 ): string {
   // <a:prstGeom prst="textNoShape"> means text-only shape without geometry.
   if (shapeType === 'textNoShape' || shapeType.toLowerCase() === 'textnoshape') return '';
+  // The compiled runtime evaluates positive extents only. Preserve the established
+  // degenerate-extent behavior through the handwritten compatibility registry.
+  if (w > 0 && h > 0) {
+    const ooxmlPaths = getOoxmlPresetShapePaths(shapeType, w, h, adjustments);
+    if (ooxmlPaths) return ooxmlPaths[0]?.d ?? '';
+  }
   // OOXML preset names are often camelCase; normalize to lowercase for lookup
   const key = shapeType.toLowerCase();
   const generator = presetShapes.get(key) ?? presetShapes.get(shapeType);

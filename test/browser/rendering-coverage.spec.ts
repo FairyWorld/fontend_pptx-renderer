@@ -3,6 +3,29 @@ import { expect, test } from '@playwright/test';
 // Set PLAYWRIGHT_CHANNEL=chrome on machines with Chrome but no downloaded Chromium.
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL });
 
+test('browser accepts the deterministic OOXML flowChartTerminator pilot geometry', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { getPresetShapePath } = await import('/src/shapes/presets.ts');
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const d = getPresetShapePath('flowChartTerminator', 400, 280);
+    svg.setAttribute('viewBox', '0 0 400 280');
+    path.setAttribute('d', d);
+    svg.append(path);
+    document.body.append(svg);
+    const box = path.getBBox();
+    return { d, x: box.x, y: box.y, width: box.width, height: box.height };
+  });
+
+  expect(result.d).toBe(
+    'M64.351852,0 L335.648148,0 A64.351852,140 0 0,1 335.648148,280 L64.351852,280 A64.351852,140 0 0,1 64.351852,0 Z',
+  );
+  expect(result).toMatchObject({ x: 0, y: 0, width: 400, height: 280 });
+});
+
 for (const hostWhiteSpace of ['normal', 'pre', 'nowrap']) {
   for (const wrap of ['square', 'none']) {
     test(`text wrap=${wrap} inside white-space:${hostWhiteSpace}`, async ({ page }) => {

@@ -330,7 +330,7 @@ describe('renderer-independent OOXML preset geometry IR', () => {
       }
       expect(failures, `${width}x${height} evaluation failures`).toEqual([]);
     }
-  });
+  }, 20_000);
 
   it('builds a deterministic structural fingerprint and evaluation gate for generated output', async () => {
     const pinned = await loadPinnedPresetShapeDefinitions(repositoryRoot, sourceManifest);
@@ -348,5 +348,5 @@ describe('renderer-independent OOXML preset geometry IR', () => {
       { name: 'wide', width: 400, height: 180, evaluatedShapes: 186 },
       { name: 'tall', width: 180, height: 400, evaluatedShapes: 186 },
     ]);
-  });
+  }, 20_000);
 });

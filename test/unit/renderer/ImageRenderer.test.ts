@@ -158,6 +158,28 @@ describe('renderImage', () => {
       expect(Number(image.getAttribute('width'))).toBeCloseTo(250, 1);
       expect(Number(image.getAttribute('height'))).toBeCloseTo(166.667, 1);
     });
+
+    it('clips a preset-geometry picture with the deterministic OOXML pilot path', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="1" name="Terminator picture"/><nvPr/></nvPicPr>
+          <blipFill><blip r:embed="rId1"/><stretch><fillRect/></stretch></blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="1905000" cy="952500"/></xfrm>
+            <prstGeom prst="flowChartTerminator"><avLst/></prstGeom>
+          </spPr>
+        </pic>`,
+      );
+
+      const el = renderImage(createPicNode({ source }), ctx);
+
+      expect(el.querySelector('clipPath path')?.getAttribute('d')).toBe(
+        'M32.175926,0 L167.824074,0 A32.175926,50 0 0,1 167.824074,100 L32.175926,100 A32.175926,50 0 0,1 32.175926,0 Z',
+      );
+      expect(el.querySelector('svg image')).toBeTruthy();
+    });
   });
 
   describe('linked images', () => {

@@ -4,7 +4,7 @@
 
 - [Architecture](ARCHITECTURE.md) — Three-layer pipeline (Parse -> Model -> Render), search/highlight API boundaries, DOM construction strategy
 - [Testing](TESTING.md) — Unit tests (vitest), E2E visual comparison, dev-page model search and thumbnail navigation, two-layer metric system
-- [OOXML geometry source contract](../scripts/ooxml-geometry/README.md) — Pinned ECMA source, formula grammar, deterministic catalog, and migration gates
+- [OOXML geometry source contract](../scripts/ooxml-geometry/README.md) — Pinned ECMA source, formula/IR compiler, SVG emitter, deterministic catalog, and migration gates
 - [Performance](PERFORMANCE.md) — Windowed mounting, lazy slide parsing, lazy media decoding, batch tuning, scaled preview guidance, large-deck optimization
 
 ## Quality & Process

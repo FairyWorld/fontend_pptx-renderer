@@ -40,6 +40,25 @@ function extractPathNumbers(path: string): number[] {
 }
 
 describe('ShapeRenderer', () => {
+  it('renders the approved OOXML geometry pilot through the parent shape renderer', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="69" name="Terminator"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3810000" cy="2667000"/></a:xfrm>
+          <a:prstGeom prst="flowChartTerminator"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+        </p:spPr>
+      </p:sp>`;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+
+    expect(el.querySelector('path')?.getAttribute('d')).toBe(
+      'M64.351852,0 L335.648148,0 A64.351852,140 0 0,1 335.648148,280 L64.351852,280 A64.351852,140 0 0,1 64.351852,0 Z',
+    );
+  });
+
   it('renders wordArtVert as upright stacked text instead of sideways vertical text', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

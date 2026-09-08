@@ -62,28 +62,36 @@ Coverage areas:
 
 ## OOXML Geometry Compiler Gate
 
-The spec-compiled geometry work is development tooling and remains disconnected from production
-rendering. Its focused unit tests cover every guide-formula operator, PowerPoint numeric
+The full-corpus compiler and emitter remain development tooling. A generated production allowlist
+currently routes only `flowChartTerminator` through `src/shapes/ooxmlGeometryRuntime.ts`; other
+presets remain handwritten. Focused tests cover every guide-formula operator, PowerPoint numeric
 deviations, predefined guides, ordered guide rebinding, adjustment overrides, every IR section,
-all six path commands, and error boundaries.
+all six path commands, path-coordinate scaling, non-circular elliptical arcs, positive/negative
+sweeps, full circles, serialization rounding, runtime/build-time parity, and error boundaries.
 
 ```bash
 pnpm exec vitest run \
   test/unit/build/ooxmlGeometrySource.test.ts \
-  test/unit/build/ooxmlGeometryIr.test.ts
+  test/unit/build/ooxmlGeometryIr.test.ts \
+  test/unit/build/ooxmlGeometryPathEmitter.test.ts \
+  test/unit/shapes/ooxmlGeometryRuntime.test.ts
 
 pnpm geometry:check
 ```
 
 `geometry:check` verifies the vendored ECMA archive/XML hashes, reconciliation rules, generated
-catalog bytes, complete IR structural SHA-256, and default evaluation of all 186 unique shapes at
-216x216, 400x180, and 180x400. These checks establish deterministic compilation and finite
-geometry values. They do not establish SVG emission fidelity or native PowerPoint equivalence;
-those gates begin with the M2 pilot.
+catalog bytes, complete IR structural SHA-256, and default evaluation plus SVG emission of all
+186 unique shapes at 216x216, 400x180, and 180x400. Each emitted profile requires all 319 paths
+to be non-empty, rejects non-finite output, and has its own SHA-256. The command also verifies the
+generated production-pilot module byte-for-byte. These checks establish deterministic compilation
+and path serialization. Browser and native PowerPoint equivalence remain separate per-shape gates.
 
 Report native comparisons with the exact source revision, case IDs, environment, errors,
 pre-existing metric failures, new regressions, and visual-review status. A sampled run is not a
 full-corpus acceptance result. Do not change thresholds or baseline images to hide failures.
+The API exposes per-slide runtime failures through `evaluationErrorCount` and `evaluationErrors`;
+they are excluded from visual metrics and reported as runtime errors. The batch runner retries
+HTTP and per-slide runtime errors once by default (`--retries`) for explicit and discovered cases.
 Unresolved native questions (including negative percent-stacked chart normalization and text
 inheritance through some empty body-property/autofit combinations) need specific native evidence.
 
@@ -357,20 +365,25 @@ The M0 geometry source contract is independent of local PowerPoint ground-truth 
 ```bash
 pnpm geometry:generate  # regenerate after an intentional source or contract change
 pnpm geometry:check     # validate source hashes and fail on generated drift
-pnpm exec vitest run test/unit/build/ooxmlGeometrySource.test.ts
+pnpm exec vitest run \
+  test/unit/build/ooxmlGeometrySource.test.ts \
+  test/unit/build/ooxmlGeometryIr.test.ts \
+  test/unit/build/ooxmlGeometryPathEmitter.test.ts \
+  test/unit/shapes/ooxmlGeometryRuntime.test.ts
 ```
 
 `geometry:check` validates the unchanged ECMA archive and nested XML hashes, all 17 formula
 operators and arities, document-order guide references, DrawingML path namespaces and
-command structure, duplicate-source handling, source reconciliation, and deterministic
-catalog bytes. It runs in CI before the package build.
+command structure, duplicate-source handling, source reconciliation, deterministic catalog
+bytes, finite IR evaluation, and deterministic SVG emission. It runs in CI before the package
+build.
 
-The generated catalog is evidence about source coverage; it is not renderer acceptance.
-Before any generated definition enters the production renderer, add tests for formula
-semantics and path topology plus browser checks for both ordinary shapes and picture clips.
-Then compare square, wide, and tall shapes and relevant adjustment bounds against native
-PowerPoint ground truth. Group, flip, rotation, line-like, and multi-path cases require their
-own coverage when applicable.
+The generated catalog is evidence about source coverage; it is not renderer acceptance. The
+production allowlist is a separate generated module and currently contains one accepted pilot.
+Before adding a definition, add tests for formula semantics and path topology plus browser checks
+for both ordinary shapes and picture clips. Then compare square, wide, and tall shapes and
+relevant adjustment bounds against native PowerPoint ground truth. Group, flip, rotation,
+line-like, and multi-path cases require their own coverage when applicable.
 
 M0 rejects active source overrides. Before enabling one, add an offline check that reads the
 alternative source bytes, verifies their SHA-256 and requested shape, and resolves an

@@ -86,11 +86,13 @@ optional and external.
 
 ## OOXML Geometry Compilation Boundary
 
-Preset geometry currently remains in the handwritten `src/shapes/presets.ts` registry. The
-M0/M1 tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML
-geometry addendum, implements the complete guide-formula contract, and compiles all unique
-definitions into renderer-independent plain data. Nothing under `src/` imports this tooling or
-the generated catalog, so M1 cannot change rendered output or bundle size.
+The handwritten `src/shapes/presets.ts` registry remains the default preset-geometry engine. The
+M0-M2 tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML geometry
+addendum, implements the complete guide-formula contract, compiles all unique definitions into
+renderer-independent plain data, and emits deterministic SVG paths. The generator also writes a
+tree-shakeable production allowlist to `src/shapes/generated/ooxmlPresetGeometryPilot.ts`.
+`src/shapes/ooxmlGeometryRuntime.ts` evaluates that data before the handwritten lookup.
+The allowlist currently contains only `flowChartTerminator`.
 
 The compiled IR retains ordered adjustment/calculated guides, adjustment handles, connection
 sites, text rectangles, path coordinate systems, path styling metadata, and the six DrawingML
@@ -98,18 +100,23 @@ path command kinds. Its evaluator resolves a concrete width, height, and named a
 without DOM or SVG dependencies. The generation gate fingerprints the structural IR and
 evaluates the complete corpus at square, wide, and tall extents.
 
-The later geometry runtime will add one remaining internal responsibility: emit evaluated path
-commands. SVG fill/theme resolution, browser masks, connector markers, picture/media ownership,
-effects, and render lifecycle stay in their existing render modules. Generated definitions will
-be resolved during render and retain the current per-node geometry cache; they will not be added
-to the serialized presentation model.
+Path emission scales each declared path coordinate space into the shape extent and converts
+DrawingML visual-angle arcs into SVG ellipse segments. Full circles are split at serialization,
+and output rounding is confined to that boundary. The runtime pilot supports the same 17 formula
+operators and predefined guides as the build-time evaluator. SVG fill/theme resolution, browser
+masks, connector markers, picture/media ownership, effects, and render lifecycle stay in their
+existing render modules. Generated paths retain the current per-node geometry cache and are not
+added to the serialized presentation model. Picture preset clipping reaches the same allowlisted
+path through `ImageRenderer`.
 
 ECMA source differences are recorded through `source-reconciliation.json`. M1 rejects active
 alternative definitions because it does not yet verify their bytes or native PowerPoint
 evidence. A later override gate must verify the local source bytes and hash, confirm the
 requested shape exists, and resolve native-oracle metadata before activation. Production
 migration is per shape or shape family, so the existing handwritten implementation remains
-available for shapes that have not passed that gate.
+active for shapes that have not passed that gate. Expanding the production allowlist requires
+formula/IR parity, SVG structure, parent renderer, picture clip, browser, package, and current
+native PowerPoint oracle evidence for the selected shape family.
 
 ## Rendering Strategies
 
