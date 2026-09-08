@@ -353,6 +353,18 @@ describe('OOXML evaluated-path SVG emitter', () => {
 });
 
 describe('OOXML runtime subset generation', () => {
+  const candidate = (name: string, expectedPathCount: 1 | 3, finalStroke = true) => ({
+    name,
+    expectedPathCount,
+    expectedPathStyles:
+      expectedPathCount === 3
+        ? [
+            { fill: 'norm', stroke: false, extrusionOk: false },
+            { fill: 'none', stroke: true, extrusionOk: false },
+            { fill: 'none', stroke: finalStroke, extrusionOk: true },
+          ]
+        : undefined,
+  });
   const singlePathIr = {
     source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
     shapes: [
@@ -366,18 +378,45 @@ describe('OOXML runtime subset generation', () => {
   };
 
   it('rejects a requested definition that is missing from the pinned source', () => {
-    expect(() => buildRuntimeGeometryModule(singlePathIr, ['missingCandidate'])).toThrow(
-      /missing from source/i,
-    );
+    expect(() =>
+      buildRuntimeGeometryModule(singlePathIr, [candidate('missingCandidate', 1)]),
+    ).toThrow(/missing from source/i);
   });
 
   it('rejects duplicate production-subset names', () => {
     expect(() =>
-      buildRuntimeGeometryModule(singlePathIr, ['singlePathCandidate', 'singlePathCandidate']),
+      buildRuntimeGeometryModule(singlePathIr, [
+        candidate('singlePathCandidate', 1),
+        candidate('singlePathCandidate', 1),
+      ]),
     ).toThrow(/must be unique/i);
   });
 
-  it('rejects multi-path definitions until the production adapter preserves every path', () => {
+  it('accepts the safe ordered three-path production contract', () => {
+    const generated = buildRuntimeGeometryModule(
+      {
+        source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+        shapes: [
+          {
+            name: 'multiPathCandidate',
+            adjustmentGuides: [],
+            calculatedGuides: [],
+            paths: [
+              { fill: 'norm', stroke: false, extrusionOk: false, commands: [] },
+              { fill: 'none', stroke: true, extrusionOk: false, commands: [] },
+              { fill: 'none', stroke: false, extrusionOk: true, commands: [] },
+            ],
+          },
+        ],
+      },
+      [candidate('multiPathCandidate', 3, false)],
+    );
+
+    expect(generated).toContain('"name": "multiPathCandidate"');
+    expect(generated.match(/"commands": \[\]/g)).toHaveLength(3);
+  });
+
+  it('rejects a definition whose path count differs from its explicit production contract', () => {
     expect(() =>
       buildRuntimeGeometryModule(
         {
@@ -387,13 +426,85 @@ describe('OOXML runtime subset generation', () => {
               name: 'multiPathCandidate',
               adjustmentGuides: [],
               calculatedGuides: [],
-              paths: [{ commands: [] }, { commands: [] }],
+              paths: [
+                { fill: 'norm', stroke: false, commands: [] },
+                { fill: 'none', stroke: true, commands: [] },
+              ],
             },
           ],
         },
-        ['multiPathCandidate'],
+        [candidate('multiPathCandidate', 3)],
       ),
-    ).toThrow(/exactly one path/i);
+    ).toThrow(/expected 3 paths/i);
+  });
+
+  it('rejects unsafe multi-path fill and stroke metadata', () => {
+    expect(() =>
+      buildRuntimeGeometryModule(
+        {
+          source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+          shapes: [
+            {
+              name: 'unsafeMultiPathCandidate',
+              adjustmentGuides: [],
+              calculatedGuides: [],
+              paths: [
+                { fill: 'norm', stroke: true, commands: [] },
+                { fill: 'none', stroke: true, commands: [] },
+                { fill: 'none', stroke: true, commands: [] },
+              ],
+            },
+          ],
+        },
+        [candidate('unsafeMultiPathCandidate', 3)],
+      ),
+    ).toThrow(/unsupported multi-path style/i);
+  });
+
+  it('rejects non-leading stroke drift from the shape-specific path contract', () => {
+    expect(() =>
+      buildRuntimeGeometryModule(
+        {
+          source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+          shapes: [
+            {
+              name: 'strokeDriftCandidate',
+              adjustmentGuides: [],
+              calculatedGuides: [],
+              paths: [
+                { fill: 'norm', stroke: false, extrusionOk: false, commands: [] },
+                { fill: 'none', stroke: true, extrusionOk: false, commands: [] },
+                { fill: 'none', stroke: false, extrusionOk: true, commands: [] },
+              ],
+            },
+          ],
+        },
+        [candidate('strokeDriftCandidate', 3, true)],
+      ),
+    ).toThrow(/path 2.*style/i);
+  });
+
+  it('rejects extrusion metadata drift from the shape-specific path contract', () => {
+    expect(() =>
+      buildRuntimeGeometryModule(
+        {
+          source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+          shapes: [
+            {
+              name: 'extrusionDriftCandidate',
+              adjustmentGuides: [],
+              calculatedGuides: [],
+              paths: [
+                { fill: 'norm', stroke: false, extrusionOk: false, commands: [] },
+                { fill: 'none', stroke: true, extrusionOk: false, commands: [] },
+                { fill: 'none', stroke: true, extrusionOk: false, commands: [] },
+              ],
+            },
+          ],
+        },
+        [candidate('extrusionDriftCandidate', 3, true)],
+      ),
+    ).toThrow(/path 2.*style/i);
   });
 
   it('rejects adjustment-bearing definitions until adjustment bounds have a production gate', () => {
@@ -410,7 +521,7 @@ describe('OOXML runtime subset generation', () => {
             },
           ],
         },
-        ['adjustedCandidate'],
+        [candidate('adjustedCandidate', 1)],
       ),
     ).toThrow(/adjustment guides/i);
   });

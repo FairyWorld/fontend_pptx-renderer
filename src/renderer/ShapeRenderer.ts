@@ -122,6 +122,7 @@ import {
   getMultiPathPreset,
   PresetSubPath,
 } from '../shapes/presets';
+import { ooxmlPresetRuntimeMultiPathShapeNames } from '../shapes/ooxmlGeometryRuntime';
 import { emuToPx } from '../parser/units';
 import { applyTint, hexToRgb, rgbToHex } from '../utils/color';
 import { SafeXmlNode } from '../parser/XmlParser';
@@ -138,6 +139,10 @@ import {
   parseMoveLinePathData,
   parseSimpleMoveLinePathData,
 } from './pathData';
+
+const ooxmlRuntimeMultiPathShapeNameSet = new Set(
+  ooxmlPresetRuntimeMultiPathShapeNames.map((name) => name.toLowerCase()),
+);
 
 function appendTransform(el: HTMLElement, transform: string): void {
   el.style.transform = `${el.style.transform || ''} ${transform}`.trim();
@@ -791,6 +796,78 @@ function angleToSvgGradientCoords(angleDeg: number): {
     x2: `${x2}%`,
     y2: `${y2}%`,
   };
+}
+
+function appendGradientStrokePaint(
+  svgNs: string,
+  defs: SVGDefsElement,
+  gradientStroke: NonNullable<ReturnType<typeof resolveGradientStroke>>,
+  bounds: { w: number; h: number },
+  isLineLike: boolean,
+): { paint: string; width: number } {
+  const gradId = `grad-stroke-${++gradientIdCounter}`;
+  const linearGrad = document.createElementNS(svgNs, 'linearGradient');
+  linearGrad.setAttribute('id', gradId);
+  linearGrad.setAttribute('color-interpolation', gradientStroke.colorInterpolation ?? 'linearRGB');
+  linearGrad.setAttribute('gradientUnits', 'userSpaceOnUse');
+
+  if (isLineLike || bounds.w <= 1 || bounds.h <= 1) {
+    const rad = (gradientStroke.angle * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+    const cx = bounds.w / 2;
+    const cy = bounds.h / 2;
+    const halfLen = Math.max(bounds.w, bounds.h) / 2;
+    linearGrad.setAttribute('x1', String(cx - halfLen * cos));
+    linearGrad.setAttribute('y1', String(cy - halfLen * sin));
+    linearGrad.setAttribute('x2', String(cx + halfLen * cos));
+    linearGrad.setAttribute('y2', String(cy + halfLen * sin));
+  } else {
+    const coords = angleToSvgGradientCoords(gradientStroke.angle);
+    linearGrad.setAttribute('x1', String((parseFloat(coords.x1) / 100) * bounds.w));
+    linearGrad.setAttribute('y1', String((parseFloat(coords.y1) / 100) * bounds.h));
+    linearGrad.setAttribute('x2', String((parseFloat(coords.x2) / 100) * bounds.w));
+    linearGrad.setAttribute('y2', String((parseFloat(coords.y2) / 100) * bounds.h));
+  }
+
+  for (const stop of gradientStroke.stops) {
+    const svgStop = document.createElementNS(svgNs, 'stop');
+    svgStop.setAttribute('offset', `${stop.position}%`);
+    svgStop.setAttribute('stop-color', stop.color);
+    linearGrad.appendChild(svgStop);
+  }
+  defs.appendChild(linearGrad);
+
+  return {
+    paint: `url(#${gradId})`,
+    width:
+      isLineLike || bounds.w <= 1 || bounds.h <= 1
+        ? Math.max(gradientStroke.width, 1)
+        : gradientStroke.width,
+  };
+}
+
+function applySvgStrokePresentation(
+  path: SVGPathElement,
+  paint: string,
+  width: number,
+  dashKind: string,
+  legacyDash: string,
+  linecap: string,
+  linejoin: string,
+): void {
+  path.setAttribute('stroke', paint);
+  path.setAttribute('stroke-width', String(width));
+  if (linecap) path.setAttribute('stroke-linecap', linecap);
+  if (linejoin) path.setAttribute('stroke-linejoin', linejoin);
+  const svgDashArray = svgDashArrayForKind(dashKind, width);
+  if (svgDashArray) {
+    path.setAttribute('stroke-dasharray', svgDashArray);
+  } else if (legacyDash === 'dashed') {
+    path.setAttribute('stroke-dasharray', `${width * 4},${width * 2}`);
+  } else if (legacyDash === 'dotted') {
+    path.setAttribute('stroke-dasharray', `${width},${width * 2}`);
+  }
 }
 
 /**
@@ -1531,6 +1608,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
     };
     pathD = renderCustomGeometry(node.customGeometry, pathW, pathH, sourceExtentEmu);
   }
+  const usesOoxmlRuntimeMultiPath =
+    !!multiPaths &&
+    !!node.presetGeometry &&
+    ooxmlRuntimeMultiPathShapeNameSet.has(node.presetGeometry.toLowerCase());
   // Connectors (cxnSp) or flat-extent shapes with line style but no geometry: draw as line
   if (
     !pathD &&
@@ -1624,13 +1705,13 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
   if (lineIsNoFill) effectiveLine = undefined;
 
   if (effectiveLine?.exists()) {
+    const lineStyle = resolveLineStyle(effectiveLine, ctx, lnRef);
+    strokeDash = lineStyle.dash;
+    strokeDashKind = lineStyle.dashKind;
     gradientStroke = resolveGradientStroke(effectiveLine, ctx);
     if (!gradientStroke) {
-      const lineStyle = resolveLineStyle(effectiveLine, ctx, lnRef);
       strokeColor = lineStyle.color;
       strokeWidth = lineStyle.width;
-      strokeDash = lineStyle.dash;
-      strokeDashKind = lineStyle.dashKind;
     }
 
     // Line cap: a:ln@cap → SVG stroke-linecap
@@ -1697,6 +1778,60 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
     if (blipUrl) {
       const defs = document.createElementNS(svgNs, 'defs');
       appendShapeBlipImage(svgNs, svg, defs, blipFill, pathD, { w: svgW, h: svgH }, blipUrl);
+
+      if (multiPaths && multiPaths.length > 1 && usesOoxmlRuntimeMultiPath) {
+        const detailGradientStroke =
+          gradientStroke && gradientStroke.stops.length > 0
+            ? appendGradientStrokePaint(
+                svgNs,
+                defs,
+                gradientStroke,
+                { w: svgW, h: svgH },
+                isLineLike,
+              )
+            : null;
+        for (const detail of multiPaths.slice(1)) {
+          const detailPath = document.createElementNS(svgNs, 'path');
+          detailPath.setAttribute('d', detail.d);
+          detailPath.setAttribute('fill', 'none');
+          const scale =
+            detail.strokeWidthScale &&
+            Number.isFinite(detail.strokeWidthScale) &&
+            detail.strokeWidthScale > 0
+              ? detail.strokeWidthScale
+              : 1;
+          if (detail.stroke && !lineIsNoFill && detailGradientStroke) {
+            applySvgStrokePresentation(
+              detailPath,
+              detailGradientStroke.paint,
+              detailGradientStroke.width * scale,
+              strokeDashKind,
+              strokeDash,
+              strokeLinecap,
+              strokeLinejoin,
+            );
+          } else if (
+            detail.stroke &&
+            !lineIsNoFill &&
+            strokeWidth > 0 &&
+            strokeColor !== 'none' &&
+            strokeColor !== 'transparent'
+          ) {
+            applySvgStrokePresentation(
+              detailPath,
+              strokeColor,
+              strokeWidth * scale,
+              strokeDashKind,
+              strokeDash,
+              strokeLinecap,
+              strokeLinejoin,
+            );
+          } else {
+            detailPath.setAttribute('stroke', 'none');
+          }
+          svg.appendChild(detailPath);
+        }
+      }
 
       const mainPathStrokeSuppressed = multiPaths && multiPaths[0]?.stroke === false;
       if (
@@ -2010,65 +2145,29 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       // accentCallout1/2/3), suppress stroke on the main path element — the leader line and accent
       // bar are rendered as separate sub-path elements with their own stroke settings.
       const mainPathStrokeSuppressed = multiPaths && multiPaths[0]?.stroke === false;
+      let sharedGradientStrokePaint: { paint: string; width: number } | null = null;
       if (
         !isCircularArrow &&
         !mainPathStrokeSuppressed &&
         gradientStroke &&
         gradientStroke.stops.length > 0
       ) {
-        // Create SVG linearGradient for the gradient stroke.
-        // Use userSpaceOnUse so the gradient is defined in SVG coordinate space rather
-        // than objectBoundingBox. This is critical for straight line paths (zero-width or
-        // zero-height bounding box) where objectBoundingBox produces degenerate coordinates
-        // and the gradient becomes invisible.
-        const gradId = `grad-stroke-${++gradientIdCounter}`;
-        const linearGrad = document.createElementNS(svgNs, 'linearGradient');
-        linearGrad.setAttribute('id', gradId);
-        linearGrad.setAttribute(
-          'color-interpolation',
-          gradientStroke.colorInterpolation ?? 'linearRGB',
+        sharedGradientStrokePaint = appendGradientStrokePaint(
+          svgNs,
+          defs,
+          gradientStroke,
+          { w: svgW, h: svgH },
+          isLineLike,
         );
-        linearGrad.setAttribute('gradientUnits', 'userSpaceOnUse');
-
-        if (isLineLike || svgW <= 1 || svgH <= 1) {
-          // Convert gradient angle to absolute coordinates in SVG user space.
-          // For straight connectors the path bbox may be zero on one axis, so use
-          // the long-axis strategy to avoid degenerate gradient coordinates.
-          const rad = (gradientStroke.angle * Math.PI) / 180;
-          const cos = Math.cos(rad);
-          const sin = Math.sin(rad);
-          const cx = svgW / 2;
-          const cy = svgH / 2;
-          const halfLen = Math.max(svgW, svgH) / 2;
-          linearGrad.setAttribute('x1', String(cx - halfLen * cos));
-          linearGrad.setAttribute('y1', String(cy - halfLen * sin));
-          linearGrad.setAttribute('x2', String(cx + halfLen * cos));
-          linearGrad.setAttribute('y2', String(cy + halfLen * sin));
-        } else {
-          const coords = angleToSvgGradientCoords(gradientStroke.angle);
-          linearGrad.setAttribute('x1', String((parseFloat(coords.x1) / 100) * svgW));
-          linearGrad.setAttribute('y1', String((parseFloat(coords.y1) / 100) * svgH));
-          linearGrad.setAttribute('x2', String((parseFloat(coords.x2) / 100) * svgW));
-          linearGrad.setAttribute('y2', String((parseFloat(coords.y2) / 100) * svgH));
-        }
-
-        for (const stop of gradientStroke.stops) {
-          const svgStop = document.createElementNS(svgNs, 'stop');
-          svgStop.setAttribute('offset', `${stop.position}%`);
-          svgStop.setAttribute('stop-color', stop.color);
-          linearGrad.appendChild(svgStop);
-        }
-
-        defs.appendChild(linearGrad);
-
-        const strokeW =
-          isLineLike || svgW <= 1 || svgH <= 1
-            ? Math.max(gradientStroke.width, 1)
-            : gradientStroke.width;
-        path.setAttribute('stroke', `url(#${gradId})`);
-        path.setAttribute('stroke-width', String(strokeW));
-        if (effectiveStrokeLinecap) path.setAttribute('stroke-linecap', effectiveStrokeLinecap);
-        if (strokeLinejoin) path.setAttribute('stroke-linejoin', strokeLinejoin);
+        applySvgStrokePresentation(
+          path,
+          sharedGradientStrokePaint.paint,
+          sharedGradientStrokePaint.width,
+          strokeDashKind,
+          strokeDash,
+          effectiveStrokeLinecap,
+          strokeLinejoin,
+        );
       } else if (
         !isCircularArrow &&
         !mainPathStrokeSuppressed &&
@@ -2209,6 +2308,19 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           defs.appendChild(linearGrad);
           return `url(#${gradId})`;
         };
+        const detailGradientStroke =
+          gradientStroke &&
+          gradientStroke.stops.length > 0 &&
+          multiPaths.slice(1).some(({ stroke }) => stroke)
+            ? (sharedGradientStrokePaint ??
+              appendGradientStrokePaint(
+                svgNs,
+                defs,
+                gradientStroke,
+                { w: svgW, h: svgH },
+                isLineLike,
+              ))
+            : null;
         // The first path was already rendered above as the main path.
         // Render additional sub-paths (darkenLess shadow, stroke-only detail lines).
         for (let pi = 1; pi < multiPaths.length; pi++) {
@@ -2281,8 +2393,26 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             // 'norm' — same fill as main path
             extraPath.setAttribute('fill', mainPathFill || 'none');
           }
-          if (sp.stroke && effectiveStrokeWidth > 0 && strokeColor !== 'transparent') {
-            extraPath.setAttribute('stroke', strokeColor);
+          if (sp.stroke && !lineIsNoFill && detailGradientStroke) {
+            const scaledStrokeWidth =
+              sp.strokeWidthScale && Number.isFinite(sp.strokeWidthScale) && sp.strokeWidthScale > 0
+                ? detailGradientStroke.width * sp.strokeWidthScale
+                : detailGradientStroke.width;
+            applySvgStrokePresentation(
+              extraPath,
+              detailGradientStroke.paint,
+              scaledStrokeWidth,
+              strokeDashKind,
+              strokeDash,
+              strokeLinecap,
+              strokeLinejoin,
+            );
+          } else if (
+            sp.stroke &&
+            effectiveStrokeWidth > 0 &&
+            strokeColor !== 'none' &&
+            strokeColor !== 'transparent'
+          ) {
             const isBorderCalloutLeader =
               node.presetGeometry?.toLowerCase() === 'bordercallout1' && sp.fill === 'none';
             const scaledStrokeWidth =
@@ -2292,8 +2422,15 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             const extraStrokeWidth = isBorderCalloutLeader
               ? Math.max(scaledStrokeWidth, 2.4)
               : scaledStrokeWidth;
-            extraPath.setAttribute('stroke-width', String(extraStrokeWidth));
-            if (isBorderCalloutLeader) extraPath.setAttribute('stroke-linecap', 'round');
+            applySvgStrokePresentation(
+              extraPath,
+              strokeColor,
+              extraStrokeWidth,
+              strokeDashKind,
+              strokeDash,
+              isBorderCalloutLeader ? 'round' : strokeLinecap,
+              strokeLinejoin,
+            );
             if (
               sp.maskToMainOutlineBandScale &&
               sp.maskToMainOutlineBandScale > 0 &&
@@ -2359,7 +2496,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
               defs.appendChild(mask);
               extraPath.setAttribute('mask', `url(#${maskId})`);
             }
-          } else if (sp.stroke && !lineIsNoFill) {
+          } else if (sp.stroke && !lineIsNoFill && !usesOoxmlRuntimeMultiPath) {
             // Detail lines without explicit line style: avoid using identical fill color,
             // otherwise guide lines (e.g. chartX diagonals) become visually invisible.
             const detailStroke = baseRgb ? mixRgb(baseRgb, { r: 0, g: 0, b: 0 }, 0.55) : '#666666';

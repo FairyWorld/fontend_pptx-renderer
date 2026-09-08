@@ -26,7 +26,7 @@ The development tooling contains an unchanged copy of
 It is used to validate and generate preset-shape metadata. The archive itself is excluded
 from the published npm package and runtime bundles. The package includes the machine-readable
 provenance manifest and a generated runtime subset containing a mechanical representation of
-20 preset definitions; neither artifact contains the source archive.
+28 preset definitions; neither artifact contains the source archive.
 
 - Standard: <https://ecma-international.org/publications-and-standards/standards/ecma-376/>
 - Copyright policy:

@@ -63,11 +63,13 @@ Coverage areas:
 ## OOXML Geometry Compiler Gate
 
 The full-corpus compiler and emitter remain development tooling. A generated production subset
-routes 20 zero-adjustment, single-path flowcharts through `src/shapes/ooxmlGeometryRuntime.ts`;
-other presets remain handwritten. Focused tests cover every guide-formula operator, PowerPoint numeric
-deviations, predefined guides, ordered guide rebinding, adjustment overrides, every IR section,
-all six path commands, path-coordinate scaling, non-circular elliptical arcs, positive/negative
-sweeps, full circles, serialization rounding, runtime/build-time parity, and error boundaries.
+routes all 28 zero-adjustment flowcharts in shape IDs 61-88 through
+`src/shapes/ooxmlGeometryRuntime.ts`; 20 contain one path and eight contain three ordered paths.
+Other presets remain handwritten. Focused tests cover every guide-formula operator, PowerPoint
+numeric deviations, predefined guides, ordered guide rebinding, adjustment overrides, every IR
+section, all six path commands, path-coordinate scaling, non-circular elliptical arcs,
+positive/negative sweeps, full circles, serialization rounding, runtime/build-time parity,
+multi-path fill/stroke order, picture silhouettes, and error boundaries.
 
 ```bash
 pnpm exec vitest run \
@@ -85,6 +87,10 @@ catalog bytes, complete IR structural SHA-256, and default evaluation plus SVG e
 to be non-empty, rejects non-finite output, and has its own SHA-256. The command also verifies the
 generated production-subset module byte-for-byte. These checks establish deterministic compilation
 and path serialization. Browser and native PowerPoint equivalence remain separate per-shape gates.
+The browser gate renders all 28 production definitions and checks the eight multi-path shapes as
+three ordered SVG paths. The native gate compares those eight cases against PowerPoint output and
+records per-case provenance, runtime errors, review status, and metric deltas from a fresh clean
+baseline.
 
 Report native comparisons with the exact source revision, case IDs, environment, errors,
 pre-existing metric failures, new regressions, and visual-review status. A sampled run is not a

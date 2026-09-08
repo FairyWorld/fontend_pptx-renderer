@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseXml } from '../../../src/parser/XmlParser';
 import { parseShapeNode } from '../../../src/model/nodes/ShapeNode';
 import { renderShape } from '../../../src/renderer/ShapeRenderer';
+import { getOoxmlPresetShapePaths } from '../../../src/shapes/ooxmlGeometryRuntime';
 import { createMockRenderContext } from '../helpers/mockContext';
 import { applyColorModifiers, applyTint, hexToRgb, rgbToHex } from '../../../src/utils/color';
 
@@ -27,6 +28,20 @@ function buildLineShapeXml(): string {
       </p:spPr>
     </p:sp>
   `;
+}
+
+function buildFlowchartShapeXml(shapeType: string, styleXml: string): string {
+  return `
+    <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+          xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <p:nvSpPr><p:cNvPr id="65" name="Flowchart"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr>
+        <a:xfrm><a:off x="0" y="0"/><a:ext cx="3810000" cy="2667000"/></a:xfrm>
+        <a:prstGeom prst="${shapeType}"><a:avLst/></a:prstGeom>
+        ${styleXml}
+      </p:spPr>
+    </p:sp>`;
 }
 
 function mixHex(base: string, target: string, t: number): string {
@@ -80,6 +95,180 @@ describe('ShapeRenderer', () => {
 
     expect(path).toContain(command);
     expect(path).not.toMatch(/NaN|Infinity/);
+  });
+
+  it.each([
+    'flowChartPredefinedProcess',
+    'flowChartInternalStorage',
+    'flowChartMultidocument',
+    'flowChartSummingJunction',
+    'flowChartOr',
+    'flowChartSort',
+    'flowChartMagneticDisk',
+    'flowChartMagneticDrum',
+  ])('renders generated %s paths in declared paint order', (shapeType) => {
+    const xml = buildFlowchartShapeXml(
+      shapeType,
+      `<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+       <a:ln w="12700"><a:solidFill><a:srgbClr val="203864"/></a:solidFill></a:ln>`,
+    );
+    const expected = getOoxmlPresetShapePaths(shapeType, 400, 280);
+    const rendered = Array.from(
+      renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext()).querySelectorAll(
+        'svg > path',
+      ),
+    );
+
+    expect(expected, shapeType).toHaveLength(3);
+    expect(rendered, shapeType).toHaveLength(3);
+    expect(rendered.map((path) => path.getAttribute('d'))).toEqual(expected?.map(({ d }) => d));
+    expect(rendered.map((path) => path.getAttribute('fill'))).toEqual(['#4472C4', 'none', 'none']);
+    expect(rendered.map((path) => path.getAttribute('stroke'))).toEqual([
+      'none',
+      '#203864',
+      shapeType === 'flowChartMultidocument' ? 'none' : '#203864',
+    ]);
+  });
+
+  it('applies solid dash, cap, and join styles to generated multi-path outlines', () => {
+    const xml = buildFlowchartShapeXml(
+      'flowChartPredefinedProcess',
+      `<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+       <a:ln w="25400" cap="rnd">
+         <a:solidFill><a:srgbClr val="203864"/></a:solidFill>
+         <a:prstDash val="dash"/><a:round/>
+       </a:ln>`,
+    );
+    const paths = Array.from(
+      renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext()).querySelectorAll(
+        'svg > path',
+      ),
+    );
+
+    expect(paths).toHaveLength(3);
+    for (const path of paths.slice(1)) {
+      expect(path.getAttribute('stroke')).toBe('#203864');
+      expect(Number(path.getAttribute('stroke-width'))).toBeGreaterThan(0);
+      expect(path.getAttribute('stroke-dasharray')).toBeTruthy();
+      expect(path.getAttribute('stroke-linecap')).toBe('round');
+      expect(path.getAttribute('stroke-linejoin')).toBe('round');
+    }
+  });
+
+  it('applies gradient line paint to generated multi-path details and outline', () => {
+    const xml = buildFlowchartShapeXml(
+      'flowChartInternalStorage',
+      `<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+       <a:ln w="25400">
+         <a:gradFill>
+           <a:gsLst>
+             <a:gs pos="0"><a:srgbClr val="112233"/></a:gs>
+             <a:gs pos="100000"><a:srgbClr val="AABBCC"/></a:gs>
+           </a:gsLst>
+           <a:lin ang="0" scaled="1"/>
+         </a:gradFill>
+         <a:prstDash val="dash"/>
+       </a:ln>`,
+    );
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const paths = Array.from(el.querySelectorAll('svg > path'));
+
+    expect(paths).toHaveLength(3);
+    expect(el.querySelector('linearGradient[id^="grad-stroke-"]')).toBeTruthy();
+    expect(paths[0].getAttribute('stroke')).toBe('none');
+    expect(paths[1].getAttribute('stroke')).toMatch(/^url\(#grad-stroke-/);
+    expect(paths[2].getAttribute('stroke')).toBe(paths[1].getAttribute('stroke'));
+    expect(paths[1].getAttribute('stroke-dasharray')).toBeTruthy();
+    expect(paths[2].getAttribute('stroke-dasharray')).toBe(
+      paths[1].getAttribute('stroke-dasharray'),
+    );
+  });
+
+  it('keeps every generated multi-path stroke disabled for explicit line noFill', () => {
+    const xml = buildFlowchartShapeXml(
+      'flowChartSort',
+      `<a:solidFill><a:srgbClr val="4472C4"/></a:solidFill><a:ln><a:noFill/></a:ln>`,
+    );
+    const paths = Array.from(
+      renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext()).querySelectorAll(
+        'svg > path',
+      ),
+    );
+
+    expect(paths).toHaveLength(3);
+    expect(paths.every((path) => path.getAttribute('stroke') === 'none')).toBe(true);
+  });
+
+  it('does not synthesize generated outlines when shape and line paint are both absent', () => {
+    const xml = buildFlowchartShapeXml('flowChartSort', `<a:noFill/>`);
+    const paths = Array.from(
+      renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext()).querySelectorAll(
+        'svg > path',
+      ),
+    );
+
+    expect(paths).toHaveLength(3);
+    expect(paths.every((path) => path.getAttribute('stroke') === 'none')).toBe(true);
+  });
+
+  it('keeps generated multi-path details above an immediate image fill', () => {
+    const xml = buildFlowchartShapeXml(
+      'flowChartPredefinedProcess',
+      `<a:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>`,
+    );
+    const base = createMockRenderContext();
+    const ctx = createMockRenderContext({
+      slide: {
+        ...base.slide,
+        rels: new Map([['rId1', { type: 'image', target: '../media/image1.png' }]]),
+      },
+      presentation: {
+        ...base.presentation,
+        media: new Map([['ppt/media/image1.png', new Uint8Array([137, 80, 78, 71])]]),
+      },
+    });
+    const expected = getOoxmlPresetShapePaths('flowChartPredefinedProcess', 400, 280);
+    const svg = renderShape(parseShapeNode(parseXml(xml)), ctx).querySelector('svg')!;
+    const paths = Array.from(svg.children).filter(
+      (child): child is SVGPathElement => child.localName === 'path',
+    );
+    const children = Array.from(svg.children);
+    const image = children.find((child) => child.localName === 'image');
+
+    expect(image).toBeTruthy();
+    expect(paths.map((path) => path.getAttribute('d'))).toEqual(
+      expected?.slice(1).map(({ d }) => d),
+    );
+    expect(paths.every((path) => path.getAttribute('stroke') === 'none')).toBe(true);
+    expect(children.indexOf(image!)).toBeLessThan(children.indexOf(paths[0]));
+  });
+
+  it('keeps generated multi-path details above a lazily resolved image fill', async () => {
+    const xml = buildFlowchartShapeXml(
+      'flowChartPredefinedProcess',
+      `<a:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></a:blipFill>
+       <a:ln w="12700"><a:solidFill><a:srgbClr val="203864"/></a:solidFill></a:ln>`,
+    );
+    const ctx = createMockRenderContext();
+    ctx.asyncTasks = [];
+    ctx.slide.rels.set('rId1', { type: 'image', target: '../media/lazy-flowchart.png' });
+    ctx.presentation.mediaResolver = {
+      resolve: vi.fn(async () => ({
+        mediaPath: 'ppt/media/lazy-flowchart.png',
+        data: new Uint8Array([137, 80, 78, 71]),
+      })),
+    };
+
+    const svg = renderShape(parseShapeNode(parseXml(xml)), ctx).querySelector('svg')!;
+    await Promise.all(ctx.asyncTasks);
+    const children = Array.from(svg.children);
+    const image = children.find((child) => child.localName === 'image');
+    const paths = children.filter((child): child is SVGPathElement => child.localName === 'path');
+
+    expect(image).toBeTruthy();
+    expect(paths).toHaveLength(3);
+    expect(children.indexOf(image)).toBeLessThan(children.indexOf(paths[0]));
+    expect(paths.slice(1).every((path) => path.getAttribute('stroke') === '#203864')).toBe(true);
   });
 
   it('renders wordArtVert as upright stacked text instead of sideways vertical text', () => {

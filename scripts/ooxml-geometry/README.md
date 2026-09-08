@@ -1,11 +1,11 @@
 # OOXML Geometry Source Contract
 
-This directory contains the M0 source contract, M1 compiler/evaluator, M2 SVG path emitter, and M3
-production-subset gate for the spec-compiled preset geometry engine. The build-time modules are
-development tooling. The generator writes an explicit production subset consumed by
-`src/shapes/ooxmlGeometryRuntime.ts`; 20 zero-adjustment, single-path flowchart shapes currently
-use it, while excluded flowcharts and every other shape use the handwritten implementation in
-`src/shapes/presets.ts`.
+This directory contains the M0 source contract, M1 compiler/evaluator, M2 SVG path emitter, M3
+single-path production gate, and M4 ordered multi-path production adapter for the spec-compiled
+preset geometry engine. The build-time modules are development tooling. The generator writes an
+explicit production subset consumed by `src/shapes/ooxmlGeometryRuntime.ts`; all 28
+zero-adjustment flowchart shapes in IDs 61-88 currently use it, while excluded flowcharts and
+every other shape use the handwritten implementation in `src/shapes/presets.ts`.
 
 ## Pinned source
 
@@ -131,16 +131,21 @@ are rounded to six decimal places only when serialized.
 and 180x400. It rejects empty or non-finite output and fingerprints each complete profile. These
 gates prove deterministic emission, not visual equivalence with PowerPoint.
 
-## M3 production subset
+## M3-M4 production subset
 
-The generated runtime subset contains these native-validated shape IDs: 61-64, 67, 69-76, 79,
-81-85, and 88. They map to 20 ECMA definitions with one path and no adjustment guides. Runtime
-generation rejects missing names, duplicates, adjustment guides, and multiple paths so an
-unsupported definition cannot enter production by editing the name list alone.
+The M3 subset contains native-validated shape IDs 61-64, 67, 69-76, 79, 81-85, and 88. They map
+to 20 ECMA definitions with one path and no adjustment guides. M4 adds IDs 65, 66, 68, 77, 78,
+80, 86, and 87. Each added definition has no adjustment guides and exactly three ordered paths:
+the first carries the normal fill without a stroke, and later paths carry no fill while retaining
+their declared detail/outline stroke flags.
 
-Shape IDs 65, 66, 68, 77, 78, 80, 86, and 87 remain handwritten because their ECMA definitions
-contain multiple paths. Preserving those definitions requires path-specific fill, stroke, and
-layer ordering in the production adapter. Expanding the subset requires formula/IR parity, SVG,
-parent-renderer, browser, picture-clip, and current native PowerPoint oracle evidence for every
-new shape or family. Renderer-owned theme fill, masks, markers, effects, and resource lifecycle
-remain outside the geometry engine.
+Runtime generation requires every candidate to declare its expected path count. Multi-path
+candidates must also pin the exact per-path `fill`, `stroke`, and `extrusionOk` tuple. The gate
+rejects missing names, duplicates, adjustment guides, count mismatches, and any tuple drift, so an
+unsupported definition cannot enter production by editing the name list alone. The renderer
+applies theme line paint and dash/cap/join attributes to each declared stroke, keeps detail paths
+above image fills, and clips pictures to the first fill-bearing path. Expanding the subset still
+requires formula/IR parity, SVG, parent-renderer, browser,
+picture-clip, and current native PowerPoint oracle evidence for every new shape or family.
+Renderer-owned theme fill, masks, markers, effects, and resource lifecycle remain outside the
+geometry engine.

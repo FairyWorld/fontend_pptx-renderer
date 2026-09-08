@@ -87,13 +87,14 @@ optional and external.
 ## OOXML Geometry Compilation Boundary
 
 The handwritten `src/shapes/presets.ts` registry remains the compatibility geometry engine. The
-M0-M3 tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML geometry
+M0-M4 tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML geometry
 addendum, implements the complete guide-formula contract, compiles all unique definitions into
 renderer-independent plain data, and emits deterministic SVG paths. The generator also writes a
 tree-shakeable production subset to `src/shapes/generated/ooxmlPresetGeometrySubset.ts`.
 `src/shapes/ooxmlGeometryRuntime.ts` evaluates that data before the handwritten lookup.
-The subset contains 20 zero-adjustment, single-path flowchart definitions. Other shapes continue
-through the handwritten registry.
+The subset contains all 28 zero-adjustment flowchart definitions in shape IDs 61-88: 20
+single-path definitions and eight ordered three-path definitions. Other shapes continue through
+the handwritten registry.
 
 The compiled IR retains ordered adjustment/calculated guides, adjustment handles, connection
 sites, text rectangles, path coordinate systems, path styling metadata, and the six DrawingML
@@ -106,9 +107,11 @@ DrawingML visual-angle arcs into SVG ellipse segments. Full circles are split at
 and output rounding is confined to that boundary. The runtime subset supports the same 17 formula
 operators and predefined guides as the build-time evaluator. SVG fill/theme resolution, browser
 masks, connector markers, picture/media ownership, effects, and render lifecycle stay in their
-existing render modules. Generated paths retain the current per-node geometry cache and are not
-added to the serialized presentation model. Picture preset clipping reaches the same allowlisted
-path through `ImageRenderer`.
+existing render modules. The multi-path adapter preserves each definition's ordered fill/stroke
+records; the renderer still owns theme paint, dash/cap/join attributes, masks, effects, and image
+layering. Generated paths retain the current per-node geometry cache and are not added to the
+serialized presentation model. Picture preset clipping uses the first generated fill-bearing
+silhouette, without adding detail or outline paths to the clip geometry.
 
 ECMA source differences are recorded through `source-reconciliation.json`. M1 rejects active
 alternative definitions because it does not yet verify their bytes or native PowerPoint

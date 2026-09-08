@@ -576,10 +576,11 @@ All commonly used OOXML `DrawingML` preset shapes, organized by category:
 Custom geometry (`<a:custGeom>`) supports numeric move, line, quadratic/cubic Bézier, arc,
 and close commands, including multiple paths and inferred source extents. The pinned OOXML
 compiler evaluates the complete preset-shape formula corpus into renderer-independent IR and SVG
-paths. A generated production subset now renders 20 zero-adjustment, single-path flowchart
-presets that passed native PowerPoint comparison. Multi-path flowcharts and every other preset
-retain the handwritten implementation until their own layering, adjustment, and oracle gates
-pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
+paths. A generated production subset now renders all 28 zero-adjustment flowchart presets in
+shape IDs 61-88 that passed native PowerPoint comparison: 20 single-path definitions and eight
+ordered three-path definitions. Other presets retain the handwritten implementation until their
+own layering, adjustment, and oracle gates pass. Symbolic `gdLst` formulas in arbitrary
+`<a:custGeom>` content remain unsupported.
 
 ### Text — 7-Level Style Inheritance
 

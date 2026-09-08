@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateOoxmlGuideFormula,
   getOoxmlPresetShapePaths,
+  ooxmlPresetRuntimeMultiPathShapeNames,
   ooxmlPresetRuntimeShapeNames,
   ooxmlPresetRuntimeSourceSha256,
 } from '../../../src/shapes/ooxmlGeometryRuntime';
@@ -20,7 +21,10 @@ const runtimeFlowchartShapeNames = [
   'flowChartAlternateProcess',
   'flowChartDecision',
   'flowChartInputOutput',
+  'flowChartPredefinedProcess',
+  'flowChartInternalStorage',
   'flowChartDocument',
+  'flowChartMultidocument',
   'flowChartTerminator',
   'flowChartPreparation',
   'flowChartManualInput',
@@ -29,31 +33,37 @@ const runtimeFlowchartShapeNames = [
   'flowChartOffpageConnector',
   'flowChartPunchedCard',
   'flowChartPunchedTape',
+  'flowChartSummingJunction',
+  'flowChartOr',
   'flowChartCollate',
+  'flowChartSort',
   'flowChartExtract',
   'flowChartMerge',
   'flowChartOnlineStorage',
   'flowChartDelay',
   'flowChartMagneticTape',
+  'flowChartMagneticDisk',
+  'flowChartMagneticDrum',
   'flowChartDisplay',
+] as const;
+
+const runtimeMultiPathFlowchartShapeNames = [
+  'flowChartPredefinedProcess',
+  'flowChartInternalStorage',
+  'flowChartMultidocument',
+  'flowChartSummingJunction',
+  'flowChartOr',
+  'flowChartSort',
+  'flowChartMagneticDisk',
+  'flowChartMagneticDrum',
 ] as const;
 
 describe('OOXML preset geometry runtime subset', () => {
   it('keeps the production subset explicit and leaves other presets on handwritten geometry', () => {
     expect(ooxmlPresetRuntimeShapeNames).toEqual(runtimeFlowchartShapeNames);
+    expect(ooxmlPresetRuntimeMultiPathShapeNames).toEqual(runtimeMultiPathFlowchartShapeNames);
     expect(ooxmlPresetRuntimeSourceSha256).toBe(sourceManifest.presetShapeDefinitions.sha256);
-    for (const shapeName of [
-      'flowChartPredefinedProcess',
-      'flowChartInternalStorage',
-      'flowChartMultidocument',
-      'flowChartSummingJunction',
-      'flowChartOr',
-      'flowChartSort',
-      'flowChartMagneticDisk',
-      'flowChartMagneticDrum',
-    ]) {
-      expect(getOoxmlPresetShapePaths(shapeName, 400, 280)).toBeNull();
-    }
+    expect(getOoxmlPresetShapePaths('flowChartOfflineStorage', 400, 280)).toBeNull();
     expect(getOoxmlPresetShapePaths('rect', 400, 280)).toBeNull();
     expect(getOoxmlPresetShapePaths('unknownShape', 400, 280)).toBeNull();
   });
@@ -89,6 +99,21 @@ describe('OOXML preset geometry runtime subset', () => {
 
     expect(getOoxmlPresetShapePaths('flowChartTerminator', 400, 280)?.[0].d).toBe(expected);
     expect(getOoxmlPresetShapePaths('FLOWCHARTTERMINATOR', 400, 280)?.[0].d).toBe(expected);
+  });
+
+  it('preserves the accepted three-path flowchart metadata and order', () => {
+    for (const shapeName of runtimeMultiPathFlowchartShapeNames) {
+      const paths = getOoxmlPresetShapePaths(shapeName, 400, 280);
+      expect(paths, shapeName).toHaveLength(3);
+      expect(paths?.[0]).toMatchObject({ fill: 'norm', stroke: false, extrusionOk: false });
+      expect(paths?.[1]).toMatchObject({ fill: 'none', stroke: true, extrusionOk: false });
+      expect(paths?.[2]).toMatchObject({
+        fill: 'none',
+        stroke: shapeName !== 'flowChartMultidocument',
+        extrusionOk: true,
+      });
+      expect(paths?.every(({ d }) => d.length > 0 && !/NaN|Infinity/.test(d))).toBe(true);
+    }
   });
 
   it('matches the build-time compiler and emitter at square, wide, and tall extents', async () => {

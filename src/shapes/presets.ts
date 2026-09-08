@@ -6568,6 +6568,12 @@ export function getMultiPathPreset(
   h: number,
   adjustments?: Map<string, number>,
 ): PresetSubPath[] | null {
+  if (w > 0 && h > 0) {
+    const ooxmlPaths = getOoxmlPresetShapePaths(shapeType, w, h, adjustments);
+    if (ooxmlPaths && ooxmlPaths.length > 1) {
+      return ooxmlPaths.map(({ d, fill, stroke }) => ({ d, fill, stroke }));
+    }
+  }
   const key = shapeType.toLowerCase();
   const gen = multiPathPresets.get(key) ?? multiPathPresets.get(shapeType);
   return gen ? gen(w, h, adjustments) : null;
@@ -6585,7 +6591,9 @@ export function getPresetShapePath(
   // degenerate-extent behavior through the handwritten compatibility registry.
   if (w > 0 && h > 0) {
     const ooxmlPaths = getOoxmlPresetShapePaths(shapeType, w, h, adjustments);
-    if (ooxmlPaths) return ooxmlPaths[0]?.d ?? '';
+    // The legacy API returns one combined path string for handwritten multi-path presets.
+    // Keep that behavior while the renderer consumes ordered generated paths separately.
+    if (ooxmlPaths?.length === 1) return ooxmlPaths[0]?.d ?? '';
   }
   // OOXML preset names are often camelCase; normalize to lowercase for lookup
   const key = shapeType.toLowerCase();
@@ -6596,4 +6604,19 @@ export function getPresetShapePath(
   // Fallback: simple rectangle
   console.warn(`Unknown preset shape: "${shapeType}", falling back to rectangle`);
   return `M0,0 L${w},0 L${w},${h} L0,${h} Z`;
+}
+
+/** Return the fill-bearing silhouette used to clip a picture with preset geometry. */
+export function getPresetShapeClipPath(
+  shapeType: string,
+  w: number,
+  h: number,
+  adjustments?: Map<string, number>,
+): string {
+  if (w > 0 && h > 0) {
+    const ooxmlPaths = getOoxmlPresetShapePaths(shapeType, w, h, adjustments);
+    const silhouette = ooxmlPaths?.find(({ fill }) => fill !== 'none');
+    if (silhouette) return silhouette.d;
+  }
+  return getPresetShapePath(shapeType, w, h, adjustments);
 }

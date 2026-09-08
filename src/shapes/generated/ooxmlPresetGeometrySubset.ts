@@ -592,6 +592,408 @@ export const OOXML_PRESET_GEOMETRY_DEFINITIONS = [
           "operands": [
             {
               "kind": "guide",
+              "name": "w"
+            },
+            {
+              "kind": "literal",
+              "value": 7
+            },
+            {
+              "kind": "literal",
+              "value": 8
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "x2",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "flowChartPredefinedProcess",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": {
+          "kind": "literal",
+          "value": 1
+        },
+        "stroke": false,
+        "width": {
+          "kind": "literal",
+          "value": 1
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 8
+            }
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 7
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 7
+            },
+            "y": {
+              "kind": "literal",
+              "value": 8
+            }
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 8
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 8
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 1
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 1
+        }
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [],
+    "name": "flowChartInternalStorage",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": {
+          "kind": "literal",
+          "value": 1
+        },
+        "stroke": false,
+        "width": {
+          "kind": "literal",
+          "value": 1
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 8
+            }
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 8
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 8
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 8
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 1
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 1
+        }
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
               "name": "h"
             },
             {
@@ -711,6 +1113,839 @@ export const OOXML_PRESET_GEOMETRY_DEFINITIONS = [
           "value": 21600
         },
         "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 21600
+        }
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "h"
+            },
+            {
+              "kind": "literal",
+              "value": 3675
+            },
+            {
+              "kind": "literal",
+              "value": 21600
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "y2",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "h"
+            },
+            {
+              "kind": "literal",
+              "value": 20782
+            },
+            {
+              "kind": "literal",
+              "value": 21600
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "y8",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "w"
+            },
+            {
+              "kind": "literal",
+              "value": 9298
+            },
+            {
+              "kind": "literal",
+              "value": 21600
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "x3",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "w"
+            },
+            {
+              "kind": "literal",
+              "value": 12286
+            },
+            {
+              "kind": "literal",
+              "value": 21600
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "x4",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "w"
+            },
+            {
+              "kind": "literal",
+              "value": 18595
+            },
+            {
+              "kind": "literal",
+              "value": 21600
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "x5",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "flowChartMultidocument",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 20782
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 9298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 23542
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 9298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 18022
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 18595
+              },
+              "y": {
+                "kind": "literal",
+                "value": 18022
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 18595
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "close"
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 1532
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1532
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 20000
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 20000
+            },
+            "y": {
+              "kind": "literal",
+              "value": 16252
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 19298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16252
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 18595
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16352
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 18595
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16352
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 18595
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "close"
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 2972
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 2972
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 21600
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 21600
+            },
+            "y": {
+              "kind": "literal",
+              "value": 14392
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 20800
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14392
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 20000
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14467
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 20000
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14467
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 20000
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": {
+          "kind": "literal",
+          "value": 21600
+        },
+        "stroke": false,
+        "width": {
+          "kind": "literal",
+          "value": 21600
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 18595
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 18595
+            },
+            "y": {
+              "kind": "literal",
+              "value": 18022
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 9298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 18022
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 9298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 23542
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 0
+              },
+              "y": {
+                "kind": "literal",
+                "value": 20782
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "close"
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 1532
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1532
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 20000
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 20000
+            },
+            "y": {
+              "kind": "literal",
+              "value": 16252
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 19298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16252
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 18595
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16352
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 18595
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16352
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 2972
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 2972
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 21600
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 21600
+            },
+            "y": {
+              "kind": "literal",
+              "value": 14392
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 20800
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14392
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 20000
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14467
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 20000
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14467
+              }
+            },
+            "type": "cubicBezTo"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 21600
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 21600
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 20782
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 9298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 23542
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 9298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 18022
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 18595
+              },
+              "y": {
+                "kind": "literal",
+                "value": 18022
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 18595
+            },
+            "y": {
+              "kind": "literal",
+              "value": 16352
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 18595
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16352
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 19298
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16252
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 20000
+              },
+              "y": {
+                "kind": "literal",
+                "value": 16252
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 20000
+            },
+            "y": {
+              "kind": "literal",
+              "value": 14467
+            }
+          },
+          {
+            "control1": {
+              "x": {
+                "kind": "literal",
+                "value": 20000
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14467
+              }
+            },
+            "control2": {
+              "x": {
+                "kind": "literal",
+                "value": 20800
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14392
+              }
+            },
+            "end": {
+              "x": {
+                "kind": "literal",
+                "value": 21600
+              },
+              "y": {
+                "kind": "literal",
+                "value": 14392
+              }
+            },
+            "type": "cubicBezTo"
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 21600
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 2972
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 2972
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1532
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1815
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1532
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 3675
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 21600
+        },
+        "stroke": false,
         "width": {
           "kind": "literal",
           "value": 21600
@@ -1774,6 +3009,760 @@ export const OOXML_PRESET_GEOMETRY_DEFINITIONS = [
           "operands": [
             {
               "kind": "guide",
+              "name": "wd2"
+            },
+            {
+              "kind": "literal",
+              "value": 2700000
+            }
+          ],
+          "operator": "cos"
+        },
+        "name": "idx",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            {
+              "kind": "literal",
+              "value": 2700000
+            }
+          ],
+          "operator": "sin"
+        },
+        "name": "idy",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hc"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "idx"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "il",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hc"
+            },
+            {
+              "kind": "guide",
+              "name": "idx"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "ir",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "vc"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "idy"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "it",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "vc"
+            },
+            {
+              "kind": "guide",
+              "name": "idy"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "ib",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "flowChartSummingJunction",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "l"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": null,
+        "stroke": false,
+        "width": null
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "il"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "it"
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "guide",
+              "name": "ir"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "ib"
+            }
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "ir"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "it"
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "guide",
+              "name": "il"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "ib"
+            }
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": null,
+        "stroke": true,
+        "width": null
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "l"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
+        "height": null,
+        "stroke": true,
+        "width": null
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "wd2"
+            },
+            {
+              "kind": "literal",
+              "value": 2700000
+            }
+          ],
+          "operator": "cos"
+        },
+        "name": "idx",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            {
+              "kind": "literal",
+              "value": 2700000
+            }
+          ],
+          "operator": "sin"
+        },
+        "name": "idy",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hc"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "idx"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "il",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hc"
+            },
+            {
+              "kind": "guide",
+              "name": "idx"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "ir",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "vc"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "idy"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "it",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "vc"
+            },
+            {
+              "kind": "guide",
+              "name": "idy"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "ib",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "flowChartOr",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "l"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": null,
+        "stroke": false,
+        "width": null
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "hc"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "t"
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "guide",
+              "name": "hc"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "b"
+            }
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "l"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "guide",
+              "name": "r"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": null,
+        "stroke": true,
+        "width": null
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "l"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
+        "height": null,
+        "stroke": true,
+        "width": null
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
               "name": "w"
             },
             {
@@ -1888,6 +3877,217 @@ export const OOXML_PRESET_GEOMETRY_DEFINITIONS = [
         ],
         "extrusionOk": true,
         "fill": "norm",
+        "height": {
+          "kind": "literal",
+          "value": 2
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 2
+        }
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "w"
+            },
+            {
+              "kind": "literal",
+              "value": 3
+            },
+            {
+              "kind": "literal",
+              "value": 4
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "ir",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "h"
+            },
+            {
+              "kind": "literal",
+              "value": 3
+            },
+            {
+              "kind": "literal",
+              "value": 4
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "ib",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "flowChartSort",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 2
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 2
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": {
+          "kind": "literal",
+          "value": 2
+        },
+        "stroke": false,
+        "width": {
+          "kind": "literal",
+          "value": 2
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 2
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 2
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 2
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 2
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 2
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
         "height": {
           "kind": "literal",
           "value": 2
@@ -2608,6 +4808,488 @@ export const OOXML_PRESET_GEOMETRY_DEFINITIONS = [
         "height": null,
         "stroke": true,
         "width": null
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "h"
+            },
+            {
+              "kind": "literal",
+              "value": 5
+            },
+            {
+              "kind": "literal",
+              "value": 6
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "y3",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "flowChartMagneticDisk",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 1
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 3
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 6
+            },
+            "y": {
+              "kind": "literal",
+              "value": 5
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 1
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 3
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": {
+          "kind": "literal",
+          "value": 6
+        },
+        "stroke": false,
+        "width": {
+          "kind": "literal",
+          "value": 6
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 6
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 1
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 3
+            }
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 6
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 6
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 0
+            },
+            "y": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 1
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 3
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 6
+            },
+            "y": {
+              "kind": "literal",
+              "value": 5
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 1
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 3
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 6
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 6
+        }
+      }
+    ]
+  },
+  {
+    "adjustmentGuides": [],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "w"
+            },
+            {
+              "kind": "literal",
+              "value": 2
+            },
+            {
+              "kind": "literal",
+              "value": 3
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "x2",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "flowChartMagneticDrum",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 5
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 3
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 6
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 3
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "norm",
+        "height": {
+          "kind": "literal",
+          "value": 6
+        },
+        "stroke": false,
+        "width": {
+          "kind": "literal",
+          "value": 6
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 5
+            },
+            "y": {
+              "kind": "literal",
+              "value": 6
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 3
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 1
+            }
+          }
+        ],
+        "extrusionOk": false,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 6
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 6
+        }
+      },
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 5
+            },
+            "y": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 3
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "lnTo",
+            "x": {
+              "kind": "literal",
+              "value": 1
+            },
+            "y": {
+              "kind": "literal",
+              "value": 6
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "literal",
+              "value": 3
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "literal",
+              "value": 1
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "none",
+        "height": {
+          "kind": "literal",
+          "value": 6
+        },
+        "stroke": true,
+        "width": {
+          "kind": "literal",
+          "value": 6
+        }
       }
     ]
   },

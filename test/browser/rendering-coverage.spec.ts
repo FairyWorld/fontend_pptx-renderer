@@ -5,10 +5,15 @@ test.use({ channel: process.env.PLAYWRIGHT_CHANNEL });
 
 test('browser accepts every deterministic OOXML flowchart runtime geometry', async ({ page }) => {
   await page.goto('/test/browser/blank.html');
-  const results = await page.evaluate(async () => {
+  const { results, multiPathResults } = await page.evaluate(async () => {
     const { getPresetShapePath } = await import('/src/shapes/presets.ts');
-    const { ooxmlPresetRuntimeShapeNames } = await import('/src/shapes/ooxmlGeometryRuntime.ts');
-    return ooxmlPresetRuntimeShapeNames.map((name) => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const { ooxmlPresetRuntimeMultiPathShapeNames, ooxmlPresetRuntimeShapeNames } =
+      await import('/src/shapes/ooxmlGeometryRuntime.ts');
+    const results = ooxmlPresetRuntimeShapeNames.map((name) => {
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       const d = getPresetShapePath(name, 400, 280);
@@ -19,9 +24,32 @@ test('browser accepts every deterministic OOXML flowchart runtime geometry', asy
       const box = path.getBBox();
       return { name, d, x: box.x, y: box.y, width: box.width, height: box.height };
     });
+    const multiPathResults = ooxmlPresetRuntimeMultiPathShapeNames.map((name) => {
+      const xml = `<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="Flowchart"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3810000" cy="2667000"/></a:xfrm>
+          <a:prstGeom prst="${name}"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln w="12700"><a:solidFill><a:srgbClr val="203864"/></a:solidFill></a:ln>
+        </p:spPr>
+      </p:sp>`;
+      const rendered = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      document.body.append(rendered);
+      return {
+        name,
+        paths: Array.from(rendered.querySelectorAll('svg > path')).map((path) => ({
+          d: path.getAttribute('d'),
+          fill: path.getAttribute('fill'),
+          stroke: path.getAttribute('stroke'),
+        })),
+      };
+    });
+    return { results, multiPathResults };
   });
 
-  expect(results).toHaveLength(20);
+  expect(results).toHaveLength(28);
   for (const result of results) {
     expect(result.d, result.name).not.toMatch(/NaN|Infinity/);
     expect(result.width, result.name).toBeGreaterThan(0);
@@ -31,6 +59,17 @@ test('browser accepts every deterministic OOXML flowchart runtime geometry', asy
   expect(results.find(({ name }) => name === 'flowChartTerminator')?.d).toBe(
     'M64.351852,0 L335.648148,0 A64.351852,140 0 0,1 335.648148,280 L64.351852,280 A64.351852,140 0 0,1 64.351852,0 Z',
   );
+  expect(multiPathResults).toHaveLength(8);
+  for (const result of multiPathResults) {
+    expect(result.paths, result.name).toHaveLength(3);
+    expect(result.paths.map(({ fill }) => fill)).toEqual(['#4472C4', 'none', 'none']);
+    expect(result.paths[0].stroke).toBe('none');
+    expect(result.paths[1].stroke).toBe('#203864');
+    expect(result.paths[2].stroke).toBe(
+      result.name === 'flowChartMultidocument' ? 'none' : '#203864',
+    );
+    expect(result.paths.every(({ d }) => !!d && !/NaN|Infinity/.test(d))).toBe(true);
+  }
 });
 
 for (const hostWhiteSpace of ['normal', 'pre', 'nowrap']) {

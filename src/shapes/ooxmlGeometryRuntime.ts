@@ -63,10 +63,12 @@ type OoxmlPathCommand =
     }
   | { readonly type: 'close' };
 
+type OoxmlPresetPathFill = 'norm' | 'darken' | 'darkenLess' | 'lighten' | 'lightenLess' | 'none';
+
 interface OoxmlPath {
   readonly width: OoxmlReference | null;
   readonly height: OoxmlReference | null;
-  readonly fill: string;
+  readonly fill: OoxmlPresetPathFill;
   readonly stroke: boolean;
   readonly extrusionOk: boolean;
   readonly commands: readonly OoxmlPathCommand[];
@@ -105,7 +107,7 @@ type EvaluatedCommand =
 interface EvaluatedPath {
   width: number;
   height: number;
-  fill: string;
+  fill: OoxmlPresetPathFill;
   stroke: boolean;
   extrusionOk: boolean;
   commands: EvaluatedCommand[];
@@ -113,7 +115,7 @@ interface EvaluatedPath {
 
 interface OoxmlEmittedPresetPath {
   d: string;
-  fill: string;
+  fill: OoxmlPresetPathFill;
   stroke: boolean;
   extrusionOk: boolean;
 }
@@ -150,6 +152,9 @@ const runtimeByName = new Map(
 
 export const ooxmlPresetRuntimeShapeNames: readonly string[] = Object.freeze(
   runtimeDefinitions.map(({ name }) => name),
+);
+export const ooxmlPresetRuntimeMultiPathShapeNames: readonly string[] = Object.freeze(
+  runtimeDefinitions.filter(({ paths }) => paths.length > 1).map(({ name }) => name),
 );
 export const ooxmlPresetRuntimeSourceSha256 = OOXML_PRESET_GEOMETRY_SOURCE_SHA256;
 

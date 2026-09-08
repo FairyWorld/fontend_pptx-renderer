@@ -7,6 +7,18 @@ import {
   getPresetOverlays,
   type PresetSubPath,
 } from '../../../src/shapes/presets';
+import { getOoxmlPresetShapePaths } from '../../../src/shapes/ooxmlGeometryRuntime';
+
+const generatedMultiPathFlowcharts = [
+  'flowChartPredefinedProcess',
+  'flowChartInternalStorage',
+  'flowChartMultidocument',
+  'flowChartSummingJunction',
+  'flowChartOr',
+  'flowChartSort',
+  'flowChartMagneticDisk',
+  'flowChartMagneticDrum',
+] as const;
 
 describe('getPresetShapePath', () => {
   it('returns a valid rect path', () => {
@@ -589,6 +601,38 @@ describe('getMultiPathPreset', () => {
   it('returns null for non-existent shapes', () => {
     const result = getMultiPathPreset('unknownMultiPath', 100, 50);
     expect(result).toBeNull();
+  });
+
+  it.each(generatedMultiPathFlowcharts)(
+    'routes generated %s paths with their declared order and paint metadata',
+    (shapeName) => {
+      const generated = getOoxmlPresetShapePaths(shapeName, 400, 280);
+      const routed = getMultiPathPreset(shapeName, 400, 280);
+
+      expect(routed, shapeName).not.toBeNull();
+      expect(routed).toEqual(
+        generated?.map(({ d, fill, stroke }) => ({
+          d,
+          fill,
+          stroke,
+        })),
+      );
+    },
+  );
+
+  it('keeps non-production and degenerate multi-path lookup on handwritten compatibility', () => {
+    expect(getOoxmlPresetShapePaths('flowChartOfflineStorage', 400, 280)).toBeNull();
+    expect(getMultiPathPreset('flowChartOfflineStorage', 400, 280)).not.toBeNull();
+    expect(getMultiPathPreset('flowChartPredefinedProcess', 0, 280)).toBeNull();
+    expect(getPresetShapePath('flowChartPredefinedProcess', 0, 280)).toContain('M0,0');
+  });
+
+  it('preserves the combined handwritten path API for generated multi-path presets', () => {
+    const legacy = presetShapes.get('flowChartPredefinedProcess');
+    expect(legacy).toBeDefined();
+    expect(getPresetShapePath('flowChartPredefinedProcess', 500, 300)).toBe(
+      legacy?.(500, 300),
+    );
   });
 
   describe('horizontalScroll', () => {

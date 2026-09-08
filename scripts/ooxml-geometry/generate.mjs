@@ -21,27 +21,65 @@ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRepositoryRoot = resolve(scriptDirectory, '../..');
 const defaultOutput = 'scripts/ooxml-geometry/generated/preset-shape-catalog.json';
 const defaultRuntimeOutput = 'src/shapes/generated/ooxmlPresetGeometrySubset.ts';
-const runtimeShapeNames = Object.freeze([
-  'flowChartProcess', // MsoAutoShapeType 61
-  'flowChartAlternateProcess', // 62
-  'flowChartDecision', // 63
-  'flowChartInputOutput', // 64 (PowerPoint label: Flowchart Data)
-  'flowChartDocument', // 67
-  'flowChartTerminator', // 69
-  'flowChartPreparation', // 70
-  'flowChartManualInput', // 71
-  'flowChartManualOperation', // 72
-  'flowChartConnector', // 73
-  'flowChartOffpageConnector', // 74
-  'flowChartPunchedCard', // 75 (PowerPoint label: Flowchart Card)
-  'flowChartPunchedTape', // 76
-  'flowChartCollate', // 79
-  'flowChartExtract', // 81
-  'flowChartMerge', // 82
-  'flowChartOnlineStorage', // 83 (PowerPoint label: Flowchart Stored Data)
-  'flowChartDelay', // 84
-  'flowChartMagneticTape', // 85 (PowerPoint label: Sequential Access Storage)
-  'flowChartDisplay', // 88
+const threePathStyleContract = (finalStroke = true) =>
+  Object.freeze([
+    Object.freeze({ fill: 'norm', stroke: false, extrusionOk: false }),
+    Object.freeze({ fill: 'none', stroke: true, extrusionOk: false }),
+    Object.freeze({ fill: 'none', stroke: finalStroke, extrusionOk: true }),
+  ]);
+const runtimeShapeCandidates = Object.freeze([
+  { name: 'flowChartProcess', expectedPathCount: 1 }, // MsoAutoShapeType 61
+  { name: 'flowChartAlternateProcess', expectedPathCount: 1 }, // 62
+  { name: 'flowChartDecision', expectedPathCount: 1 }, // 63
+  { name: 'flowChartInputOutput', expectedPathCount: 1 }, // 64 (PowerPoint label: Data)
+  {
+    name: 'flowChartPredefinedProcess',
+    expectedPathCount: 3,
+    expectedPathStyles: threePathStyleContract(),
+  }, // 65
+  {
+    name: 'flowChartInternalStorage',
+    expectedPathCount: 3,
+    expectedPathStyles: threePathStyleContract(),
+  }, // 66
+  { name: 'flowChartDocument', expectedPathCount: 1 }, // 67
+  {
+    name: 'flowChartMultidocument',
+    expectedPathCount: 3,
+    expectedPathStyles: threePathStyleContract(false),
+  }, // 68
+  { name: 'flowChartTerminator', expectedPathCount: 1 }, // 69
+  { name: 'flowChartPreparation', expectedPathCount: 1 }, // 70
+  { name: 'flowChartManualInput', expectedPathCount: 1 }, // 71
+  { name: 'flowChartManualOperation', expectedPathCount: 1 }, // 72
+  { name: 'flowChartConnector', expectedPathCount: 1 }, // 73
+  { name: 'flowChartOffpageConnector', expectedPathCount: 1 }, // 74
+  { name: 'flowChartPunchedCard', expectedPathCount: 1 }, // 75 (PowerPoint label: Card)
+  { name: 'flowChartPunchedTape', expectedPathCount: 1 }, // 76
+  {
+    name: 'flowChartSummingJunction',
+    expectedPathCount: 3,
+    expectedPathStyles: threePathStyleContract(),
+  }, // 77
+  { name: 'flowChartOr', expectedPathCount: 3, expectedPathStyles: threePathStyleContract() }, // 78
+  { name: 'flowChartCollate', expectedPathCount: 1 }, // 79
+  { name: 'flowChartSort', expectedPathCount: 3, expectedPathStyles: threePathStyleContract() }, // 80
+  { name: 'flowChartExtract', expectedPathCount: 1 }, // 81
+  { name: 'flowChartMerge', expectedPathCount: 1 }, // 82
+  { name: 'flowChartOnlineStorage', expectedPathCount: 1 }, // 83 (PowerPoint label: Stored Data)
+  { name: 'flowChartDelay', expectedPathCount: 1 }, // 84
+  { name: 'flowChartMagneticTape', expectedPathCount: 1 }, // 85 (Sequential Access Storage)
+  {
+    name: 'flowChartMagneticDisk',
+    expectedPathCount: 3,
+    expectedPathStyles: threePathStyleContract(),
+  }, // 86
+  {
+    name: 'flowChartMagneticDrum',
+    expectedPathCount: 3,
+    expectedPathStyles: threePathStyleContract(),
+  }, // 87 (Direct Access Storage)
+  { name: 'flowChartDisplay', expectedPathCount: 1 }, // 88
 ]);
 const evaluationProfiles = Object.freeze([
   { name: 'square', width: 216, height: 216 },
@@ -82,20 +120,48 @@ export async function writeOrCheckGeneratedCatalog({
   return { outputPath, status: 'generated' };
 }
 
-export function buildRuntimeGeometryModule(ir, shapeNames = runtimeShapeNames) {
+export function buildRuntimeGeometryModule(ir, candidates = runtimeShapeCandidates) {
+  const candidateNames = candidates.map(({ name }) => name);
+  if (new Set(candidateNames).size !== candidateNames.length) {
+    throw new Error('OOXML runtime subset shape names must be unique');
+  }
   const shapeByName = new Map(ir.shapes.map((shape) => [shape.name, shape]));
-  const definitions = shapeNames.map((name) => {
+  const definitions = candidates.map(({ name, expectedPathCount, expectedPathStyles }) => {
+    if (expectedPathCount !== 1 && expectedPathCount !== 3) {
+      throw new Error(
+        `OOXML runtime subset shape has unsupported expected path count ${expectedPathCount}: ${name}`,
+      );
+    }
     const shape = shapeByName.get(name);
     if (!shape) throw new Error(`OOXML runtime subset shape is missing from source: ${name}`);
-    if (shape.paths.length !== 1) {
+    if (shape.paths.length !== expectedPathCount) {
       throw new Error(
-        `OOXML runtime subset shape must contain exactly one path until multi-path routing is supported: ${name}`,
+        `OOXML runtime subset shape expected ${expectedPathCount} paths but found ${shape.paths.length}: ${name}`,
       );
     }
     if (shape.adjustmentGuides.length !== 0) {
       throw new Error(
         `OOXML runtime subset shape must not contain adjustment guides until adjustment bounds are gated: ${name}`,
       );
+    }
+    if (expectedPathCount === 3) {
+      if (!Array.isArray(expectedPathStyles) || expectedPathStyles.length !== 3) {
+        throw new Error(
+          `OOXML runtime subset shape is missing its three-path style contract: ${name}`,
+        );
+      }
+      for (const [pathIndex, expectedStyle] of expectedPathStyles.entries()) {
+        const path = shape.paths[pathIndex];
+        if (
+          path.fill !== expectedStyle.fill ||
+          path.stroke !== expectedStyle.stroke ||
+          path.extrusionOk !== expectedStyle.extrusionOk
+        ) {
+          throw new Error(
+            `OOXML runtime subset shape ${name} path ${pathIndex} has unsupported multi-path style metadata`,
+          );
+        }
+      }
     }
     return {
       name: shape.name,
@@ -104,9 +170,6 @@ export function buildRuntimeGeometryModule(ir, shapeNames = runtimeShapeNames) {
       paths: shape.paths,
     };
   });
-  if (new Set(shapeNames).size !== shapeNames.length) {
-    throw new Error('OOXML runtime subset shape names must be unique');
-  }
   const sourceSha256 = ir.source?.presetShapeDefinitions?.sha256;
   if (!/^[a-f0-9]{64}$/.test(sourceSha256 ?? '')) {
     throw new Error('OOXML runtime subset requires a valid preset source SHA-256');

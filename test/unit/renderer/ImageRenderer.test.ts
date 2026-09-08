@@ -202,6 +202,28 @@ describe('renderImage', () => {
       expect(path).not.toMatch(/NaN|Infinity/);
       expect(el.querySelector('svg image')).toBeTruthy();
     });
+
+    it('clips a multi-path flowchart picture to its generated normal-fill silhouette', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="1" name="Predefined process picture"/><nvPr/></nvPicPr>
+          <blipFill><blip r:embed="rId1"/><stretch><fillRect/></stretch></blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="1905000" cy="952500"/></xfrm>
+            <prstGeom prst="flowChartPredefinedProcess"><avLst/></prstGeom>
+          </spPr>
+        </pic>`,
+      );
+
+      const el = renderImage(createPicNode({ source }), ctx);
+      const path = el.querySelector('clipPath path')?.getAttribute('d');
+
+      expect(path).toBe('M0,0 L200,0 L200,100 L0,100 Z');
+      expect(path).not.toContain('M25,0');
+      expect(el.querySelector('svg image')).toBeTruthy();
+    });
   });
 
   describe('linked images', () => {

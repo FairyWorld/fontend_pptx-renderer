@@ -20,7 +20,7 @@ import { SafeXmlNode } from '../parser/XmlParser';
 import { isAllowedExternalMediaUrl, isAllowedExternalUrl } from '../utils/urlSafety';
 import { resolveSlideNavigationIndex, slideJumpTitle } from './navigation';
 import { renderCustomGeometry } from '../shapes/customGeometry';
-import { getPresetShapePath } from '../shapes/presets';
+import { getPresetShapeClipPath } from '../shapes/presets';
 import { splitTiledPatternFillCss } from './cssValues';
 
 /**
@@ -383,7 +383,7 @@ function getPictureGeometryClipPath(node: PicNodeData): string | undefined {
   const sourcePreset = node.source.child('spPr').child('prstGeom').attr('prst');
   const preset = node.presetGeometry ?? sourcePreset;
   if (!preset || preset === 'rect') return undefined;
-  const d = getPresetShapePath(preset, node.size.w, node.size.h);
+  const d = getPresetShapeClipPath(preset, node.size.w, node.size.h);
   return d || undefined;
 }
 
