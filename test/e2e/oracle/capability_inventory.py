@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import math
+import re
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 from typing import Iterable
@@ -74,7 +75,7 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _registry_fingerprint(registry: CapabilityRegistry) -> str:
+def compute_registry_fingerprint(registry: CapabilityRegistry) -> str:
     digest = hashlib.sha256()
     for capability in registry.capabilities:
         digest.update(capability.id.encode("utf-8"))
@@ -160,6 +161,10 @@ def _scan_xml_part(
     capabilities: tuple[CapabilityDefinition, ...],
 ) -> set[str]:
     matches: set[str] = set()
+    if re.search(br"<!\s*(?:DOCTYPE|ENTITY)\b", data, flags=re.IGNORECASE):
+        raise CapabilityInventoryError(
+            f"DTD or entity declaration is not allowed in XML part: {part_name}"
+        )
     try:
         events = ElementTree.iterparse(io.BytesIO(data), events=("start",))
         for _, element in events:
@@ -275,7 +280,7 @@ def scan_corpus(
     )
     return InventoryReport(
         schema_version=INVENTORY_SCHEMA_VERSION,
-        registry_fingerprint=_registry_fingerprint(registry),
+        registry_fingerprint=compute_registry_fingerprint(registry),
         raw_package_count=raw_package_count,
         unique_package_count=len(packages),
         packages=packages,

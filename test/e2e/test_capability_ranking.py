@@ -5,6 +5,7 @@ import pytest
 from oracle.capability_contract import load_capability_registry
 from oracle.capability_ranking import (
     LedgerRow,
+    build_ledger_rows,
     build_work_packet,
     rank_capabilities,
 )
@@ -92,6 +93,18 @@ def test_oracle_readiness_then_dependency_depth_then_id_break_ties():
     assert [item.capability_id for item in ranked] == ["cap.a", "cap.b", "cap.c", "cap.d"]
 
 
+def test_verified_and_blocked_rows_are_watched_but_not_selected():
+    ranked = rank_capabilities(
+        [
+            row("cap.a", evidence_state="verified"),
+            row("cap.b", evidence_state="blocked"),
+            row("cap.c", evidence_state="regressed"),
+        ]
+    )
+
+    assert [item.capability_id for item in ranked] == ["cap.c"]
+
+
 def test_ranking_rejects_invalid_or_duplicate_rows():
     with pytest.raises(ValueError, match="duplicate ledger capability"):
         rank_capabilities([row("cap.a"), row("cap.a")])
@@ -131,4 +144,79 @@ def test_work_packet_contains_one_bounded_donut_matrix():
     assert packet["rollbackConditions"]
     assert packet["requiredGates"] == list(
         registry.by_id()[selected.capability_id].required_gates
+    )
+
+
+def test_oracle_row_with_uninventoried_source_hash_is_stale():
+    registry = load_capability_registry(Path("oracle/capabilities.json"))
+    capability_id = "drawingml.shape.geometry.adjustment.donut"
+    inventory = {
+        "renderer": {"revision": "a" * 40, "dirty": False},
+        "packages": [
+            {
+                "sha256": "b" * 64,
+                "capabilityIds": [capability_id],
+            }
+        ],
+    }
+    oracle_report = {
+        "results": [
+            {
+                "capabilityId": capability_id,
+                "passed": True,
+                "provenance": {
+                    "renderer": {"revision": "a" * 40, "dirty": False},
+                    "inputs": {
+                        "sourcePptx": {"sha256": "c" * 64},
+                        "groundTruth": {"combinedSha256": "d" * 64},
+                    },
+                },
+            }
+        ]
+    }
+
+    rows = build_ledger_rows(registry, inventory, oracle_report=oracle_report)
+    row_by_id = {item.capability_id: item for item in rows}
+
+    assert row_by_id[capability_id].oracle_ready is False
+    assert row_by_id[capability_id].blockers == ("oracle-report:stale",)
+
+
+def test_accepted_state_is_preserved_until_fresh_failure_regresses_it():
+    registry = load_capability_registry(Path("oracle/capabilities.json"))
+    capability_id = "drawingml.shape.geometry.adjustment.donut"
+    inventory = {
+        "renderer": {"revision": "a" * 40, "dirty": False},
+        "packages": [{"sha256": "c" * 64, "capabilityIds": [capability_id]}],
+    }
+    verified = build_ledger_rows(
+        registry,
+        inventory,
+        accepted_states={capability_id: "verified"},
+    )
+    assert {item.capability_id: item for item in verified}[capability_id].evidence_state == "verified"
+
+    failing_report = {
+        "results": [
+            {
+                "capabilityId": capability_id,
+                "passed": False,
+                "provenance": {
+                    "renderer": {"revision": "a" * 40, "dirty": False},
+                    "inputs": {
+                        "sourcePptx": {"sha256": "c" * 64},
+                        "groundTruth": {"combinedSha256": "d" * 64},
+                    },
+                },
+            }
+        ]
+    }
+    regressed = build_ledger_rows(
+        registry,
+        inventory,
+        oracle_report=failing_report,
+        accepted_states={capability_id: "verified"},
+    )
+    assert {item.capability_id: item for item in regressed}[capability_id].evidence_state == (
+        "regressed"
     )

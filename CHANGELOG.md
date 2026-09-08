@@ -9,6 +9,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Added
 
+- Added an evidence-driven capability loop with a tracked OOXML feature registry, namespace-aware
+  bounded PPTX corpus inventory, transparent cohort ranking, generated work packets, and atomic
+  promotion receipts bound to capability, implementation, source, and PowerPoint ground-truth
+  hashes.
+- Added `pnpm capability:check` as a CI-safe contract gate and `pnpm capability:inventory` for local
+  ignored corpora; generated evidence stays outside the published package and tracked source tree.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
   deterministic SVG emitter, and a generated runtime subset with source-hash verification.
 - Added browser rendering for licensed EOT/MTX fonts embedded in PowerPoint files, with

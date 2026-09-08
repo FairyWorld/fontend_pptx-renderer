@@ -443,14 +443,3 @@ def validate_acceptance_history(
             raise ValueError(
                 f"promotion receipt references unknown capability: {receipt.capability_id}"
             )
-        expected_definition = capability_definition_fingerprint(capability)
-        if receipt.definition_fingerprint != expected_definition:
-            raise ValueError(
-                f"promotion receipt definitionFingerprint is stale for {receipt.capability_id}"
-            )
-        missing_gates = sorted(set(capability.required_gates) - set(receipt.gates))
-        if missing_gates:
-            raise ValueError(
-                f"promotion receipt for {receipt.capability_id} is missing gates: "
-                f"{', '.join(missing_gates)}"
-            )

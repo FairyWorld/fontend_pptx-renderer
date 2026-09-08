@@ -2,6 +2,33 @@
 
 This directory contains the local-macOS PowerPoint oracle pipeline used to drive renderer improvements.
 
+## Capability Loop
+
+The oracle now has a tracked capability contract in `capabilities.json` and sanitized historical
+promotion receipts in `capability-acceptance.json`. The loop separates intended render mode from
+current evidence state and only permits a public `supported` claim when a bounded capability is
+both `native` and freshly `verified`.
+
+```bash
+# From the repository root
+pnpm capability:check
+pnpm capability:inventory
+
+# Inspect all commands
+python3 test/e2e/scripts/run_capability_loop.py --help
+```
+
+`capability_contract.py`, `capability_inventory.py`, `capability_evidence.py`, and
+`capability_ranking.py` contain the domain rules. `scripts/run_capability_loop.py` only composes
+them. Local outputs are written below `test/e2e/reports/capability-loop/` and remain ignored because
+they may refer to private case aliases. Tracked receipts keep stable case IDs and SHA-256 values,
+but remove absolute paths, usernames, free-form issue bodies, and private labels.
+
+The default inventory limits match the renderer safety contract: 4,000 ZIP entries, 32 MiB per
+decoded entry, and 256 MiB decoded in total. Ranking counts byte-identical PPTX files once. A dirty
+report, missing or changed inputs, stale relevant implementation files, skipped required cases,
+failed structural checks, or an unresolved manual-review row blocks promotion.
+
 ## Current Implemented Pieces
 
 1. `powerpoint_oracle.py`

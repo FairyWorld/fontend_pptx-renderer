@@ -218,6 +218,7 @@ def test_build_and_sanitize_promotion_receipt(evidence_fixture):
     report = fresh_native_report(capability, fingerprint)
     report["environment"]["privateCasePath"] = "/Users/example/private/source.pptx"
     report["environment"]["username"] = "example"
+    report["environment"]["windowsPath"] = "C:\\Users\\example\\source.pptx"
 
     receipt = build_promotion_receipt(capability, report, repo, "2026-09-09T01:02:03Z")
     tracked = sanitize_receipt_for_tracking(receipt)
@@ -228,3 +229,4 @@ def test_build_and_sanitize_promotion_receipt(evidence_fixture):
     assert tracked["groundTruthFingerprints"] == [GROUND_TRUTH_HASH]
     assert "privateCasePath" not in json.dumps(tracked)
     assert "/Users/example" not in json.dumps(tracked)
+    assert "C:\\\\Users" not in json.dumps(tracked)

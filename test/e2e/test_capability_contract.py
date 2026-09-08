@@ -204,3 +204,45 @@ def test_tracked_capability_contract_is_valid():
 
     validate_acceptance_history(registry, history)
     assert len(registry.capabilities) == 12
+
+
+def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path: Path):
+    registry = load_capability_registry(
+        write_json(
+            tmp_path / "capabilities.json",
+            {
+                "schemaVersion": 1,
+                "capabilities": [
+                    capability(
+                        render_mode="native",
+                        fallback="none",
+                        required_gates=["unit", "native-powerpoint"],
+                    )
+                ],
+            },
+        )
+    )
+    history = load_acceptance_history(
+        write_json(
+            tmp_path / "acceptance.json",
+            {
+                "schemaVersion": 1,
+                "receipts": [
+                    {
+                        "capabilityId": registry.capabilities[0].id,
+                        "definitionFingerprint": "e" * 64,
+                        "acceptedRevision": "a" * 40,
+                        "implementationFingerprint": "b" * 64,
+                        "caseIds": ["oracle-shape-0001"],
+                        "caseInputFingerprints": ["c" * 64],
+                        "groundTruthFingerprints": ["d" * 64],
+                        "gates": ["unit", "native-powerpoint"],
+                        "environment": {"oracle": "powerpoint-macos"},
+                        "acceptedAt": "2026-09-09T00:00:00Z",
+                    }
+                ],
+            },
+        )
+    )
+
+    validate_acceptance_history(registry, history)

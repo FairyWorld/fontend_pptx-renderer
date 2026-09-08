@@ -130,6 +130,18 @@ def test_scan_pptx_rejects_unsafe_or_oversized_archives(
         scan_pptx(package, registry, limits)
 
 
+def test_scan_pptx_rejects_xml_document_type_declarations(tmp_path: Path, registry):
+    slide = """<!DOCTYPE p:sld [<!ENTITY x "expanded">]>
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+           xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <a:scene3d>&x;</a:scene3d>
+    </p:sld>"""
+    package = write_test_pptx(tmp_path / "doctype.pptx", slide_xml=slide, chart_xml=None)
+
+    with pytest.raises(CapabilityInventoryError, match="DTD or entity declaration"):
+        scan_pptx(package, registry)
+
+
 def test_scan_corpus_deduplicates_identical_packages_and_serializes_deterministically(
     tmp_path: Path,
     registry,

@@ -6,6 +6,34 @@
 2. Model
 3. Render
 
+Renderer evolution is governed by a separate evidence loop. It observes source packages and test
+results, but does not bypass or rewrite the Parse → Model → Render boundaries.
+
+## Capability Evidence Boundary
+
+`test/e2e/oracle/capabilities.json` is the tracked support contract. Each stable capability ID
+declares namespace-aware OOXML selectors, a bounded scope, current render mode, fallback, relevant
+implementation/test paths, and required gates. `capability-acceptance.json` stores only sanitized
+promotion receipts; private PPTX/PDF/PNG artifacts and generated inventory remain ignored.
+
+The loop has four domain modules and a thin CLI:
+
+- `capability_contract.py` validates immutable registry and receipt types.
+- `capability_inventory.py` scans PPTX ZIP/XML within fixed entry and decoded-byte limits and
+  deduplicates packages by SHA-256.
+- `capability_evidence.py` binds receipts to capability definitions, relevant file content, source
+  PPTX, ground truth, gates, environment, and revision.
+- `capability_ranking.py` applies a documented lexicographic priority and emits one bounded work
+  packet.
+- `scripts/run_capability_loop.py` composes `validate`, `inventory`, `rank`, `work-packet`, and
+  `accept`; it does not edit GitHub issues or accept visual baselines.
+
+Render mode and evidence state are independent. Render modes are `none`, `fallback`, `approximate`,
+`native`, and `excluded`; evidence moves through `unknown`, `observed`, `reproducible`, `candidate`,
+`verified`, `regressed`, or `blocked`. User-facing support requires both `native` and `verified` for
+the declared scope. A relevant implementation or scope change invalidates the receipt, while an
+unrelated documentation-only commit does not.
+
 ## 1) Parse Layer
 
 Core modules:

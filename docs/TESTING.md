@@ -385,8 +385,9 @@ bytes, finite IR evaluation, and deterministic SVG emission. It runs in CI befor
 build.
 
 The generated catalog is evidence about source coverage; it is not renderer acceptance. The
-production subset is a separate generated module and currently contains 20 accepted flowchart
-definitions with one path and no adjustment guides.
+production subset is a separate generated module and currently contains all 28 zero-adjustment
+flowchart definitions in shape IDs 61-88: 20 single-path definitions and eight ordered three-path
+definitions.
 Before adding a definition, add tests for formula semantics and path topology plus browser checks
 for both ordinary shapes and picture clips. Then compare square, wide, and tall shapes and
 relevant adjustment bounds against native PowerPoint ground truth. Group, flip, rotation,
@@ -396,6 +397,47 @@ M0 rejects active source overrides. Before enabling one, add an offline check th
 alternative source bytes, verifies their SHA-256 and requested shape, and resolves an
 existing native PowerPoint oracle record. Do not update a visual baseline merely to make a
 generated definition pass.
+
+## Capability Loop Contract
+
+The capability loop turns corpus observations into one reviewable renderer cohort at a time. Its
+tracked inputs are `test/e2e/oracle/capabilities.json` and
+`test/e2e/oracle/capability-acceptance.json`. Its local inventory, ledger, ranking, work packet, and
+verification files stay ignored under `test/e2e/reports/capability-loop/`.
+
+```bash
+# CI-safe contract check; requires no private corpus or PowerPoint installation
+pnpm capability:check
+
+# Scan the default ignored testdata/cases corpus
+pnpm capability:inventory
+
+# Add more local corpora and an optional read-only issue snapshot
+python3 test/e2e/scripts/run_capability_loop.py inventory \
+  --corpus test/e2e/testdata/cases \
+  --corpus test/e2e/testdata/windows-cases \
+  --issues docs/agent-tmp/open-issues.json
+```
+
+The scanner reads ZIP members in memory without extracting them. It rejects path traversal, more
+than 4,000 entries, a decoded entry over 32 MiB, or more than 256 MiB decoded in total. Identical
+PPTX bytes count once for ranking while all corpus aliases remain available in the ignored report.
+Selectors match XML namespace, local name, and optional attribute predicates; similarly named
+elements from unrelated namespaces do not count.
+
+Ranking is lexicographic and retains every input dimension: impact, currently reproduced issues,
+unique observed packages, failure type, native-oracle readiness, dependency depth, then capability
+ID. It does not generate a weighted quality percentage. An open issue only contributes demand after
+the issue snapshot explicitly records a current reproduction.
+
+Promotion uses the `accept` command only after the capability registry says `renderMode=native` and
+the candidate implementation is committed. The command requires a clean tracked tree, matching
+HEAD and relevant-file fingerprints, source and ground-truth SHA-256 values, every declared gate,
+no skipped/runtime-failed cases, and an accepted manual verdict for every review row. It writes a
+sanitized receipt atomically and never changes GitHub issues or visual baselines.
+
+DrawingML shape 3D, chart 3D, Office 2017 embedded models, and PresentationML animation are separate
+capability IDs. A verified flat 2D fallback in one lane cannot promote native behavior in another.
 
 ## Chart Fix Protocol
 

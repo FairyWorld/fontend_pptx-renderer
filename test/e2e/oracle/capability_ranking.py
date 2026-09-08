@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from oracle.capability_contract import (
     IMPACTS,
@@ -107,8 +107,215 @@ def rank_capabilities(rows: list[LedgerRow] | tuple[LedgerRow, ...]) -> tuple[Ra
         if row.capability_id in seen:
             raise ValueError(f"duplicate ledger capability: {row.capability_id}")
         seen.add(row.capability_id)
+        if row.evidence_state in {"verified", "blocked"}:
+            continue
         ranked.append(_ranked(row))
     return tuple(sorted(ranked, key=lambda item: item.priority_key))
+
+
+def ledger_row_to_dict(row: LedgerRow) -> dict[str, Any]:
+    return {
+        "capabilityId": row.capability_id,
+        "impact": row.impact,
+        "currentIssueCount": row.current_issue_count,
+        "observedUniquePackages": row.observed_unique_packages,
+        "failureKind": row.failure_kind,
+        "oracleReady": row.oracle_ready,
+        "dependencyDepth": row.dependency_depth,
+        "evidenceState": row.evidence_state,
+        "renderMode": row.render_mode,
+        "blockers": list(row.blockers),
+        "issueUrls": list(row.issue_urls),
+    }
+
+
+def ledger_row_from_dict(value: Mapping[str, Any]) -> LedgerRow:
+    try:
+        row = LedgerRow(
+            capability_id=str(value["capabilityId"]),
+            impact=str(value["impact"]),
+            current_issue_count=int(value["currentIssueCount"]),
+            observed_unique_packages=int(value["observedUniquePackages"]),
+            failure_kind=str(value["failureKind"]),
+            oracle_ready=value["oracleReady"] is True,
+            dependency_depth=int(value["dependencyDepth"]),
+            evidence_state=str(value["evidenceState"]),
+            render_mode=str(value["renderMode"]),
+            blockers=tuple(str(item) for item in value.get("blockers", [])),
+            issue_urls=tuple(str(item) for item in value.get("issueUrls", [])),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError("invalid capability ledger row") from error
+    _validate_row(row)
+    return row
+
+
+def ranked_capability_to_dict(item: RankedCapability) -> dict[str, Any]:
+    return {
+        "capabilityId": item.capability_id,
+        "priority": {name: value for name, value in item.priority_labels},
+        "row": ledger_row_to_dict(item.row),
+    }
+
+
+def _issue_current_reproduction_count(
+    capability: CapabilityDefinition,
+    issues: Sequence[Mapping[str, Any]],
+) -> int:
+    linked_urls = set(capability.issue_urls)
+    return sum(
+        1
+        for issue in issues
+        if issue.get("url") in linked_urls and issue.get("currentReproduction") is True
+    )
+
+
+def _oracle_rows_for(
+    capability_id: str,
+    oracle_report: Mapping[str, Any] | None,
+) -> tuple[Mapping[str, Any], ...]:
+    if oracle_report is None:
+        return ()
+    values = oracle_report.get("results")
+    if not isinstance(values, list):
+        return ()
+    rows: list[Mapping[str, Any]] = []
+    for value in values:
+        if not isinstance(value, Mapping):
+            continue
+        ids = value.get("capabilityIds")
+        if value.get("capabilityId") == capability_id or (
+            isinstance(ids, list) and capability_id in ids
+        ):
+            rows.append(value)
+    return tuple(rows)
+
+
+def _oracle_failure_kind(rows: tuple[Mapping[str, Any], ...]) -> str:
+    if any(row.get("error") or row.get("evaluation_errors") for row in rows):
+        return "runtime-error"
+    if any(row.get("structuralPassed") is False for row in rows):
+        return "deterministic-failure"
+    if any(row.get("passed") is False for row in rows):
+        return "native-failure"
+    if any(row.get("needs_review") is True or row.get("needsReview") is True for row in rows):
+        return "review-warning"
+    return "none"
+
+
+def _is_sha256(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _oracle_row_is_fresh(
+    row: Mapping[str, Any],
+    revision: Any,
+    inventory_dirty: Any,
+    inventory_hashes: set[str],
+) -> bool:
+    provenance = row.get("provenance")
+    if not isinstance(provenance, Mapping):
+        return False
+    renderer = provenance.get("renderer")
+    inputs = provenance.get("inputs")
+    if not isinstance(renderer, Mapping) or not isinstance(inputs, Mapping):
+        return False
+    source = inputs.get("sourcePptx")
+    ground_truth = inputs.get("groundTruth")
+    source_sha256 = source.get("sha256") if isinstance(source, Mapping) else None
+    ground_truth_sha256 = (
+        ground_truth.get("combinedSha256") if isinstance(ground_truth, Mapping) else None
+    )
+    return (
+        inventory_dirty is False
+        and renderer.get("revision") == revision
+        and renderer.get("dirty") is False
+        and _is_sha256(source_sha256)
+        and source_sha256 in inventory_hashes
+        and _is_sha256(ground_truth_sha256)
+    )
+
+
+def build_ledger_rows(
+    registry: CapabilityRegistry,
+    inventory: Mapping[str, Any],
+    *,
+    issues: Sequence[Mapping[str, Any]] = (),
+    oracle_report: Mapping[str, Any] | None = None,
+    accepted_states: Mapping[str, str] | None = None,
+) -> tuple[LedgerRow, ...]:
+    packages = inventory.get("packages")
+    if not isinstance(packages, list):
+        raise ValueError("inventory packages must be a list")
+    renderer = inventory.get("renderer")
+    revision = renderer.get("revision") if isinstance(renderer, Mapping) else None
+    inventory_dirty = renderer.get("dirty") if isinstance(renderer, Mapping) else None
+    inventory_hashes = {
+        package.get("sha256")
+        for package in packages
+        if isinstance(package, Mapping) and _is_sha256(package.get("sha256"))
+    }
+    accepted_states = accepted_states or {}
+    rows: list[LedgerRow] = []
+    for capability in registry.capabilities:
+        observed = sum(
+            1
+            for package in packages
+            if isinstance(package, Mapping)
+            and isinstance(package.get("capabilityIds"), list)
+            and capability.id in package["capabilityIds"]
+        )
+        oracle_rows = _oracle_rows_for(capability.id, oracle_report)
+        fresh_rows = tuple(
+            row
+            for row in oracle_rows
+            if _oracle_row_is_fresh(row, revision, inventory_dirty, inventory_hashes)
+        )
+        blockers: list[str] = []
+        accepted_state = accepted_states.get(capability.id)
+        if accepted_state is not None and accepted_state not in EVIDENCE_STATES:
+            raise ValueError(
+                f"unsupported accepted evidence state for {capability.id}: {accepted_state}"
+            )
+        if oracle_report is not None and oracle_rows and not fresh_rows:
+            blockers.append("oracle-report:stale")
+        elif (
+            "native-powerpoint" in capability.required_gates
+            and not oracle_rows
+            and accepted_state != "verified"
+        ):
+            blockers.append("oracle-report:missing-or-unmapped")
+        oracle_ready = bool(fresh_rows)
+        failure_kind = _oracle_failure_kind(fresh_rows)
+        if accepted_state is not None:
+            evidence_state = accepted_state
+            if accepted_state == "regressed":
+                blockers.append("acceptance:regressed")
+        else:
+            evidence_state = "reproducible" if oracle_ready else "observed" if observed else "unknown"
+        if accepted_state == "verified" and failure_kind != "none":
+            evidence_state = "regressed"
+            blockers.append("accepted-capability:fresh-failure")
+        rows.append(
+            LedgerRow(
+                capability_id=capability.id,
+                impact=capability.impact,
+                current_issue_count=_issue_current_reproduction_count(capability, issues),
+                observed_unique_packages=observed,
+                failure_kind=failure_kind,
+                oracle_ready=oracle_ready,
+                dependency_depth=0,
+                evidence_state=evidence_state,
+                render_mode=capability.render_mode,
+                blockers=tuple(blockers),
+                issue_urls=capability.issue_urls,
+            )
+        )
+    return tuple(rows)
 
 
 def _thaw(value: Any) -> Any:

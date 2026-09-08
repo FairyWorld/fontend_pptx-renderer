@@ -86,7 +86,12 @@ jobs:
           node-version: 20
           cache: pnpm
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm capability:check
       - run: pnpm geometry:check
       - run: pnpm test:pdfjs-contract
       - run: pnpm build

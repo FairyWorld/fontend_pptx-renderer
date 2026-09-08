@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
@@ -254,8 +255,14 @@ def _sanitize_value(value: Any, key: str = "") -> Any:
         return result
     if isinstance(value, (list, tuple)):
         return [item for item in (_sanitize_value(item, key) for item in value) if item is not None]
-    if isinstance(value, str) and (value.startswith("/") or value.startswith("~")):
-        return None
+    if isinstance(value, str):
+        if (
+            value.startswith(("/", "~", "\\\\", "file://"))
+            or re.match(r"^[A-Za-z]:[\\/]", value)
+            or "/Users/" in value
+            or "/home/" in value
+        ):
+            return None
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
     return str(value)

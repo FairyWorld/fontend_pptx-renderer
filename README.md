@@ -36,6 +36,25 @@ presentation by its exact full path, and require an unlocked interactive PowerPo
 lets local oracle runs coexist with other open presentations without treating the active window as
 the export target.
 
+### Evidence-Driven Capability Loop
+
+Renderer support is tracked by bounded OOXML capability rather than by a single aggregate score.
+The tracked registry at `test/e2e/oracle/capabilities.json` declares each feature's exact scope,
+current render mode, fallback, relevant implementation files, and mandatory gates. Promotion
+receipts in `test/e2e/oracle/capability-acceptance.json` bind an accepted scope to its implementation,
+PPTX inputs, PowerPoint ground truth, environment, and revision hashes.
+
+```bash
+pnpm capability:check      # validate tracked contracts and relevant file paths
+pnpm capability:inventory  # scan the local ignored corpus into an ignored evidence report
+```
+
+Inventory, ledger, ranking, work-packet, and verification reports stay under the ignored
+`test/e2e/reports/capability-loop/` directory. `native` describes the intended render behavior;
+the public `supported` claim additionally requires a fresh `verified` receipt. A report from a
+dirty tree, a changed capability scope, changed implementation files, changed input/ground-truth
+hashes, skipped cases, or an unresolved manual review cannot promote a capability.
+
 ## Install
 
 ```bash
@@ -741,7 +760,14 @@ Dev pages at `http://127.0.0.1:5173`:
 
 ## What's Not Yet Supported
 
-3D effects, true 3D chart perspective/depth/surface meshes, animations/transitions, equations (OMML), full EMF/WMF vector rendering, shadow/reflection/glow effects, executing/editing embedded OLE objects, and slide notes rendering. Available OLE picture previews can render; they are not an OLE object engine. EMF bitmap and embedded-PDF previews remain supported (PDF previews require PDF.js); arbitrary EMF/WMF vector records remain excluded.
+DrawingML `a:scene3d`/`a:sp3d` camera, lighting, bevel, contour, and extrusion semantics currently
+retain the flat 2D shape fallback. True 3D chart perspective/depth/surface meshes, Office 2017
+embedded 3D models, animations/transitions, equations (OMML), full EMF/WMF vector rendering,
+executing/editing embedded OLE objects, and slide notes rendering are also outside the verified
+native scope. Available OLE picture previews can render; they are not an OLE object engine. EMF
+bitmap and embedded-PDF previews remain supported (PDF previews require PDF.js); arbitrary EMF/WMF
+vector records remain excluded. Exact current boundaries live in the capability registry described
+above.
 
 ## FAQ
 
