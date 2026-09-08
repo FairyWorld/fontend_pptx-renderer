@@ -6,6 +6,7 @@ import pytest
 
 from oracle.powerpoint_oracle import (
     PowerPointExportError,
+    _powerpoint_mac_path,
     export_pptx_to_pdf_mac,
     run_macro_only_mac,
     run_macro_export_mac,
@@ -15,6 +16,13 @@ pytestmark = pytest.mark.skipif(
     sys.platform == "win32",
     reason="AppleScript-based tests are macOS-only",
 )
+
+
+def test_powerpoint_mac_path_normalizes_private_tmp_firmlink():
+    assert _powerpoint_mac_path(Path("/private/tmp/pptx-renderer/input.pptx")) == (
+        "/tmp/pptx-renderer/input.pptx"
+    )
+    assert _powerpoint_mac_path(Path("/Users/aiden/input.pptx")) == "/Users/aiden/input.pptx"
 
 
 def test_export_invokes_osascript_with_expected_args(tmp_path: Path):

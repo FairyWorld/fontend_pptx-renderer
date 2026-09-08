@@ -31,6 +31,16 @@ def _as_osascript_literal(value: str) -> str:
     return f'"{escaped}"'
 
 
+def _powerpoint_mac_path(path: Path) -> str:
+    """Use the POSIX alias PowerPoint reports for macOS's /private/tmp firmlink."""
+    value = str(path)
+    if value == "/private/tmp":
+        return "/tmp"
+    if value.startswith("/private/tmp/"):
+        return value[len("/private") :]
+    return value
+
+
 def _qualify_macro_name(macro_host_pptm: Path, macro_name: str) -> str:
     if "!" in macro_name:
         return macro_name
@@ -48,12 +58,12 @@ def _build_macro_inline_cmd(
     params_literal = ", ".join(_as_osascript_literal(param) for param in params)
 
     lines = [
-        f"set inPptmPath to {_as_osascript_literal(str(macro_host_pptm))}",
+        f"set inPptmPath to {_as_osascript_literal(_powerpoint_mac_path(macro_host_pptm))}",
         f"set macroName to {_as_osascript_literal(macro_name)}",
         f"set macroParams to {{{params_literal}}}",
     ]
     if output_pdf is not None:
-        lines.append(f"set outPdfPath to {_as_osascript_literal(str(output_pdf))}")
+        lines.append(f"set outPdfPath to {_as_osascript_literal(_powerpoint_mac_path(output_pdf))}")
 
     lines.extend(
         [
@@ -213,7 +223,12 @@ def export_pptx_to_pdf_mac(
             shutil.copy2(src, run_src)
 
     script_path = Path(__file__).resolve().parent / "scripts" / "export_pptx_to_pdf.applescript"
-    cmd = ["osascript", str(script_path), str(run_src), str(run_out)]
+    cmd = [
+        "osascript",
+        str(script_path),
+        _powerpoint_mac_path(run_src),
+        _powerpoint_mac_path(run_out),
+    ]
 
     last_error: Exception | None = None
     attempts_made = 0
@@ -286,10 +301,10 @@ def run_macro_export_mac(
         primary_cmd = [
             "osascript",
             str(script_path),
-            str(host),
+            _powerpoint_mac_path(host),
             qualified_macro_name,
             *(macro_params or []),
-            str(out),
+            _powerpoint_mac_path(out),
         ]
         fallback_cmd = _build_macro_inline_cmd(
             macro_host_pptm=host,
@@ -302,7 +317,7 @@ def run_macro_export_mac(
         primary_cmd = [
             "osascript",
             str(script_path),
-            str(host),
+            _powerpoint_mac_path(host),
             qualified_macro_name,
             *(macro_params or []),
         ]
@@ -342,7 +357,7 @@ def run_macro_only_mac(
     primary_cmd = [
         "osascript",
         str(script_path),
-        str(host),
+        _powerpoint_mac_path(host),
         qualified_macro_name,
         *(macro_params or []),
     ]
