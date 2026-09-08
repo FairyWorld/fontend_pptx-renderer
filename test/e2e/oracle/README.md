@@ -29,7 +29,8 @@ decoded entry, and 256 MiB decoded in total. Ranking counts byte-identical PPTX 
 report, missing or changed inputs, stale relevant implementation files, skipped required cases,
 failed structural checks, or an unresolved manual-review row blocks promotion. Corpus scans isolate
 and report rejected packages instead of losing all other observations; use `--fail-on-rejected` for
-a strict nonzero exit after the report is written.
+a strict nonzero exit after the report is written. Unknown, verified, and externally blocked rows
+remain in the ledger for observation but are not selected as the next implementation cohort.
 
 ## Current Implemented Pieces
 

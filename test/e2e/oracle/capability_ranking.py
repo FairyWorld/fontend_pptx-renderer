@@ -107,7 +107,7 @@ def rank_capabilities(rows: list[LedgerRow] | tuple[LedgerRow, ...]) -> tuple[Ra
         if row.capability_id in seen:
             raise ValueError(f"duplicate ledger capability: {row.capability_id}")
         seen.add(row.capability_id)
-        if row.evidence_state in {"verified", "blocked"}:
+        if row.evidence_state in {"unknown", "verified", "blocked"}:
             continue
         ranked.append(_ranked(row))
     return tuple(sorted(ranked, key=lambda item: item.priority_key))
