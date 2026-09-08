@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 from pathlib import Path
 
@@ -69,3 +70,186 @@ def test_batch_result_preserves_case_provenance():
     )
 
     assert result["provenance"] == provenance
+
+
+def test_server_counts_per_slide_runtime_errors_separately_from_visual_metrics():
+    per_slide = [
+        {"slideIdx": 0, "ssim": 0.99},
+        {"slideIdx": 1, "ssim": None, "error": "Target page closed"},
+    ]
+
+    assert server._evaluation_errors(per_slide) == [
+        {"slideIdx": 1, "error": "Target page closed"},
+    ]
+
+
+def test_empty_runtime_error_message_remains_an_evaluation_error():
+    run_all = _load_run_all_module()
+    per_slide = [{"slideIdx": 0, "error": ""}]
+    expected = [{"slideIdx": 0, "error": "Unknown slide evaluation error"}]
+
+    assert server._evaluation_errors(per_slide) == expected
+    assert run_all._evaluation_errors_from_response({"perSlide": per_slide}) == expected
+
+
+def test_batch_retry_recovers_a_transient_per_slide_runtime_error():
+    run_all = _load_run_all_module()
+
+    class Response:
+        status_code = 200
+
+        def __init__(self, body):
+            self._body = body
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._body
+
+    class Client:
+        def __init__(self):
+            self.calls = 0
+
+        async def post(self, _url):
+            self.calls += 1
+            if self.calls == 1:
+                return Response(
+                    {
+                        "perSlide": [
+                            {"slideIdx": 0, "ssim": None, "error": "Target page closed"}
+                        ]
+                    }
+                )
+            return Response(
+                {
+                    "avgSsim": 0.99,
+                    "avgColorHistCorr": 1.0,
+                    "slideCount": 1,
+                    "visibleSlideCount": 1,
+                    "supported": True,
+                    "quality": {"needsReview": False},
+                    "perSlide": [{"slideIdx": 0, "ssim": 0.99}],
+                }
+            )
+
+    client = Client()
+    result, error = asyncio.run(
+        run_all._eval_one(
+            client,
+            asyncio.Semaphore(1),
+            "http://127.0.0.1:8081",
+            "sample",
+            retries=1,
+        )
+    )
+
+    assert error is None
+    assert result is not None
+    assert result["summary"]["ssim"] == 0.99
+    assert client.calls == 2
+
+
+def test_browser_init_replaces_a_disconnected_browser(monkeypatch):
+    events = []
+    close_started = None
+    release_close = None
+
+    class Browser:
+        def __init__(self, connected):
+            self.connected = connected
+
+        def is_connected(self):
+            return self.connected
+
+        async def close(self):
+            events.append("close-browser")
+            if not self.connected:
+                close_started.set()
+                await release_close.wait()
+
+    class Playwright:
+        def __init__(self, browser):
+            self.chromium = self
+            self.browser = browser
+
+        async def launch(self, **_options):
+            events.append("launch-browser")
+            return self.browser
+
+        async def stop(self):
+            events.append("stop-playwright")
+
+    class Starter:
+        async def start(self):
+            events.append("start-playwright")
+            return fresh_playwright
+
+    stale_browser = Browser(False)
+    stale_playwright = Playwright(stale_browser)
+    fresh_browser = Browser(True)
+    fresh_playwright = Playwright(fresh_browser)
+    monkeypatch.setattr(server, "_browser", stale_browser)
+    monkeypatch.setattr(server, "_playwright", stale_playwright)
+    monkeypatch.setattr(server, "async_playwright", lambda: Starter())
+    monkeypatch.setattr(server, "_browser_init_lock", asyncio.Lock())
+
+    async def get_concurrently():
+        nonlocal close_started, release_close
+        close_started = asyncio.Event()
+        release_close = asyncio.Event()
+        first = asyncio.create_task(server.get_browser())
+        await close_started.wait()
+        second = asyncio.create_task(server.get_browser())
+        await asyncio.sleep(0)
+        release_close.set()
+        results = await asyncio.gather(first, second)
+        initialization_events = list(events)
+        await server.close_browser()
+        return results, initialization_events
+
+    results, initialization_events = asyncio.run(get_concurrently())
+
+    assert results == [fresh_browser, fresh_browser]
+    assert initialization_events == [
+        "close-browser",
+        "stop-playwright",
+        "start-playwright",
+        "launch-browser",
+    ]
+
+
+def test_browser_init_stops_playwright_when_launch_is_cancelled(monkeypatch):
+    events = []
+
+    class Playwright:
+        chromium = None
+
+        def __init__(self):
+            self.chromium = self
+
+        async def launch(self, **_options):
+            events.append("launch-browser")
+            raise asyncio.CancelledError()
+
+        async def stop(self):
+            events.append("stop-playwright")
+
+    playwright = Playwright()
+
+    class Starter:
+        async def start(self):
+            events.append("start-playwright")
+            return playwright
+
+    monkeypatch.setattr(server, "_browser", None)
+    monkeypatch.setattr(server, "_playwright", None)
+    monkeypatch.setattr(server, "async_playwright", lambda: Starter())
+    monkeypatch.setattr(server, "_browser_init_lock", asyncio.Lock())
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(server.get_browser())
+
+    assert events == ["start-playwright", "launch-browser", "stop-playwright"]
+    assert server._browser is None
+    assert server._playwright is None

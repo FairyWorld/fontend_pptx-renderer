@@ -104,33 +104,73 @@ app.add_middleware(
 
 _browser = None
 _playwright = None
+_browser_init_lock = asyncio.Lock()
+
+
+def _browser_is_connected(browser) -> bool:
+    if browser is None:
+        return False
+    try:
+        return bool(browser.is_connected())
+    except Exception:
+        return False
+
+
+async def _close_browser_unlocked():
+    global _browser, _playwright
+    browser = _browser
+    playwright = _playwright
+    _browser = None
+    _playwright = None
+    if browser is not None:
+        try:
+            await browser.close()
+        except Exception:
+            pass
+    if playwright is not None:
+        try:
+            await playwright.stop()
+        except Exception:
+            pass
 
 
 async def get_browser():
     global _browser, _playwright
-    if _browser is None:
-        _playwright = await async_playwright().start()
+    if _browser_is_connected(_browser):
+        return _browser
+
+    async with _browser_init_lock:
+        if _browser_is_connected(_browser):
+            return _browser
+        await _close_browser_unlocked()
+        playwright = await async_playwright().start()
         launch_options = {"headless": True}
         if channel := os.getenv("PPTX_E2E_BROWSER_CHANNEL", "").strip():
             launch_options["channel"] = channel
-        _browser = await _playwright.chromium.launch(**launch_options)
+        try:
+            browser = await playwright.chromium.launch(**launch_options)
+        except BaseException:
+            await playwright.stop()
+            raise
+        _playwright = playwright
+        _browser = browser
     return _browser
 
 
 async def close_browser():
-    global _browser, _playwright
-    if _browser:
-        try:
-            await _browser.close()
-        except Exception:
-            pass
-        _browser = None
-    if _playwright:
-        try:
-            await _playwright.stop()
-        except Exception:
-            pass
-        _playwright = None
+    async with _browser_init_lock:
+        await _close_browser_unlocked()
+
+
+def _evaluation_errors(per_slide: list[dict]) -> list[dict]:
+    return [
+        {
+            "slideIdx": slide.get("slideIdx"),
+            "error": str(slide["error"]).strip() or "Unknown slide evaluation error",
+        }
+        for slide in per_slide
+        if "error" in slide
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -653,21 +693,26 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
     avg_fg_iou_tolerant = sum(fg_iou_tolerant_scores) / len(fg_iou_tolerant_scores) if fg_iou_tolerant_scores else 0.0
     avg_chamfer = sum(chamfer_scores) / len(chamfer_scores) if chamfer_scores else 0.0
 
+    evaluation_errors = _evaluation_errors(per_slide)
     summary = {
         "ssim": avg_ssim,
         "color_hist_corr": avg_color_hist_corr,
         "fg_iou": avg_fg_iou,
     }
-    triage_reasons = classify_case_outcome(
-        summary,
-        {"ssim": VISUAL_EVAL_THRESHOLDS["ssim"]},
-    )
-    # --- Pass/fail: only SSIM + color_hist_corr (conservative, zero false positives) ---
-    metric_reasons = []
-    if avg_ssim < VISUAL_EVAL_THRESHOLDS["ssim"]:
-        metric_reasons.append("metric:ssim")
-    if avg_color_hist_corr < VISUAL_EVAL_THRESHOLDS["color_hist_corr"]:
-        metric_reasons.append("metric:color_hist_corr")
+    if evaluation_errors:
+        triage_reasons = []
+        metric_reasons = []
+    else:
+        triage_reasons = classify_case_outcome(
+            summary,
+            {"ssim": VISUAL_EVAL_THRESHOLDS["ssim"]},
+        )
+        # --- Pass/fail: only SSIM + color_hist_corr (conservative, zero false positives) ---
+        metric_reasons = []
+        if avg_ssim < VISUAL_EVAL_THRESHOLDS["ssim"]:
+            metric_reasons.append("metric:ssim")
+        if avg_color_hist_corr < VISUAL_EVAL_THRESHOLDS["color_hist_corr"]:
+            metric_reasons.append("metric:color_hist_corr")
 
     hard_reasons: list[str] = []
     for reason in [*metric_reasons, *triage_reasons]:
@@ -675,11 +720,13 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
             continue
         if reason not in hard_reasons:
             hard_reasons.append(reason)
+    if evaluation_errors:
+        hard_reasons.append("runtime:evaluation_error")
 
     # --- Warning layer: flag for human review (does NOT auto-fail) ---
     warning_reasons = [reason for reason in triage_reasons if reason.startswith("warn:")]
-    needs_review = avg_ssim < SSIM_WARNING_THRESHOLD
-    if needs_review:
+    needs_review = bool(evaluation_errors) or avg_ssim < SSIM_WARNING_THRESHOLD
+    if not evaluation_errors and needs_review:
         warning_reasons.append("warn:ssim_below_review_threshold")
     if oracle_mismatch_count:
         warning_reasons.append("warn:oracle_ground_truth_mismatch")
@@ -690,6 +737,8 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
         "testFile": test_file,
         "slideCount": len(slide_to_pdf),
         "visibleSlideCount": sum(1 for s in slide_to_pdf if s is not None),
+        "evaluationErrorCount": len(evaluation_errors),
+        "evaluationErrors": evaluation_errors,
         "oracleMismatchCount": oracle_mismatch_count,
         "avgSsim": round(avg_ssim, 4),
         "avgMae": round(avg_mae, 4),
@@ -699,7 +748,9 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
         "avgChamferScore": round(avg_chamfer, 4),
         "supported": passed,
         "quality": {
-            "status": "supported" if passed else "unsupported",
+            "status": (
+                "error" if evaluation_errors else "supported" if passed else "unsupported"
+            ),
             "passed": passed,
             "thresholds": VISUAL_EVAL_THRESHOLDS,
             "reasons": hard_reasons,
