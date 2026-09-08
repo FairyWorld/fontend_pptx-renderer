@@ -4,6 +4,7 @@
 Produces oracle-pypptx-* cases covering:
   - Rich text: fonts, sizes, bold/italic, alignment, vertical text, bullets
   - Shape adjustment variants: same shape with different adj values
+  - Static DrawingML 3D: bounded orthographic top-bevel and opt-out matrix
   - Chart data variants: 2D chart types with custom data/series
   - Composite: multiple components on a single slide
 
@@ -23,10 +24,12 @@ import math
 import posixpath
 import random
 import sys
+from io import BytesIO
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from lxml import etree
+from PIL import Image, ImageDraw
 from pptx import Presentation
 from pptx.chart.data import BubbleChartData, CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
@@ -137,6 +140,62 @@ def _set_cjk_paragraph_text(paragraph, text: str, **style) -> None:
     paragraph.text = text
     for run in paragraph.runs:
         _set_cjk_run_style(run, **style)
+
+
+def _shape3d_fixture_image() -> BytesIO:
+    """Return a deterministic image whose edge lighting remains visible in native exports."""
+    image = Image.new("RGB", (480, 280), "#17456B")
+    draw = ImageDraw.Draw(image)
+    for x in range(image.width):
+        red = 24 + round(50 * x / max(1, image.width - 1))
+        green = 74 + round(90 * x / max(1, image.width - 1))
+        blue = 112 + round(65 * x / max(1, image.width - 1))
+        draw.line((x, 0, x, image.height), fill=(red, green, blue))
+    draw.rectangle((44, 40, 436, 240), outline="#F2C14E", width=12)
+    draw.ellipse((178, 78, 302, 202), fill="#F4F7FB", outline="#102A43", width=8)
+    stream = BytesIO()
+    image.save(stream, format="PNG", optimize=False)
+    stream.seek(0)
+    return stream
+
+
+def _insert_before_ext_lst(parent, child) -> None:
+    ext_lst = parent.find(qn("a:extLst"))
+    if ext_lst is None:
+        parent.append(child)
+    else:
+        parent.insert(parent.index(ext_lst), child)
+
+
+def _apply_bounded_shape3d(
+    shape,
+    *,
+    contour_width_emu: int | None = None,
+    contour_color: str = "FFFFFF",
+) -> None:
+    """Insert the exact static 3D tuple used by the bounded renderer cohort."""
+    sp_pr = shape._element.spPr
+    scene3d = etree.Element(qn("a:scene3d"))
+    etree.SubElement(scene3d, qn("a:camera"), prst="orthographicFront")
+    etree.SubElement(scene3d, qn("a:lightRig"), rig="threePt", dir="t")
+
+    sp3d_attrs = {"extrusionH": "0"}
+    if contour_width_emu is not None:
+        sp3d_attrs["contourW"] = str(contour_width_emu)
+    sp3d = etree.Element(qn("a:sp3d"), **sp3d_attrs)
+    etree.SubElement(
+        sp3d,
+        qn("a:bevelT"),
+        w="127000",
+        h="127000",
+        prst="circle",
+    )
+    if contour_width_emu is not None:
+        contour_clr = etree.SubElement(sp3d, qn("a:contourClr"))
+        etree.SubElement(contour_clr, qn("a:srgbClr"), val=contour_color)
+
+    _insert_before_ext_lst(sp_pr, scene3d)
+    _insert_before_ext_lst(sp_pr, sp3d)
 
 
 def _add_cjk_textbox(
@@ -901,6 +960,171 @@ def _build_shape_adj_cases() -> list[CaseDef]:
 
 
 # ---------------------------------------------------------------------------
+# P1b: Bounded static DrawingML 3D
+# ---------------------------------------------------------------------------
+
+def _build_shape3d_cases() -> list[CaseDef]:
+    """Build a narrow native-oracle matrix for orthographic circle top bevels."""
+    cases: list[CaseDef] = []
+    seq = 0
+
+    def _add(slug: str, build_fn, *, features: list[str]):
+        nonlocal seq
+        seq += 1
+        cases.append({
+            "name": f"oracle-pypptx-shape3d-{seq:04d}-{slug}",
+            "build_fn": build_fn,
+            "coverage": {
+                "oracle": "native-powerpoint",
+                "features": features,
+            },
+        })
+
+    def _add_picture(prs, *, apply_3d: bool):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        picture = slide.shapes.add_picture(
+            _shape3d_fixture_image(),
+            _emu(3.0),
+            _emu(1.75),
+            _emu(7.333),
+            _emu(4.0),
+        )
+        picture.name = "Static 3D picture"
+        if apply_3d:
+            _apply_bounded_shape3d(picture)
+
+    _add(
+        "flat-optout",
+        lambda prs: _add_picture(prs, apply_3d=False),
+        features=["p:pic", "a:scene3d=absent", "a:sp3d=absent"],
+    )
+    _add(
+        "picture-rect-circle-bevel",
+        lambda prs: _add_picture(prs, apply_3d=True),
+        features=[
+            "p:pic",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _add_shape(
+        prs,
+        shape_type,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        contour: bool = False,
+    ):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_shape(
+            shape_type,
+            _emu(left),
+            _emu(top),
+            _emu(width),
+            _emu(height),
+        )
+        shape.name = "Static 3D shape"
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
+        shape.line.fill.background()
+        _apply_bounded_shape3d(shape, contour_width_emu=12700 if contour else None)
+
+    _add(
+        "roundrect-bevel-contour",
+        lambda prs: _add_shape(
+            prs,
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            left=3.0,
+            top=1.75,
+            width=7.333,
+            height=4.0,
+            contour=True,
+        ),
+        features=[
+            "p:sp.prstGeom=roundRect",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT=circle",
+            "a:sp3d.contourW=12700",
+            "a:sp3d.contourClr=FFFFFF",
+        ],
+    )
+    _add(
+        "wide-bevel",
+        lambda prs: _add_shape(
+            prs,
+            MSO_SHAPE.RECTANGLE,
+            left=1.35,
+            top=2.25,
+            width=10.6,
+            height=2.2,
+        ),
+        features=[
+            "p:sp.prstGeom=rect",
+            "geometry.aspect=wide",
+            "a:scene3d.camera=orthographicFront",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+    _add(
+        "tall-bevel",
+        lambda prs: _add_shape(
+            prs,
+            MSO_SHAPE.RECTANGLE,
+            left=5.15,
+            top=0.55,
+            width=3.0,
+            height=6.4,
+        ),
+        features=[
+            "p:sp.prstGeom=rect",
+            "geometry.aspect=tall",
+            "a:scene3d.camera=orthographicFront",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _build_grouped(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        group = slide.shapes.add_group_shape()
+        shape = group.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            _emu(1.0),
+            _emu(1.0),
+            _emu(4.0),
+            _emu(2.5),
+        )
+        shape.name = "Grouped static 3D shape"
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0x70, 0xAD, 0x47)
+        shape.line.fill.background()
+        _apply_bounded_shape3d(shape)
+        group.left = _emu(3.0)
+        group.top = _emu(1.5)
+        group.width = _emu(7.2)
+        group.height = _emu(4.5)
+
+    _add(
+        "grouped-bevel",
+        _build_grouped,
+        features=[
+            "p:grpSp/p:sp",
+            "group.nonIdentityScale",
+            "a:scene3d.camera=orthographicFront",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    return cases
+
+
+# ---------------------------------------------------------------------------
 # P2: Composite (multi-component) cases
 # ---------------------------------------------------------------------------
 
@@ -1652,6 +1876,7 @@ def _build_all_case_defs() -> list[CaseDef]:
     all_cases: list[CaseDef] = []
     all_cases.extend(_build_text_cases())
     all_cases.extend(_build_shape_adj_cases())
+    all_cases.extend(_build_shape3d_cases())
     all_cases.extend(_build_composite_cases())
     all_cases.extend(_build_chart_cases())
     return all_cases

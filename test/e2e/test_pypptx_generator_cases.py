@@ -301,3 +301,116 @@ def test_scaled_group_composite_case_generates_non_identity_group_space(tmp_path
         "a:chExt/@cy",
         namespaces=ns,
     )
+
+
+def test_static_shape3d_matrix_is_registered():
+    generator = _load_generator_module()
+    names = {
+        case["name"]
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-shape3d-")
+    }
+
+    assert names == {
+        "oracle-pypptx-shape3d-0001-flat-optout",
+        "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel",
+        "oracle-pypptx-shape3d-0003-roundrect-bevel-contour",
+        "oracle-pypptx-shape3d-0004-wide-bevel",
+        "oracle-pypptx-shape3d-0005-tall-bevel",
+        "oracle-pypptx-shape3d-0006-grouped-bevel",
+    }
+
+
+def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
+    generator = _load_generator_module()
+    cases = {
+        case["name"]: case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-shape3d-")
+    }
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    roots = {}
+
+    for name, case in cases.items():
+        pptx_path = tmp_path / name / "source.pptx"
+        generator._generate_pptx(case, pptx_path)
+        with ZipFile(pptx_path) as zf:
+            roots[name] = etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+
+    optout = roots["oracle-pypptx-shape3d-0001-flat-optout"]
+    assert not optout.xpath(".//a:scene3d | .//a:sp3d", namespaces=ns)
+
+    positive_names = set(cases) - {"oracle-pypptx-shape3d-0001-flat-optout"}
+    for name in positive_names:
+        root = roots[name]
+        targets = root.xpath(
+            ".//*[self::p:sp or self::p:pic][p:spPr/a:scene3d and p:spPr/a:sp3d]",
+            namespaces=ns,
+        )
+        assert len(targets) == 1, name
+        target = targets[0]
+        assert target.xpath(
+            "boolean(p:spPr/a:scene3d/a:camera[@prst='orthographicFront'])",
+            namespaces=ns,
+        ), name
+        assert target.xpath(
+            "boolean(p:spPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'])",
+            namespaces=ns,
+        ), name
+        assert target.xpath(
+            "boolean(p:spPr/a:sp3d[@extrusionH='0']/a:bevelT"
+            "[@w='127000'][@h='127000'][@prst='circle'])",
+            namespaces=ns,
+        ), name
+        assert not target.xpath(
+            "p:spPr/a:scene3d/a:camera/a:rot | p:spPr/a:sp3d/a:bevelB",
+            namespaces=ns,
+        ), name
+        assert not target.xpath("p:spPr/a:sp3d/@prstMaterial", namespaces=ns), name
+
+    picture = roots["oracle-pypptx-shape3d-0002-picture-rect-circle-bevel"]
+    assert len(picture.xpath(".//p:pic[p:spPr/a:sp3d]", namespaces=ns)) == 1
+
+    contour = roots["oracle-pypptx-shape3d-0003-roundrect-bevel-contour"]
+    assert contour.xpath(
+        "boolean(.//p:sp/p:spPr/a:sp3d[@contourW='12700']"
+        "/a:contourClr/a:srgbClr[@val='FFFFFF'])",
+        namespaces=ns,
+    )
+
+    wide = roots["oracle-pypptx-shape3d-0004-wide-bevel"]
+    wide_ext = [int(value) for value in wide.xpath(".//p:sp[p:spPr/a:sp3d]/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)]
+    assert wide_ext[0] > wide_ext[1]
+
+    tall = roots["oracle-pypptx-shape3d-0005-tall-bevel"]
+    tall_ext = [int(value) for value in tall.xpath(".//p:sp[p:spPr/a:sp3d]/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)]
+    assert tall_ext[1] > tall_ext[0]
+
+    grouped = roots["oracle-pypptx-shape3d-0006-grouped-bevel"]
+    assert len(grouped.xpath(".//p:grpSp/p:sp[p:spPr/a:sp3d]", namespaces=ns)) == 1
+
+
+def test_static_shape3d_case_json_records_exact_scope(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel"
+    )
+
+    path = generator._write_case_json(case, tmp_path)
+    payload = __import__("json").loads(path.read_text(encoding="utf-8"))
+
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "features": [
+            "p:pic",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT=circle",
+        ],
+    }

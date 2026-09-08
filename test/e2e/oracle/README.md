@@ -164,12 +164,15 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 123 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 129 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (51 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
   placeholder inheritance, plus a 12-case CJK wrap/autofit/line-spacing interaction matrix
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
+- **Static DrawingML 3D** (6 cases): flat picture opt-out plus a bounded
+  `orthographicFront`/`threePt:t`/circle-top-bevel matrix across picture, rect, roundRect,
+  contour, wide/tall, and grouped-shape contexts
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -182,12 +185,17 @@ cd test/e2e
 # Focus one or more exact/glob patterns; this example selects text IDs 0040-0051.
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-text-00[45]*'
+
+# Generate only the bounded static DrawingML 3D matrix.
+.venv/bin/python3 scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-shape3d-*'
 ```
 
 macOS exports PDF; Windows exports PDF plus optional per-slide PNG. `--pptx-only` works without
 PowerPoint. On macOS each export is isolated to its staged input path and fixed runtime sink;
-PowerPoint itself may remain running. The exporter resolves and closes only the presentation whose
-full path matches that staged input, so unrelated user presentations stay outside the export
+PowerPoint itself may remain running. The exporter normalizes macOS's `/private/tmp` firmlink to
+the `/tmp` spelling reported by PowerPoint, then resolves and closes only the presentation whose
+full path matches that staged input. Unrelated user presentations stay outside the export
 lifecycle. The binary artifacts remain ignored under `testdata/`, while tracked case JSON records
 coverage and font requirements. The generation report includes the selected patterns and SHA-256
 fingerprints.

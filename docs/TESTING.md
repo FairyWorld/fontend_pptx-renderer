@@ -215,11 +215,13 @@ cd test/e2e
 
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
-For text, shape-adjustment, composite, and chart interaction cases, use the python-pptx
-generator. It currently defines 123 cases: 51 text, 31 shape-adjustment, 20 composite, and 21
-chart cases. The CJK text matrix at IDs 0040-0051 covers square/no-wrap behavior, omitted and
-explicit autofit modes, percentage and point line spacing, paragraph spacing, adjacent run
-spacing, and centered text inside a parent shape.
+For text, shape-adjustment, bounded static DrawingML 3D, composite, and chart interaction cases,
+use the python-pptx generator. It currently defines 129 cases: 51 text, 31 shape-adjustment, 6
+static 3D, 20 composite, and 21 chart cases. The static 3D matrix covers flat opt-out, picture and
+shape containers, rect/roundRect, white contour, wide/tall aspect ratios, and a non-identity group.
+The CJK text matrix at IDs 0040-0051 covers square/no-wrap behavior, omitted and explicit autofit
+modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, and centered
+text inside a parent shape.
 
 ```bash
 cd test/e2e
@@ -230,6 +232,10 @@ cd test/e2e
 # Generate only the CJK matrix. --case is repeatable and accepts exact names or globs.
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-text-00[45]*'
+
+# Generate only the bounded static DrawingML 3D matrix.
+.venv/bin/python scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-shape3d-*'
 
 # Package-only inspection on a host without PowerPoint.
 .venv/bin/python scripts/generate_pypptx_cases.py \
@@ -246,8 +252,9 @@ PowerPoint automation on macOS requires an unlocked interactive session. Error `
 same known-good deck exports normally in an unlocked session is an environment failure, not a
 renderer result. Ordinary exports stage `_pptx-input.pptx` and `_pptx-output.pdf` in the ignored
 `testdata/oracle-runtime` directory; grant PowerPoint access to that directory once. Each script
-matches the opened file by exact `full name`, never exports or closes `active presentation`, and
-closes only the matched object on success or failure. Macro names are qualified with their loaded
+normalizes macOS's `/private/tmp` firmlink to the `/tmp` spelling returned by PowerPoint, matches
+the opened file by exact `full name`, never exports or closes `active presentation`, and closes
+only the matched object on success or failure. Macro names are qualified with their loaded
 `.pptm` filename because an unqualified name can return PowerPoint error `-18` when another deck is
 open. The 120-second export and macro timeouts stop without retry and tell the operator to check
 the unlock state and any pending **Grant File Access** or macro-security dialog. Stale output PDFs
