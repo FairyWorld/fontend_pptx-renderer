@@ -1,11 +1,12 @@
 # OOXML Geometry Source Contract
 
 This directory contains the M0 source contract, M1 compiler/evaluator, M2 SVG path emitter, M3
-single-path production gate, and M4 ordered multi-path production adapter for the spec-compiled
+single-path production gate, M4 ordered multi-path production adapter, and M5 bounded-adjustment
+gate for the spec-compiled
 preset geometry engine. The build-time modules are development tooling. The generator writes an
-explicit production subset consumed by `src/shapes/ooxmlGeometryRuntime.ts`; all 28
-zero-adjustment flowchart shapes in IDs 61-88 currently use it, while excluded flowcharts and
-every other shape use the handwritten implementation in `src/shapes/presets.ts`.
+explicit 29-definition production subset consumed by `src/shapes/ooxmlGeometryRuntime.ts`: all 28
+zero-adjustment flowchart shapes in IDs 61-88 plus bounded-adjustment `donut`. Every other shape
+uses the handwritten implementation in `src/shapes/presets.ts`.
 
 ## Pinned source
 
@@ -131,7 +132,7 @@ are rounded to six decimal places only when serialized.
 and 180x400. It rejects empty or non-finite output and fingerprints each complete profile. These
 gates prove deterministic emission, not visual equivalence with PowerPoint.
 
-## M3-M4 production subset
+## M3-M5 production subset
 
 The M3 subset contains native-validated shape IDs 61-64, 67, 69-76, 79, 81-85, and 88. They map
 to 20 ECMA definitions with one path and no adjustment guides. M4 adds IDs 65, 66, 68, 77, 78,
@@ -139,10 +140,18 @@ to 20 ECMA definitions with one path and no adjustment guides. M4 adds IDs 65, 6
 the first carries the normal fill without a stroke, and later paths carry no fill while retaining
 their declared detail/outline stroke flags.
 
+M5 adds `donut` as the first adjustment-bearing production definition. Its candidate contract pins
+the single `adj` guide to the literal default `25000` and requires one polar radius handle with
+literal bounds `0..50000`. The generated calculated guide retains the source `pin` formula, so
+out-of-range overrides clamp according to the pinned definition. Runtime/build-time parity covers
+`0`, `1`, `25000`, `49999`, and `50000` at square, wide, and tall extents.
+
 Runtime generation requires every candidate to declare its expected path count. Multi-path
-candidates must also pin the exact per-path `fill`, `stroke`, and `extrusionOk` tuple. The gate
-rejects missing names, duplicates, adjustment guides, count mismatches, and any tuple drift, so an
-unsupported definition cannot enter production by editing the name list alone. The renderer
+candidates must also pin the exact per-path `fill`, `stroke`, and `extrusionOk` tuple. A candidate
+with adjustments must pin the exact ordered guide names, literal defaults, handle kind/axis, and
+literal bounds. The gate rejects missing names, duplicates, uncontracted adjustments, count
+mismatches, and any contract drift, so an unsupported definition cannot enter production by editing
+the name list alone. The renderer
 applies theme line paint and dash/cap/join attributes to each declared stroke, keeps detail paths
 above image fills, and clips pictures to the first fill-bearing path. Expanding the subset still
 requires formula/IR parity, SVG, parent-renderer, browser,

@@ -3,29 +3,36 @@ import { expect, test } from '@playwright/test';
 // Set PLAYWRIGHT_CHANNEL=chrome on machines with Chrome but no downloaded Chromium.
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL });
 
-test('browser accepts every deterministic OOXML flowchart runtime geometry', async ({ page }) => {
+test('browser accepts deterministic OOXML runtime geometry and bounded donut adjustments', async ({
+  page,
+}) => {
   await page.goto('/test/browser/blank.html');
-  const { results, multiPathResults } = await page.evaluate(async () => {
-    const { getPresetShapePath } = await import('/src/shapes/presets.ts');
-    const { parseXml } = await import('/src/parser/XmlParser.ts');
-    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
-    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
-    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
-    const { ooxmlPresetRuntimeMultiPathShapeNames, ooxmlPresetRuntimeShapeNames } =
-      await import('/src/shapes/ooxmlGeometryRuntime.ts');
-    const results = ooxmlPresetRuntimeShapeNames.map((name) => {
-      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      const d = getPresetShapePath(name, 400, 280);
-      svg.setAttribute('viewBox', '0 0 400 280');
-      path.setAttribute('d', d);
-      svg.append(path);
-      document.body.append(svg);
-      const box = path.getBBox();
-      return { name, d, x: box.x, y: box.y, width: box.width, height: box.height };
-    });
-    const multiPathResults = ooxmlPresetRuntimeMultiPathShapeNames.map((name) => {
-      const xml = `<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+  const { results, multiPathResults, donutResults, groupedDonut, pictureClipD } =
+    await page.evaluate(async () => {
+      const { getPresetShapePath } = await import('/src/shapes/presets.ts');
+      const { parseXml } = await import('/src/parser/XmlParser.ts');
+      const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+      const { parsePicNode } = await import('/src/model/nodes/PicNode.ts');
+      const { parseGroupNode } = await import('/src/model/nodes/GroupNode.ts');
+      const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+      const { renderImage } = await import('/src/renderer/ImageRenderer.ts');
+      const { renderGroup } = await import('/src/renderer/GroupRenderer.ts');
+      const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+      const { ooxmlPresetRuntimeMultiPathShapeNames, ooxmlPresetRuntimeShapeNames } =
+        await import('/src/shapes/ooxmlGeometryRuntime.ts');
+      const results = ooxmlPresetRuntimeShapeNames.map((name) => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        const d = getPresetShapePath(name, 400, 280);
+        svg.setAttribute('viewBox', '0 0 400 280');
+        path.setAttribute('d', d);
+        svg.append(path);
+        document.body.append(svg);
+        const box = path.getBBox();
+        return { name, d, x: box.x, y: box.y, width: box.width, height: box.height };
+      });
+      const multiPathResults = ooxmlPresetRuntimeMultiPathShapeNames.map((name) => {
+        const xml = `<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
           xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
         <p:nvSpPr><p:cNvPr id="1" name="Flowchart"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
         <p:spPr>
@@ -35,21 +42,81 @@ test('browser accepts every deterministic OOXML flowchart runtime geometry', asy
           <a:ln w="12700"><a:solidFill><a:srgbClr val="203864"/></a:solidFill></a:ln>
         </p:spPr>
       </p:sp>`;
-      const rendered = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
-      document.body.append(rendered);
-      return {
-        name,
-        paths: Array.from(rendered.querySelectorAll('svg > path')).map((path) => ({
-          d: path.getAttribute('d'),
-          fill: path.getAttribute('fill'),
-          stroke: path.getAttribute('stroke'),
-        })),
-      };
-    });
-    return { results, multiPathResults };
-  });
+        const rendered = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+        document.body.append(rendered);
+        return {
+          name,
+          paths: Array.from(rendered.querySelectorAll('svg > path')).map((path) => ({
+            d: path.getAttribute('d'),
+            fill: path.getAttribute('fill'),
+            stroke: path.getAttribute('stroke'),
+          })),
+        };
+      });
+      const donutResults = [0, 10000, 25000, 50000].map((adjustment) => {
+        const xml = `<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="18" name="Donut"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3810000" cy="1714500"/></a:xfrm>
+          <a:prstGeom prst="donut"><a:avLst><a:gd name="adj" fmla="val ${adjustment}"/></a:avLst></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+        </p:spPr>
+      </p:sp>`;
+        const rendered = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+        document.body.append(rendered);
+        const path = rendered.querySelector('svg > path')!;
+        const box = path.getBBox();
+        return {
+          adjustment,
+          d: path.getAttribute('d') ?? '',
+          box: { x: box.x, y: box.y, width: box.width, height: box.height },
+        };
+      });
 
-  expect(results).toHaveLength(28);
+      const groupXml = `<p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <p:nvGrpSpPr><p:cNvPr id="40" name="Donut group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+      <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="1905000"/><a:chOff x="0" y="0"/><a:chExt cx="3810000" cy="952500"/></a:xfrm></p:grpSpPr>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="18" name="Grouped donut"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm><a:prstGeom prst="donut"><a:avLst><a:gd name="adj" fmla="val 10000"/></a:avLst></a:prstGeom><a:solidFill><a:srgbClr val="4472C4"/></a:solidFill></p:spPr>
+      </p:sp>
+    </p:grpSp>`;
+      const group = renderGroup(
+        parseGroupNode(parseXml(groupXml)),
+        createMockRenderContext(),
+        (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
+      );
+      document.body.append(group);
+      const groupedShape = group.firstElementChild as HTMLElement;
+      const groupedDonut = {
+        width: groupedShape.getBoundingClientRect().width,
+        height: groupedShape.getBoundingClientRect().height,
+        d: groupedShape.querySelector('svg > path')?.getAttribute('d') ?? '',
+      };
+
+      const pictureXml = `<p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+        xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <p:nvPicPr><p:cNvPr id="19" name="Donut picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+      <p:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
+      <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm><a:prstGeom prst="donut"><a:avLst><a:gd name="adj" fmla="val 10000"/></a:avLst></a:prstGeom></p:spPr>
+    </p:pic>`;
+      const pictureContext = createMockRenderContext();
+      pictureContext.slide.rels.set('rId1', { type: 'image', target: 'ppt/media/image1.png' });
+      pictureContext.presentation.media.set(
+        'ppt/media/image1.png',
+        new Uint8Array([0x89, 0x50, 0x4e, 0x47]),
+      );
+      const picture = renderImage(parsePicNode(parseXml(pictureXml)), pictureContext);
+      document.body.append(picture);
+      const pictureClipD = picture.querySelector('clipPath path')?.getAttribute('d') ?? '';
+
+      return { results, multiPathResults, donutResults, groupedDonut, pictureClipD };
+    });
+
+  expect(results).toHaveLength(29);
   for (const result of results) {
     expect(result.d, result.name).not.toMatch(/NaN|Infinity/);
     expect(result.width, result.name).toBeGreaterThan(0);
@@ -70,6 +137,14 @@ test('browser accepts every deterministic OOXML flowchart runtime geometry', asy
     );
     expect(result.paths.every(({ d }) => !!d && !/NaN|Infinity/.test(d))).toBe(true);
   }
+  for (const result of donutResults) {
+    expect(result.d.match(/M/g), `donut adj=${result.adjustment}`).toHaveLength(2);
+    expect(result.d, `donut adj=${result.adjustment}`).not.toMatch(/NaN|Infinity/);
+    expect(result.box).toEqual({ x: 0, y: 0, width: 400, height: 180 });
+  }
+  expect(groupedDonut).toMatchObject({ width: 100, height: 200 });
+  expect(groupedDonut.d).toContain('M10,100 A40,90');
+  expect(pictureClipD).toContain('M10,50 A90,40');
 });
 
 for (const hostWhiteSpace of ['normal', 'pre', 'nowrap']) {

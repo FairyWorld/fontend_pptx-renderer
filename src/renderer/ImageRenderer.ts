@@ -383,7 +383,7 @@ function getPictureGeometryClipPath(node: PicNodeData): string | undefined {
   const sourcePreset = node.source.child('spPr').child('prstGeom').attr('prst');
   const preset = node.presetGeometry ?? sourcePreset;
   if (!preset || preset === 'rect') return undefined;
-  const d = getPresetShapeClipPath(preset, node.size.w, node.size.h);
+  const d = getPresetShapeClipPath(preset, node.size.w, node.size.h, node.geometryAdjustments);
   return d || undefined;
 }
 

@@ -174,7 +174,7 @@ function findFill(spPr: SafeXmlNode): SafeXmlNode | undefined {
  * Parse adjustment values from `a:avLst > a:gd` elements.
  * Each guide has a `name` attribute and a `fmla` attribute like "val 50000".
  */
-function parseAdjustments(avLst: SafeXmlNode): Map<string, number> {
+export function parseAdjustments(avLst: SafeXmlNode): Map<string, number> {
   const adjustments = new Map<string, number>();
   for (const gd of avLst.children('gd')) {
     const name = gd.attr('name');

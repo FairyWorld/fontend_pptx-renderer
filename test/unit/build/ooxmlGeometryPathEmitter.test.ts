@@ -353,9 +353,19 @@ describe('OOXML evaluated-path SVG emitter', () => {
 });
 
 describe('OOXML runtime subset generation', () => {
-  const candidate = (name: string, expectedPathCount: 1 | 3, finalStroke = true) => ({
+  const candidate = (
+    name: string,
+    expectedPathCount: 1 | 3,
+    finalStroke = true,
+    expectedAdjustments?: readonly {
+      name: string;
+      defaultValue: number;
+      handle: { type: 'polar'; axis: 'radius'; min: number; max: number };
+    }[],
+  ) => ({
     name,
     expectedPathCount,
+    expectedAdjustments,
     expectedPathStyles:
       expectedPathCount === 3
         ? [
@@ -524,5 +534,102 @@ describe('OOXML runtime subset generation', () => {
         [candidate('adjustedCandidate', 1)],
       ),
     ).toThrow(/adjustment guides/i);
+  });
+
+  it('accepts an adjustment only when its default and handle bounds match the contract', () => {
+    const generated = buildRuntimeGeometryModule(
+      {
+        source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+        shapes: [
+          {
+            name: 'adjustedCandidate',
+            adjustmentGuides: [
+              {
+                name: 'adj',
+                formula: {
+                  operator: 'val',
+                  operands: [{ kind: 'literal', value: 25000 }],
+                },
+              },
+            ],
+            calculatedGuides: [],
+            adjustHandles: [
+              {
+                type: 'polar',
+                guideRefR: 'adj',
+                guideRefAngle: null,
+                minR: { kind: 'literal', value: 0 },
+                maxR: { kind: 'literal', value: 50000 },
+                minAngle: null,
+                maxAngle: null,
+              },
+            ],
+            paths: [{ commands: [] }],
+          },
+        ],
+      },
+      [
+        candidate('adjustedCandidate', 1, true, [
+          {
+            name: 'adj',
+            defaultValue: 25000,
+            handle: { type: 'polar', axis: 'radius', min: 0, max: 50000 },
+          },
+        ]),
+      ],
+    );
+
+    expect(generated).toContain('"name": "adjustedCandidate"');
+    expect(generated).toContain('"value": 25000');
+  });
+
+  it.each([
+    ['default', 24000, 0, 50000],
+    ['minimum', 25000, 1, 50000],
+    ['maximum', 25000, 0, 49999],
+  ])('rejects adjustment %s drift from the production contract', (_field, value, min, max) => {
+    expect(() =>
+      buildRuntimeGeometryModule(
+        {
+          source: { presetShapeDefinitions: { sha256: 'a'.repeat(64) } },
+          shapes: [
+            {
+              name: 'adjustedCandidate',
+              adjustmentGuides: [
+                {
+                  name: 'adj',
+                  formula: {
+                    operator: 'val',
+                    operands: [{ kind: 'literal', value }],
+                  },
+                },
+              ],
+              calculatedGuides: [],
+              adjustHandles: [
+                {
+                  type: 'polar',
+                  guideRefR: 'adj',
+                  guideRefAngle: null,
+                  minR: { kind: 'literal', value: min },
+                  maxR: { kind: 'literal', value: max },
+                  minAngle: null,
+                  maxAngle: null,
+                },
+              ],
+              paths: [{ commands: [] }],
+            },
+          ],
+        },
+        [
+          candidate('adjustedCandidate', 1, true, [
+            {
+              name: 'adj',
+              defaultValue: 25000,
+              handle: { type: 'polar', axis: 'radius', min: 0, max: 50000 },
+            },
+          ]),
+        ],
+      ),
+    ).toThrow(/adjustment.*contract/i);
   });
 });

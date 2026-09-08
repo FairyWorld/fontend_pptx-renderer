@@ -5402,5 +5402,418 @@ export const OOXML_PRESET_GEOMETRY_DEFINITIONS = [
         }
       }
     ]
+  },
+  {
+    "adjustmentGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "literal",
+              "value": 25000
+            }
+          ],
+          "operator": "val"
+        },
+        "name": "adj",
+        "normalizedFrom": null
+      }
+    ],
+    "calculatedGuides": [
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "adj"
+            },
+            {
+              "kind": "literal",
+              "value": 50000
+            }
+          ],
+          "operator": "pin"
+        },
+        "name": "a",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "ss"
+            },
+            {
+              "kind": "guide",
+              "name": "a"
+            },
+            {
+              "kind": "literal",
+              "value": 100000
+            }
+          ],
+          "operator": "*/"
+        },
+        "name": "dr",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "wd2"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "dr"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "iwd2",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "dr"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "ihd2",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "wd2"
+            },
+            {
+              "kind": "literal",
+              "value": 2700000
+            }
+          ],
+          "operator": "cos"
+        },
+        "name": "idx",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            {
+              "kind": "literal",
+              "value": 2700000
+            }
+          ],
+          "operator": "sin"
+        },
+        "name": "idy",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hc"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "idx"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "il",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "hc"
+            },
+            {
+              "kind": "guide",
+              "name": "idx"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "ir",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "vc"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            },
+            {
+              "kind": "guide",
+              "name": "idy"
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "it",
+        "normalizedFrom": null
+      },
+      {
+        "formula": {
+          "operands": [
+            {
+              "kind": "guide",
+              "name": "vc"
+            },
+            {
+              "kind": "guide",
+              "name": "idy"
+            },
+            {
+              "kind": "literal",
+              "value": 0
+            }
+          ],
+          "operator": "+-"
+        },
+        "name": "ib",
+        "normalizedFrom": null
+      }
+    ],
+    "name": "donut",
+    "paths": [
+      {
+        "commands": [
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "l"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "hd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "wd2"
+            }
+          },
+          {
+            "type": "close"
+          },
+          {
+            "type": "moveTo",
+            "x": {
+              "kind": "guide",
+              "name": "dr"
+            },
+            "y": {
+              "kind": "guide",
+              "name": "vc"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "ihd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd2"
+            },
+            "sweepAngle": {
+              "kind": "literal",
+              "value": -5400000
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "iwd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "ihd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "cd4"
+            },
+            "sweepAngle": {
+              "kind": "literal",
+              "value": -5400000
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "iwd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "ihd2"
+            },
+            "startAngle": {
+              "kind": "literal",
+              "value": 0
+            },
+            "sweepAngle": {
+              "kind": "literal",
+              "value": -5400000
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "iwd2"
+            }
+          },
+          {
+            "heightRadius": {
+              "kind": "guide",
+              "name": "ihd2"
+            },
+            "startAngle": {
+              "kind": "guide",
+              "name": "3cd4"
+            },
+            "sweepAngle": {
+              "kind": "literal",
+              "value": -5400000
+            },
+            "type": "arcTo",
+            "widthRadius": {
+              "kind": "guide",
+              "name": "iwd2"
+            }
+          },
+          {
+            "type": "close"
+          }
+        ],
+        "extrusionOk": true,
+        "fill": "norm",
+        "height": null,
+        "stroke": true,
+        "width": null
+      }
+    ]
   }
 ] as const;

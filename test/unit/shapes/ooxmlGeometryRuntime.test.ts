@@ -58,9 +58,11 @@ const runtimeMultiPathFlowchartShapeNames = [
   'flowChartMagneticDrum',
 ] as const;
 
+const runtimeShapeNames = [...runtimeFlowchartShapeNames, 'donut'] as const;
+
 describe('OOXML preset geometry runtime subset', () => {
   it('keeps the production subset explicit and leaves other presets on handwritten geometry', () => {
-    expect(ooxmlPresetRuntimeShapeNames).toEqual(runtimeFlowchartShapeNames);
+    expect(ooxmlPresetRuntimeShapeNames).toEqual(runtimeShapeNames);
     expect(ooxmlPresetRuntimeMultiPathShapeNames).toEqual(runtimeMultiPathFlowchartShapeNames);
     expect(ooxmlPresetRuntimeSourceSha256).toBe(sourceManifest.presetShapeDefinitions.sha256);
     expect(getOoxmlPresetShapePaths('flowChartOfflineStorage', 400, 280)).toBeNull();
@@ -120,7 +122,7 @@ describe('OOXML preset geometry runtime subset', () => {
     const source = await loadPinnedPresetShapeDefinitions(process.cwd(), sourceManifest);
     const ir = compilePresetShapeDefinitions(source.xml, sourceManifest, sourceReconciliation);
 
-    for (const shapeName of runtimeFlowchartShapeNames) {
+    for (const shapeName of runtimeShapeNames) {
       const shape = ir.shapes.find(({ name }: { name: string }) => name === shapeName);
       expect(shape, `${shapeName} must exist in the pinned IR`).toBeDefined();
       for (const dimensions of [
@@ -136,6 +138,57 @@ describe('OOXML preset geometry runtime subset', () => {
       }
     }
   }, 20_000);
+
+  it('matches the pinned donut definition across adjustment bounds and aspect ratios', async () => {
+    const source = await loadPinnedPresetShapeDefinitions(process.cwd(), sourceManifest);
+    const ir = compilePresetShapeDefinitions(source.xml, sourceManifest, sourceReconciliation);
+    const shape = ir.shapes.find(({ name }: { name: string }) => name === 'donut');
+    expect(shape).toBeDefined();
+
+    for (const dimensions of [
+      { width: 216, height: 216 },
+      { width: 400, height: 180 },
+      { width: 180, height: 400 },
+    ]) {
+      for (const adjustment of [0, 1, 25000, 49999, 50000]) {
+        const buildTime = emitPresetShapePaths(
+          evaluatePresetShape(shape, {
+            ...dimensions,
+            adjustments: { adj: adjustment },
+          }),
+        ).paths;
+        const runtime = getOoxmlPresetShapePaths(
+          'donut',
+          dimensions.width,
+          dimensions.height,
+          new Map([['adj', adjustment]]),
+        );
+
+        expect(
+          runtime,
+          `donut adj=${adjustment} at ${dimensions.width}x${dimensions.height}`,
+        ).toEqual(buildTime);
+        expect(runtime?.[0]?.d.match(/M/g)).toHaveLength(2);
+        expect(runtime?.[0]?.d).not.toMatch(/NaN|Infinity/);
+      }
+    }
+  }, 20_000);
+
+  it('uses the OOXML donut default and clamps overrides through the pinned guide formula', () => {
+    const atDefault = getOoxmlPresetShapePaths('donut', 400, 180);
+    expect(atDefault).toEqual(
+      getOoxmlPresetShapePaths('donut', 400, 180, new Map([['adj', 25000]])),
+    );
+    expect(getOoxmlPresetShapePaths('donut', 400, 180, new Map([['adj', -1]]))).toEqual(
+      getOoxmlPresetShapePaths('donut', 400, 180, new Map([['adj', 0]])),
+    );
+    expect(getOoxmlPresetShapePaths('donut', 400, 180, new Map([['adj', 50001]]))).toEqual(
+      getOoxmlPresetShapePaths('donut', 400, 180, new Map([['adj', 50000]])),
+    );
+    expect(() =>
+      getOoxmlPresetShapePaths('donut', 400, 180, new Map([['adj', Number.NaN]])),
+    ).toThrow(/adjustment adj.*finite/i);
+  });
 
   it('rejects invalid dimensions and ignores unrelated legacy adjustment entries', () => {
     expect(() => getOoxmlPresetShapePaths('flowChartTerminator', 0, 280)).toThrow(

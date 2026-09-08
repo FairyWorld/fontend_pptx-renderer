@@ -120,9 +120,10 @@ addendum, implements the complete guide-formula contract, compiles all unique de
 renderer-independent plain data, and emits deterministic SVG paths. The generator also writes a
 tree-shakeable production subset to `src/shapes/generated/ooxmlPresetGeometrySubset.ts`.
 `src/shapes/ooxmlGeometryRuntime.ts` evaluates that data before the handwritten lookup.
-The subset contains all 28 zero-adjustment flowchart definitions in shape IDs 61-88: 20
-single-path definitions and eight ordered three-path definitions. Other shapes continue through
-the handwritten registry.
+The subset contains 29 definitions: all 28 zero-adjustment flowcharts in shape IDs 61-88 (20
+single-path definitions and eight ordered three-path definitions), plus `donut`. Donut generation
+pins the source default (`adj=25000`) and its polar-handle bounds (`0..50000`) before admitting the
+definition. Other shapes continue through the handwritten registry.
 
 The compiled IR retains ordered adjustment/calculated guides, adjustment handles, connection
 sites, text rectangles, path coordinate systems, path styling metadata, and the six DrawingML
@@ -139,7 +140,9 @@ existing render modules. The multi-path adapter preserves each definition's orde
 records; the renderer still owns theme paint, dash/cap/join attributes, masks, effects, and image
 layering. Generated paths retain the current per-node geometry cache and are not added to the
 serialized presentation model. Picture preset clipping uses the first generated fill-bearing
-silhouette, without adding detail or outline paths to the clip geometry.
+silhouette, without adding detail or outline paths to the clip geometry. Picture nodes retain
+preset-geometry adjustments so generated clipping uses the same bounded guide values as ordinary
+and grouped shapes.
 
 ECMA source differences are recorded through `source-reconciliation.json`. M1 rejects active
 alternative definitions because it does not yet verify their bytes or native PowerPoint

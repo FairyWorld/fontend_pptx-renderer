@@ -30,6 +30,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
+  polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
   renderer, browser, picture-clip, and native PowerPoint comparison gates.

@@ -63,9 +63,10 @@ Coverage areas:
 ## OOXML Geometry Compiler Gate
 
 The full-corpus compiler and emitter remain development tooling. A generated production subset
-routes all 28 zero-adjustment flowcharts in shape IDs 61-88 through
-`src/shapes/ooxmlGeometryRuntime.ts`; 20 contain one path and eight contain three ordered paths.
-Other presets remain handwritten. Focused tests cover every guide-formula operator, PowerPoint
+routes 29 definitions through `src/shapes/ooxmlGeometryRuntime.ts`: all 28 zero-adjustment
+flowcharts in shape IDs 61-88 (20 one-path and eight ordered three-path definitions), plus `donut`
+with pinned `adj=25000` default and `0..50000` handle bounds. Other presets remain handwritten.
+Focused tests cover every guide-formula operator, PowerPoint
 numeric deviations, predefined guides, ordered guide rebinding, adjustment overrides, every IR
 section, all six path commands, path-coordinate scaling, non-circular elliptical arcs,
 positive/negative sweeps, full circles, serialization rounding, runtime/build-time parity,
@@ -87,10 +88,11 @@ catalog bytes, complete IR structural SHA-256, and default evaluation plus SVG e
 to be non-empty, rejects non-finite output, and has its own SHA-256. The command also verifies the
 generated production-subset module byte-for-byte. These checks establish deterministic compilation
 and path serialization. Browser and native PowerPoint equivalence remain separate per-shape gates.
-The browser gate renders all 28 production definitions and checks the eight multi-path shapes as
-three ordered SVG paths. The native gate compares those eight cases against PowerPoint output and
-records per-case provenance, runtime errors, review status, and metric deltas from a fresh clean
-baseline.
+The browser gate renders all 29 production definitions, checks the eight multi-path flowcharts as
+three ordered SVG paths, and exercises donut bounds in standalone, non-uniform group, and adjusted
+picture-clip contexts. The native gate compares the multi-path flowchart and bounded donut cases
+against PowerPoint output and records per-case provenance, runtime errors, review status, and
+metric deltas from a fresh clean baseline.
 
 Report native comparisons with the exact source revision, case IDs, environment, errors,
 pre-existing metric failures, new regressions, and visual-review status. A sampled run is not a
@@ -385,9 +387,9 @@ bytes, finite IR evaluation, and deterministic SVG emission. It runs in CI befor
 build.
 
 The generated catalog is evidence about source coverage; it is not renderer acceptance. The
-production subset is a separate generated module and currently contains all 28 zero-adjustment
-flowchart definitions in shape IDs 61-88: 20 single-path definitions and eight ordered three-path
-definitions.
+production subset is a separate generated module and currently contains 29 definitions: all 28
+zero-adjustment flowcharts in shape IDs 61-88 (20 single-path and eight ordered three-path
+definitions), plus bounded-adjustment `donut`.
 Before adding a definition, add tests for formula semantics and path topology plus browser checks
 for both ordinary shapes and picture clips. Then compare square, wide, and tall shapes and
 relevant adjustment bounds against native PowerPoint ground truth. Group, flip, rotation,

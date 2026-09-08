@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderImage } from '../../../src/renderer/ImageRenderer';
+import { parsePicNode } from '../../../src/model/nodes/PicNode';
 import { createMockRenderContext } from '../helpers/mockContext';
 import { xmlNode } from '../helpers/xmlNode';
 import type { PicNodeData } from '../../../src/model/nodes/PicNode';
@@ -173,7 +174,7 @@ describe('renderImage', () => {
         </pic>`,
       );
 
-      const el = renderImage(createPicNode({ source }), ctx);
+      const el = renderImage(parsePicNode(source), ctx);
 
       expect(el.querySelector('clipPath path')?.getAttribute('d')).toBe(
         'M32.175926,0 L167.824074,0 A32.175926,50 0 0,1 167.824074,100 L32.175926,100 A32.175926,50 0 0,1 32.175926,0 Z',
@@ -222,6 +223,30 @@ describe('renderImage', () => {
 
       expect(path).toBe('M0,0 L200,0 L200,100 L0,100 Z');
       expect(path).not.toContain('M25,0');
+      expect(el.querySelector('svg image')).toBeTruthy();
+    });
+
+    it('clips a donut picture with its explicit OOXML adjustment', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="1" name="Adjusted donut picture"/><nvPr/></nvPicPr>
+          <blipFill><blip r:embed="rId1"/><stretch><fillRect/></stretch></blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="1905000" cy="952500"/></xfrm>
+            <prstGeom prst="donut">
+              <avLst><gd name="adj" fmla="val 10000"/></avLst>
+            </prstGeom>
+          </spPr>
+        </pic>`,
+      );
+
+      const el = renderImage(parsePicNode(source), ctx);
+      const path = el.querySelector('clipPath path')?.getAttribute('d');
+
+      expect(path).toContain('M10,50 A90,40');
+      expect(path).not.toContain('M25,50');
       expect(el.querySelector('svg image')).toBeTruthy();
     });
   });

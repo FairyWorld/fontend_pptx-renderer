@@ -152,7 +152,7 @@
     {
       "id": "drawingml.shape.geometry.adjustment.donut",
       "component": "shape",
-      "renderMode": "approximate",
+      "renderMode": "native",
       "impact": "fidelity",
       "selectors": [
         {
@@ -171,7 +171,7 @@
         "presets": ["donut"]
       },
       "fallback": "Use the existing handwritten donut geometry for invalid or degenerate generated-runtime inputs.",
-      "implementationPaths": ["scripts/ooxml-geometry/generate.mjs", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/unit/shapes/presets.test.ts"],
+      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "scripts/ooxml-geometry/README.md", "scripts/ooxml-geometry/formula-contract.mjs", "scripts/ooxml-geometry/formula-evaluator.mjs", "scripts/ooxml-geometry/generate.mjs", "scripts/ooxml-geometry/geometry-ir.mjs", "scripts/ooxml-geometry/path-emitter.mjs", "src/model/nodes/PicNode.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/ImageRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/browser/rendering-coverage.spec.ts", "test/unit/build/ooxmlGeometryPathEmitter.test.ts", "test/unit/docs/geometryDocs.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },

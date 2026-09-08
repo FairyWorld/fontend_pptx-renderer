@@ -94,6 +94,24 @@ function makeSpXml(id = '1', name = 'Shape'): SafeXmlNode {
   `);
 }
 
+function makeDonutSpXml(): SafeXmlNode {
+  return xml(`
+    <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+          xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <p:nvSpPr>
+        <p:cNvPr id="18" name="Adjusted donut"/><p:cNvSpPr/><p:nvPr/>
+      </p:nvSpPr>
+      <p:spPr>
+        <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+        <a:prstGeom prst="donut">
+          <a:avLst><a:gd name="adj" fmla="val 10000"/></a:avLst>
+        </a:prstGeom>
+        <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+      </p:spPr>
+    </p:sp>
+  `);
+}
+
 function makeTextSpXml(opts: {
   id?: string;
   name?: string;
@@ -839,6 +857,26 @@ describe('renderGroup — parseGroupChild dispatch for sp', () => {
     const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
     const child = el.children[0] as HTMLElement;
     expect(child.getAttribute('data-node-id')).toBe('42');
+  });
+
+  it('preserves adjusted donut geometry through non-uniform group remapping', () => {
+    const group = makeGroup([makeDonutSpXml()], {
+      w: 200,
+      h: 200,
+      childExtentW: 400,
+      childExtentH: 100,
+    });
+
+    const el = renderGroup(group, createMockRenderContext(), (childNode, childCtx) =>
+      renderShape(childNode as any, childCtx),
+    );
+    const child = el.firstElementChild as HTMLElement;
+    const path = child.querySelector('svg > path');
+
+    expect(child.style.width).toBe('100px');
+    expect(child.style.height).toBe('200px');
+    expect(path?.getAttribute('d')).toContain('M10,100 A40,90');
+    expect(path?.getAttribute('d')?.match(/M/g)).toHaveLength(2);
   });
 
   it('resolves layout placeholder inheritance for lazy group children before remapping coordinates', () => {

@@ -4,6 +4,7 @@
 
 import { SafeXmlNode } from '../../parser/XmlParser';
 import { BaseNodeData, parseBaseProps } from './BaseNode';
+import { parseAdjustments } from './ShapeNode';
 
 export interface CropRect {
   top: number;
@@ -23,6 +24,8 @@ export interface PicNodeData extends BaseNodeData {
   line?: SafeXmlNode;
   /** Picture preset geometry, when the picture is clipped to a non-rectangular preset. */
   presetGeometry?: string;
+  /** Adjustment values for the picture's preset clipping geometry. */
+  geometryAdjustments?: Map<string, number>;
   /** @internal Raw custom geometry used to clip the picture fill. */
   customGeometry?: SafeXmlNode;
   isVideo?: boolean;
@@ -85,6 +88,9 @@ export function parsePicNode(picNode: SafeXmlNode): PicNodeData {
   const line = ln.exists() ? ln : undefined;
   const prstGeom = spPr.child('prstGeom');
   const presetGeometry = prstGeom.exists() ? prstGeom.attr('prst') : undefined;
+  const geometryAdjustments = prstGeom.exists()
+    ? parseAdjustments(prstGeom.child('avLst'))
+    : undefined;
   const custGeom = spPr.child('custGeom');
   const customGeometry = custGeom.exists() ? custGeom : undefined;
 
@@ -114,6 +120,7 @@ export function parsePicNode(picNode: SafeXmlNode): PicNodeData {
     fill,
     line,
     presetGeometry,
+    geometryAdjustments,
     customGeometry,
     isVideo: isVideo || undefined,
     isAudio: isAudio || undefined,

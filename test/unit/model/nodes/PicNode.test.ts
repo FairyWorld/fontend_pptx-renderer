@@ -123,9 +123,7 @@ describe('parsePicNode', () => {
   });
 
   it('prefers the Office SVG relationship over the raster fallback', () => {
-    const node = parsePicNode(
-      makePicXml({ embed: 'rIdPng', svgEmbed: 'rIdSvg' }),
-    );
+    const node = parsePicNode(makePicXml({ embed: 'rIdPng', svgEmbed: 'rIdSvg' }));
 
     expect(node.blipEmbed).toBe('rIdSvg');
   });
@@ -235,5 +233,25 @@ describe('parsePicNode', () => {
 
     expect(node.customGeometry?.exists()).toBe(true);
     expect(node.customGeometry?.localName).toBe('custGeom');
+  });
+
+  it('parses preset picture geometry adjustments for clipped image rendering', () => {
+    const node = parsePicNode(
+      parseXml(`
+        <pic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <nvPicPr><cNvPr id="5" name="Adjusted donut picture"/><nvPr/></nvPicPr>
+          <blipFill><blip embed="rId1"/></blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="1905000" cy="952500"/></xfrm>
+            <prstGeom prst="donut">
+              <avLst><gd name="adj" fmla="val 10000"/></avLst>
+            </prstGeom>
+          </spPr>
+        </pic>
+      `),
+    );
+
+    expect(node.presetGeometry).toBe('donut');
+    expect(node.geometryAdjustments).toEqual(new Map([['adj', 10000]]));
   });
 });
