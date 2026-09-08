@@ -86,6 +86,11 @@
     "prepublishOnly": "npm run build",
     "prepare": "husky"
   },
+  "knip": {
+    "ignoreBinaries": [
+      "python3"
+    ]
+  },
   "size-limit": [
     {
       "path": "dist/aiden0z-pptx-renderer.es.js",

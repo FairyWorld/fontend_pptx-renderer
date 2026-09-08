@@ -11,9 +11,9 @@ import type { RenderContext } from './RenderContext';
 import { resolveColor } from './StyleResolver';
 import { applyLumOff, applySatMod } from '../utils/color';
 
-export type StaticShape3DSurface = 'shape' | 'picture';
+type StaticShape3DSurface = 'shape' | 'picture';
 
-export type StaticShape3DFallbackReason =
+type StaticShape3DFallbackReason =
   | 'missing-properties'
   | 'parser-unsupported'
   | 'invalid-bounds'
@@ -23,7 +23,7 @@ export type StaticShape3DFallbackReason =
   | 'contour-paint'
   | 'tiled-picture';
 
-export interface StaticShape3DTarget {
+interface StaticShape3DTarget {
   nodeType: StaticShape3DSurface;
   presetGeometry?: string;
   width: number;
@@ -68,7 +68,7 @@ export interface StaticShape3DSupportedPlan {
 
 export type StaticShape3DPlan = StaticShape3DFlatPlan | StaticShape3DSupportedPlan;
 
-export interface AppendStaticShape3DEffectsOptions {
+interface AppendStaticShape3DEffectsOptions {
   svg: SVGSVGElement;
   defs: SVGDefsElement;
   pathD: string;
@@ -76,7 +76,7 @@ export interface AppendStaticShape3DEffectsOptions {
   plan: StaticShape3DPlan;
 }
 
-export interface AppendedStaticShape3DEffects {
+interface AppendedStaticShape3DEffects {
   group: SVGGElement;
   filterId: string;
   clipId: string;

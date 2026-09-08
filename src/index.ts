@@ -77,6 +77,7 @@ export type {
   Scene3DProperties,
   Shape3DFormatProperties,
   Shape3DBevelProperties,
+  Shape3DColorObservation,
   Shape3DRotation,
   Shape3DUnsupportedReason,
 } from './model/nodes/Shape3D';
