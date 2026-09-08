@@ -266,6 +266,47 @@
       "wd8": "*/ w 1 8"
     }
   },
+  "geometryIr": {
+    "evaluationProfiles": [
+      {
+        "evaluatedShapes": 186,
+        "height": 216,
+        "name": "square",
+        "width": 216
+      },
+      {
+        "evaluatedShapes": 186,
+        "height": 180,
+        "name": "wide",
+        "width": 400
+      },
+      {
+        "evaluatedShapes": 186,
+        "height": 400,
+        "name": "tall",
+        "width": 180
+      }
+    ],
+    "schemaVersion": 1,
+    "structuralSha256": "2ce78a1515e8270ff7831a679636afc892443ed59c9220ee754870beacf8426b",
+    "summary": {
+      "adjustHandles": 241,
+      "adjustmentGuides": 298,
+      "calculatedGuides": 3612,
+      "connectionSites": 856,
+      "pathCommands": {
+        "arcTo": 393,
+        "close": 319,
+        "cubicBezTo": 28,
+        "lnTo": 1689,
+        "moveTo": 445,
+        "quadBezTo": 33
+      },
+      "paths": 319,
+      "shapes": 186,
+      "textRectangles": 181
+    }
+  },
   "reconciliation": {
     "entries": [
       {

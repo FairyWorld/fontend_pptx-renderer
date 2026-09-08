@@ -60,6 +60,27 @@ Coverage areas:
 - Renderer behavior (batching, windowed mounting, hyperlink safety)
 - Color utilities (HSL/RGB conversion, lumMod/lumOff/tint/shade modifiers)
 
+## OOXML Geometry Compiler Gate
+
+The spec-compiled geometry work is development tooling and remains disconnected from production
+rendering. Its focused unit tests cover every guide-formula operator, PowerPoint numeric
+deviations, predefined guides, ordered guide rebinding, adjustment overrides, every IR section,
+all six path commands, and error boundaries.
+
+```bash
+pnpm exec vitest run \
+  test/unit/build/ooxmlGeometrySource.test.ts \
+  test/unit/build/ooxmlGeometryIr.test.ts
+
+pnpm geometry:check
+```
+
+`geometry:check` verifies the vendored ECMA archive/XML hashes, reconciliation rules, generated
+catalog bytes, complete IR structural SHA-256, and default evaluation of all 186 unique shapes at
+216x216, 400x180, and 180x400. These checks establish deterministic compilation and finite
+geometry values. They do not establish SVG emission fidelity or native PowerPoint equivalence;
+those gates begin with the M2 pilot.
+
 Report native comparisons with the exact source revision, case IDs, environment, errors,
 pre-existing metric failures, new regressions, and visual-review status. A sampled run is not a
 full-corpus acceptance result. Do not change thresholds or baseline images to hide failures.

@@ -179,7 +179,7 @@ export async function loadPinnedPresetShapeDefinitions(repositoryRoot, manifest)
 }
 
 /**
- * Validate the source-reconciliation registry. M0 records manual comparisons but rejects
+ * Validate the source-reconciliation registry. M0/M1 records manual comparisons but rejects
  * every active override until source bytes and native-oracle evidence can be verified offline.
  *
  * @param {any} registry
@@ -246,7 +246,7 @@ export function validateSourceReconciliation(registry, availableShapes) {
         );
       }
       throw new Error(
-        `Override activation is not supported in M0; source bytes and native-oracle evidence need an offline verifier`,
+        `Override activation is not supported in M0/M1; source bytes and native-oracle evidence need an offline verifier`,
       );
     } else if (entry.override !== undefined) {
       throw new Error(

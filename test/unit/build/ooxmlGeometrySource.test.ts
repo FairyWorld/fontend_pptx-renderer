@@ -284,7 +284,7 @@ describe('OOXML preset geometry source validation', () => {
         },
         new Set(['rect']),
       ),
-    ).toThrow(/override activation is not supported in M0/i);
+    ).toThrow(/override activation is not supported in M0\/M1/i);
 
     expect(() =>
       validateSourceReconciliation(sourceReconciliation, new Set(['leftArrow'])),

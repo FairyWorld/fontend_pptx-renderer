@@ -574,9 +574,10 @@ All commonly used OOXML `DrawingML` preset shapes, organized by category:
 | **Multi-path 3D** |   33+ | Bevel, cube, can, ribbons — multi-layer SVG with 3D appearance |
 
 Custom geometry (`<a:custGeom>`) supports numeric move, line, quadratic/cubic Bézier, arc,
-and close commands, including multiple paths and inferred source extents. Symbolic `gdLst`
-formula evaluation is planned through the spec-compiled geometry work and is not part of the
-current custom-geometry renderer.
+and close commands, including multiple paths and inferred source extents. The development-only
+spec compiler now evaluates the complete preset-shape formula corpus into renderer-independent
+IR. It is not routed into production preset or custom-geometry rendering yet, so symbolic
+`gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
 
 ### Text — 7-Level Style Inheritance
 

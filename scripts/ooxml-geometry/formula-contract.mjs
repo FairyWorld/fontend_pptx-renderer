@@ -1,8 +1,8 @@
 /**
  * Build-time PowerPoint-compatible contract for ECMA-376 DrawingML geometry guide formulas.
  *
- * This module deliberately does not evaluate formulas. Runtime evaluation is an M1 concern;
- * M0 only locks grammar, operand order, built-in guide names, and exceptional-number policy.
+ * This module owns grammar, operand order, built-in guide names, and exceptional-number policy.
+ * The separate M1 evaluator implements this contract without coupling it to renderer code.
  */
 
 export const FORMULA_DEFINITIONS = Object.freeze([

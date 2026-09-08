@@ -93,7 +93,10 @@ for (const excludedPath of [
   'scripts/ooxml-geometry/vendor/OfficeOpenXML-DrawingMLGeometries.zip',
   'scripts/ooxml-geometry/generated/preset-shape-catalog.json',
   'scripts/ooxml-geometry/formula-contract.mjs',
+  'scripts/ooxml-geometry/formula-evaluator.mjs',
   'scripts/ooxml-geometry/generate.mjs',
+  'scripts/ooxml-geometry/geometry-ir.mjs',
+  'scripts/ooxml-geometry/source-reconciliation.json',
   'scripts/ooxml-geometry/source-validator.mjs',
   'scripts/package-contract.mjs',
 ]) {

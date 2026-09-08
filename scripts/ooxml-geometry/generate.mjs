@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { dirname, isAbsolute, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,10 +10,20 @@ import {
   loadPinnedPresetShapeDefinitions,
   stableJson,
 } from './source-validator.mjs';
+import {
+  compilePresetShapeDefinitions,
+  evaluatePresetShape,
+  summarizePresetGeometryIr,
+} from './geometry-ir.mjs';
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const defaultRepositoryRoot = resolve(scriptDirectory, '../..');
 const defaultOutput = 'scripts/ooxml-geometry/generated/preset-shape-catalog.json';
+const evaluationProfiles = Object.freeze([
+  { name: 'square', width: 216, height: 216 },
+  { name: 'wide', width: 400, height: 180 },
+  { name: 'tall', width: 180, height: 400 },
+]);
 
 async function readJson(path) {
   return JSON.parse(await readFile(path, 'utf8'));
@@ -40,6 +51,22 @@ export async function writeOrCheckGeneratedCatalog({ check = false, generated, o
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, generated, 'utf8');
   return { outputPath, status: 'generated' };
+}
+
+export function buildGeometryIrContract(ir) {
+  const structuralBytes = stableJson({ schemaVersion: ir.schemaVersion, shapes: ir.shapes });
+  const profiles = evaluationProfiles.map((profile) => {
+    for (const shape of ir.shapes) {
+      evaluatePresetShape(shape, profile);
+    }
+    return { ...profile, evaluatedShapes: ir.shapes.length };
+  });
+  return {
+    schemaVersion: ir.schemaVersion,
+    structuralSha256: createHash('sha256').update(structuralBytes).digest('hex'),
+    summary: summarizePresetGeometryIr(ir),
+    evaluationProfiles: profiles,
+  };
 }
 
 function parseArguments(arguments_) {
@@ -82,7 +109,9 @@ export async function generatePresetShapeCatalog({
   const manifest = await readJson(manifestPath);
   const reconciliation = await readJson(reconciliationPath);
   const source = await loadPinnedPresetShapeDefinitions(repositoryRoot, manifest);
-  const catalog = buildPresetShapeCatalog(source.xml, manifest, reconciliation);
+  const sourceCatalog = buildPresetShapeCatalog(source.xml, manifest, reconciliation);
+  const geometryIr = compilePresetShapeDefinitions(source.xml, manifest, reconciliation);
+  const catalog = { ...sourceCatalog, geometryIr: buildGeometryIrContract(geometryIr) };
   const generated = stableJson(catalog);
   const outputPath = isAbsolute(output) ? output : resolve(repositoryRoot, output);
   const persisted = await writeOrCheckGeneratedCatalog({ check, generated, outputPath });
