@@ -80,6 +80,7 @@ class PromotionReceipt:
     implementation_fingerprint: str
     case_ids: tuple[str, ...]
     case_input_fingerprints: tuple[str, ...]
+    ground_truth_fingerprints: tuple[str, ...]
     gates: tuple[str, ...]
     environment: Mapping[str, Any]
     accepted_at: str
@@ -353,6 +354,7 @@ def _parse_receipt(value: Any, index: int) -> PromotionReceipt:
             "implementationFingerprint",
             "caseIds",
             "caseInputFingerprints",
+            "groundTruthFingerprints",
             "gates",
             "environment",
             "acceptedAt",
@@ -377,11 +379,22 @@ def _parse_receipt(value: Any, index: int) -> PromotionReceipt:
     case_hashes = _unique_strings(
         value["caseInputFingerprints"], f"{label} caseInputFingerprints"
     )
-    if len(case_ids) != len(case_hashes):
-        raise ValueError(f"{label} caseIds and caseInputFingerprints must have equal length")
+    ground_truth_hashes = _unique_strings(
+        value["groundTruthFingerprints"], f"{label} groundTruthFingerprints"
+    )
+    if len(case_ids) != len(case_hashes) or len(case_ids) != len(ground_truth_hashes):
+        raise ValueError(
+            f"{label} caseIds, caseInputFingerprints, and groundTruthFingerprints "
+            "must have equal length"
+        )
     invalid_hashes = [item for item in case_hashes if not _SHA256.fullmatch(item)]
     if invalid_hashes:
         raise ValueError(f"{label} caseInputFingerprints must contain lowercase SHA-256 values")
+    invalid_ground_truth_hashes = [
+        item for item in ground_truth_hashes if not _SHA256.fullmatch(item)
+    ]
+    if invalid_ground_truth_hashes:
+        raise ValueError(f"{label} groundTruthFingerprints must contain lowercase SHA-256 values")
     gates = _unique_strings(value["gates"], f"{label} gates")
     unknown_gates = sorted(set(gates) - GATES)
     if unknown_gates:
@@ -396,6 +409,7 @@ def _parse_receipt(value: Any, index: int) -> PromotionReceipt:
         implementation_fingerprint=implementation_fingerprint,
         case_ids=case_ids,
         case_input_fingerprints=case_hashes,
+        ground_truth_fingerprints=ground_truth_hashes,
         gates=gates,
         environment=environment,
         accepted_at=_parse_timestamp(value["acceptedAt"], f"{label} acceptedAt"),
