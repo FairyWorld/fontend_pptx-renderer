@@ -147,6 +147,174 @@ test('browser accepts deterministic OOXML runtime geometry and bounded donut adj
   expect(pictureClipD).toContain('M10,50 A90,40');
 });
 
+test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, and disposal', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { parsePicNode } = await import('/src/model/nodes/PicNode.ts');
+    const { parseGroupNode } = await import('/src/model/nodes/GroupNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { renderGroup } = await import('/src/renderer/GroupRenderer.ts');
+    const { renderSlide } = await import('/src/renderer/SlideRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+
+    const scene =
+      '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>';
+    const bevel = '<a:sp3d><a:bevelT w="127000" h="127000" prst="circle"/></a:sp3d>';
+    const shapeXml = (preset: string, width: number, height: number, color: string) => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="3D ${preset}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="${width * 9525}" cy="${height * 9525}"/></a:xfrm>
+          <a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="${color}"/></a:solidFill>${scene}${bevel}
+        </p:spPr>
+      </p:sp>`;
+
+    document.body.style.margin = '0';
+    const host = document.createElement('div');
+    host.id = 'shape3d-browser-host';
+    Object.assign(host.style, {
+      display: 'flex',
+      flexWrap: 'wrap',
+      gap: '20px',
+      width: '900px',
+      padding: '20px',
+      overflow: 'auto',
+      background: 'white',
+    });
+    document.body.append(host);
+    const ctx = createMockRenderContext();
+    for (const spec of [
+      ['rect', 260, 80, '2F75B5'],
+      ['rect', 80, 220, '2F75B5'],
+      ['roundRect', 220, 100, '2F75B5'],
+      ['rect', 240, 100, '70AD47'],
+    ] as const) {
+      const shape = renderShape(
+        parseShapeNode(parseXml(shapeXml(...spec))),
+        createMockRenderContext(),
+      );
+      shape.style.position = 'relative';
+      shape.style.left = '0';
+      shape.style.top = '0';
+      host.append(shape);
+    }
+
+    const flat = renderShape(
+      parseShapeNode(
+        parseXml(
+          shapeXml('ellipse', 120, 80, '2F75B5').replace('orthographicFront', 'perspectiveFront'),
+        ),
+      ),
+      createMockRenderContext(),
+    );
+    flat.style.position = 'relative';
+    flat.style.left = '0';
+    flat.style.top = '0';
+    host.append(flat);
+
+    const groupXml = `
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="20" name="3D group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/><a:chOff x="0" y="0"/><a:chExt cx="3810000" cy="1905000"/></a:xfrm></p:grpSpPr>
+        ${shapeXml('rect', 200, 100, '70AD47')}
+      </p:grpSp>`;
+    const group = renderGroup(
+      parseGroupNode(parseXml(groupXml)),
+      createMockRenderContext(),
+      (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
+    );
+    group.style.position = 'relative';
+    group.style.left = '0';
+    group.style.top = '0';
+    host.append(group);
+
+    const png = Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII=',
+      ),
+      (char) => char.charCodeAt(0),
+    );
+    const pictureXml = `
+      <p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <p:nvPicPr><p:cNvPr id="30" name="3D picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+        <p:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${scene}${bevel}
+        </p:spPr>
+      </p:pic>`;
+    ctx.slide.rels.set('rId1', { type: 'image', target: 'ppt/media/image1.png' });
+    ctx.presentation.media.set('ppt/media/image1.png', png);
+    ctx.slide.nodes = [parsePicNode(parseXml(pictureXml))];
+    const revoked: string[] = [];
+    const originalRevoke = URL.revokeObjectURL.bind(URL);
+    URL.revokeObjectURL = (url: string) => {
+      revoked.push(url);
+      originalRevoke(url);
+    };
+    const handle = renderSlide(ctx.presentation, ctx.slide);
+    handle.element.style.position = 'absolute';
+    handle.element.style.left = '-2000px';
+    document.body.append(handle.element);
+    await handle.ready;
+    const disposableHadBevel = !!handle.element.querySelector('[data-pptx-shape3d-bevel]');
+    handle.dispose();
+    URL.revokeObjectURL = originalRevoke;
+    handle.element.remove();
+
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    const ids = Array.from(host.querySelectorAll('[id]'), (element) => element.id);
+    const groupChild = group.firstElementChild as HTMLElement;
+    return {
+      bevelCount: host.querySelectorAll('[data-pptx-shape3d-bevel]').length,
+      flatHasBevel: !!flat.querySelector('[data-pptx-shape3d-bevel]'),
+      uniqueIds: new Set(ids).size === ids.length,
+      noHorizontalGrowth: host.scrollWidth === host.clientWidth,
+      groupBounds: {
+        width: group.getBoundingClientRect().width,
+        height: group.getBoundingClientRect().height,
+        childWidth: groupChild.getBoundingClientRect().width,
+        childHeight: groupChild.getBoundingClientRect().height,
+      },
+      disposableHadBevel,
+      revokedCount: revoked.length,
+    };
+  });
+
+  expect(result).toEqual(
+    expect.objectContaining({
+      bevelCount: 5,
+      flatHasBevel: false,
+      uniqueIds: true,
+      noHorizontalGrowth: true,
+      disposableHadBevel: true,
+      revokedCount: 1,
+    }),
+  );
+  expect(result.groupBounds).toEqual({ width: 200, height: 100, childWidth: 100, childHeight: 50 });
+
+  const host = page.locator('#shape3d-browser-host');
+  const first = await host.screenshot();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  const second = await host.screenshot();
+  expect(first.equals(second)).toBe(true);
+});
+
 for (const hostWhiteSpace of ['normal', 'pre', 'nowrap']) {
   for (const wrap of ['square', 'none']) {
     test(`text wrap=${wrap} inside white-space:${hostWhiteSpace}`, async ({ page }) => {

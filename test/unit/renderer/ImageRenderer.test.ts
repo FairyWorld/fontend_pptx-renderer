@@ -3766,4 +3766,64 @@ describe('renderImage', () => {
       spy.mockRestore();
     });
   });
+
+  describe('bounded static DrawingML 3D', () => {
+    it('renders a rect picture through SVG so bevel, outline, and outer shadow coexist', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="91" name="Real picture bevel slice"/><nvPr/></nvPicPr>
+          <blipFill><blip r:embed="rId1"/><stretch><fillRect/></stretch></blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="3048000" cy="1714500"/></xfrm>
+            <prstGeom prst="rect"><avLst/></prstGeom>
+            <solidFill><srgbClr val="FFFFFF"><shade val="85000"/></srgbClr></solidFill>
+            <ln w="88900" cap="sq"><solidFill><srgbClr val="FFFFFF"/></solidFill><miter lim="800000"/></ln>
+            <effectLst>
+              <outerShdw blurRad="55000" dist="18000" dir="5400000" algn="tl" rotWithShape="0">
+                <srgbClr val="000000"><alpha val="40000"/></srgbClr>
+              </outerShdw>
+            </effectLst>
+            <scene3d>
+              <camera prst="orthographicFront"/>
+              <lightRig rig="twoPt" dir="t"><rot lat="0" lon="0" rev="7200000"/></lightRig>
+            </scene3d>
+            <sp3d><bevelT w="25400" h="19050"/><contourClr><srgbClr val="FFFFFF"/></contourClr></sp3d>
+          </spPr>
+        </pic>`,
+      );
+
+      const el = renderImage(parsePicNode(source), ctx);
+
+      expect(el.style.overflow).toBe('visible');
+      expect(el.style.border).toBe('');
+      expect(el.style.filter).toContain('drop-shadow');
+      expect(el.querySelector('svg image')).toBeTruthy();
+      expect(el.querySelector('[data-pptx-shape3d-bevel]')).toBeTruthy();
+      expect(el.querySelector('[data-pptx-shape3d-contour]')).toBeNull();
+      const outline = el.querySelector('path[data-pptx-picture-outline]');
+      expect(outline?.getAttribute('stroke')).toBe('#FFFFFF');
+      expect(Number(outline?.getAttribute('stroke-width'))).toBeCloseTo(9.3333, 3);
+      expect(outline?.hasAttribute('filter')).toBe(false);
+    });
+
+    it('keeps a picture without supported 3D on the ordinary img path', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="92" name="Flat picture"/><nvPr/></nvPicPr>
+          <blipFill><blip r:embed="rId1"/><stretch><fillRect/></stretch></blipFill>
+          <spPr><xfrm><off x="0" y="0"/><ext cx="1905000" cy="952500"/></xfrm><prstGeom prst="rect"><avLst/></prstGeom></spPr>
+        </pic>`,
+      );
+
+      const el = renderImage(parsePicNode(source), ctx);
+
+      expect(el.style.overflow).toBe('hidden');
+      expect(el.querySelector(':scope > img')).toBeTruthy();
+      expect(el.querySelector('[data-pptx-shape3d-bevel]')).toBeNull();
+    });
+  });
 });

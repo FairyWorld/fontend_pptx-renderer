@@ -6717,4 +6717,56 @@ describe('ShapeRenderer', () => {
 
     expect(el.querySelector('svg image')).toBeNull();
   });
+
+  it('renders the bounded static 3D bevel below the text overlay', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="81" name="3D round rectangle"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+          <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d contourW="12700">
+            <a:bevelT w="127000" h="127000" prst="circle"/>
+            <a:contourClr><a:srgbClr val="FFFFFF"/></a:contourClr>
+          </a:sp3d>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Readable</a:t></a:r></a:p></p:txBody>
+      </p:sp>`;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const bevel = el.querySelector('[data-pptx-shape3d-bevel]');
+    const contour = el.querySelector('[data-pptx-shape3d-contour]');
+    const text = Array.from(el.children).find((child) => child.tagName.toLowerCase() === 'div');
+
+    expect(bevel).toBeTruthy();
+    expect(contour).toBeTruthy();
+    expect(text?.textContent).toContain('Readable');
+    expect(text?.hasAttribute('filter')).toBe(false);
+    expect(Array.from(el.children).indexOf(text!)).toBeGreaterThan(
+      Array.from(el.children).indexOf(el.querySelector('svg')!),
+    );
+  });
+
+  it('keeps unsupported perspective shape 3D as the ordinary flat renderer', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="82" name="Perspective fallback"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:scene3d><a:camera prst="perspectiveFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT w="127000" h="127000" prst="circle"/></a:sp3d>
+        </p:spPr>
+      </p:sp>`;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+
+    expect(el.querySelector('[data-pptx-shape3d-bevel]')).toBeNull();
+    expect(el.querySelector('svg > path')?.getAttribute('fill')).toBe('#4472C4');
+  });
 });

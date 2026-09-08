@@ -22,6 +22,11 @@ import { resolveSlideNavigationIndex, slideJumpTitle } from './navigation';
 import { renderCustomGeometry } from '../shapes/customGeometry';
 import { getPresetShapeClipPath } from '../shapes/presets';
 import { splitTiledPatternFillCss } from './cssValues';
+import {
+  appendStaticShape3DEffects,
+  buildStaticShape3DPlan,
+  type StaticShape3DPlan,
+} from './Shape3DRenderer';
 
 /**
  * Check if a file extension is an unsupported legacy format (WMF only now; EMF is handled).
@@ -238,6 +243,18 @@ function renderImageUrl(
   const blipOpacity = resolveBlipOpacity(blip);
 
   const tile = blipFill.child('tile');
+  const shape3dPlan = buildStaticShape3DPlan(
+    node.shape3d,
+    {
+      nodeType: 'picture',
+      presetGeometry: node.presetGeometry,
+      width: node.size.w,
+      height: node.size.h,
+      paintKind: 'picture',
+      isTiledPicture: tile.exists(),
+    },
+    ctx,
+  );
   if (tile.exists()) {
     wrapper.style.backgroundImage = `url("${url}")`;
     wrapper.style.backgroundRepeat = 'repeat';
@@ -251,8 +268,34 @@ function renderImageUrl(
   const fillRect = node.source.child('blipFill').child('stretch').child('fillRect');
   const fillRectBox = fillRect.exists() ? getFillRectBox(fillRect) : undefined;
   const geometryClipPath = getPictureGeometryClipPath(node);
-  if (geometryClipPath) {
-    renderClippedSvgImage(node, wrapper, url, geometryClipPath, blip, ctx, fillRectBox);
+  const shape3dClipPath =
+    shape3dPlan.mode === 'orthographic-top-bevel'
+      ? (geometryClipPath ??
+        `M0,0 L${node.size.w},0 L${node.size.w},${node.size.h} L0,${node.size.h} Z`)
+      : geometryClipPath;
+  if (shape3dClipPath) {
+    const pictureOutline =
+      shape3dPlan.mode === 'orthographic-top-bevel'
+        ? resolvePictureOutlineStyle(node, ctx)
+        : undefined;
+    if (shape3dPlan.mode === 'orthographic-top-bevel') {
+      wrapper.style.overflow = 'visible';
+      if (pictureOutline) {
+        wrapper.style.border = '';
+        wrapper.style.boxSizing = '';
+      }
+    }
+    renderClippedSvgImage(
+      node,
+      wrapper,
+      url,
+      shape3dClipPath,
+      blip,
+      ctx,
+      fillRectBox,
+      shape3dPlan,
+      pictureOutline,
+    );
     if (blipOpacity < 1) {
       wrapper.style.opacity = `${Number(blipOpacity.toFixed(4))}`;
     }
@@ -344,6 +387,15 @@ interface FillRectBox {
   height: number;
 }
 
+interface PictureOutlineStyle {
+  width: number;
+  color: string;
+  dash: string;
+  dashKind: string;
+  linecap?: 'butt' | 'round' | 'square';
+  linejoin?: 'miter' | 'round' | 'bevel';
+}
+
 function getFillRectBox(fillRect: SafeXmlNode): FillRectBox {
   const left = pctAttr(fillRect, 'l');
   const top = pctAttr(fillRect, 't');
@@ -402,6 +454,8 @@ function renderClippedSvgImage(
   blip: SafeXmlNode,
   ctx: RenderContext,
   fillRectBox?: FillRectBox,
+  shape3dPlan?: StaticShape3DPlan,
+  pictureOutline?: PictureOutlineStyle,
 ): void {
   const svgNs = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNs, 'svg');
@@ -409,7 +463,7 @@ function renderClippedSvgImage(
   svg.setAttribute('width', '100%');
   svg.setAttribute('height', '100%');
   svg.style.display = 'block';
-  svg.style.overflow = 'hidden';
+  svg.style.overflow = shape3dPlan?.mode === 'orthographic-top-bevel' ? 'visible' : 'hidden';
 
   const clipId = `picture-clip-${pictureClipPathIdCounter++}`;
   const defs = document.createElementNS(svgNs, 'defs');
@@ -462,6 +516,34 @@ function renderClippedSvgImage(
   wrapper.appendChild(svg);
   svg.appendChild(clippedImageGroup);
   clippedImageGroup.appendChild(image);
+  if (shape3dPlan) {
+    appendStaticShape3DEffects({
+      svg,
+      defs,
+      pathD: clipPathD,
+      bounds: { width: node.size.w, height: node.size.h },
+      plan: shape3dPlan,
+    });
+  }
+  if (pictureOutline) {
+    const outline = document.createElementNS(svgNs, 'path');
+    outline.dataset.pptxPictureOutline = 'true';
+    outline.setAttribute('d', clipPathD);
+    outline.setAttribute('fill', 'none');
+    outline.setAttribute('stroke', pictureOutline.color);
+    outline.setAttribute('stroke-width', String(pictureOutline.width));
+    if (pictureOutline.linecap) outline.setAttribute('stroke-linecap', pictureOutline.linecap);
+    if (pictureOutline.linejoin) outline.setAttribute('stroke-linejoin', pictureOutline.linejoin);
+    if (pictureOutline.dashKind !== 'solid') {
+      const unit = Math.max(1, pictureOutline.width);
+      const dashArray = pictureOutline.dashKind.includes('dot')
+        ? `${unit},${unit * 2}`
+        : `${unit * 4},${unit * 2}`;
+      outline.setAttribute('stroke-dasharray', dashArray);
+    }
+    outline.setAttribute('pointer-events', 'none');
+    svg.appendChild(outline);
+  }
 }
 
 /** Apply color effects to the existing SVG image, preserving one decoded media resource. */
@@ -590,10 +672,13 @@ function clearCssFillBackground(el: HTMLElement): void {
   el.style.backgroundSize = '';
 }
 
-function applyPictureOutline(wrapper: HTMLElement, node: PicNodeData, ctx: RenderContext): void {
+function resolvePictureOutlineStyle(
+  node: PicNodeData,
+  ctx: RenderContext,
+): PictureOutlineStyle | undefined {
   const lnRef = node.source.child('style').child('lnRef');
   const lineIsNoFill = node.line?.child('noFill').exists() ?? false;
-  if (lineIsNoFill) return;
+  if (lineIsNoFill) return undefined;
 
   const hasExplicitLine = node.line?.exists() ?? false;
   const themeLineFromLnRef =
@@ -604,10 +689,27 @@ function applyPictureOutline(wrapper: HTMLElement, node: PicNodeData, ctx: Rende
       ? ctx.theme.lineStyles![(lnRef.numAttr('idx') ?? 1) - 1]
       : undefined;
   const line = hasExplicitLine ? node.line! : themeLineFromLnRef;
-  if (!line?.exists()) return;
+  if (!line?.exists()) return undefined;
 
   const style = resolveLineStyle(line, ctx, lnRef);
-  if (style.width <= 0 || style.color === 'transparent') return;
+  if (style.width <= 0 || style.color === 'transparent') return undefined;
+
+  const cap = line.attr('cap');
+  const linecap =
+    cap === 'rnd' ? 'round' : cap === 'sq' ? 'square' : cap === 'flat' ? 'butt' : undefined;
+  const linejoin = line.child('round').exists()
+    ? 'round'
+    : line.child('bevel').exists()
+      ? 'bevel'
+      : line.child('miter').exists()
+        ? 'miter'
+        : undefined;
+  return { ...style, linecap, linejoin };
+}
+
+function applyPictureOutline(wrapper: HTMLElement, node: PicNodeData, ctx: RenderContext): void {
+  const style = resolvePictureOutlineStyle(node, ctx);
+  if (!style) return;
 
   wrapper.style.boxSizing = 'border-box';
   wrapper.style.border = `${style.width}px ${style.dash} ${style.color}`;

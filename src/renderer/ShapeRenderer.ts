@@ -139,6 +139,7 @@ import {
   parseMoveLinePathData,
   parseSimpleMoveLinePathData,
 } from './pathData';
+import { appendStaticShape3DEffects, buildStaticShape3DPlan } from './Shape3DRenderer';
 
 const ooxmlRuntimeMultiPathShapeNameSet = new Set(
   ooxmlPresetRuntimeMultiPathShapeNames.map((name) => name.toLowerCase()),
@@ -2508,6 +2509,40 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           svg.appendChild(extraPath);
         }
       }
+
+      const shape3dPaintKind = blipFill.exists()
+        ? 'picture'
+        : spPr.child('gradFill').exists()
+          ? 'gradient'
+          : spPr.child('pattFill').exists()
+            ? 'pattern'
+            : spPr.child('grpFill').exists()
+              ? 'group'
+              : spPr.child('noFill').exists()
+                ? 'none'
+                : spPr.child('solidFill').exists() || node.fill?.localName === 'solidFill'
+                  ? 'solid'
+                  : 'unknown';
+      const shape3dPlan = buildStaticShape3DPlan(
+        node.shape3d,
+        {
+          nodeType: 'shape',
+          presetGeometry: node.presetGeometry,
+          width: svgW,
+          height: svgH,
+          isLineLike,
+          paintKind: shape3dPaintKind,
+          baseFill: /^#[0-9a-f]{6}$/i.test(fillCss) ? fillCss : undefined,
+        },
+        ctx,
+      );
+      appendStaticShape3DEffects({
+        svg,
+        defs,
+        pathD,
+        bounds: { width: svgW, height: svgH },
+        plan: shape3dPlan,
+      });
 
       // Some multi-path detail rendering adds masks/gradients after the initial defs population.
       if (defs.children.length > 0 && !defs.parentNode) {

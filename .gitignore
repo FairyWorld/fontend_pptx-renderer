@@ -34,6 +34,8 @@ test/e2e/baselines/
 # Debug & development screenshots
 screenshots/
 debug-screenshots/
+test-results/
+playwright-report/
 
 # Editor & OS
 .DS_Store
