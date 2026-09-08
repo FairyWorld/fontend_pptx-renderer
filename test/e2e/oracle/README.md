@@ -27,7 +27,9 @@ but remove absolute paths, usernames, free-form issue bodies, and private labels
 The default inventory limits match the renderer safety contract: 4,000 ZIP entries, 32 MiB per
 decoded entry, and 256 MiB decoded in total. Ranking counts byte-identical PPTX files once. A dirty
 report, missing or changed inputs, stale relevant implementation files, skipped required cases,
-failed structural checks, or an unresolved manual-review row blocks promotion.
+failed structural checks, or an unresolved manual-review row blocks promotion. Corpus scans isolate
+and report rejected packages instead of losing all other observations; use `--fail-on-rejected` for
+a strict nonzero exit after the report is written.
 
 ## Current Implemented Pieces
 

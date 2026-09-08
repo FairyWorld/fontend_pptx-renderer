@@ -24,7 +24,9 @@ INVENTORY_SCHEMA_VERSION = 1
 
 
 class CapabilityInventoryError(ValueError):
-    pass
+    def __init__(self, message: str, *, code: str = "scan-error") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 @dataclass(frozen=True)
@@ -56,12 +58,23 @@ class PackageObservation:
 
 
 @dataclass(frozen=True)
+class RejectedPackage:
+    package_id: str
+    sha256: str | None
+    aliases: tuple[str, ...]
+    reason_code: str
+    reason: str
+
+
+@dataclass(frozen=True)
 class InventoryReport:
     schema_version: int
     registry_fingerprint: str
     raw_package_count: int
     unique_package_count: int
     packages: tuple[PackageObservation, ...]
+    rejected_package_count: int
+    rejected_packages: tuple[RejectedPackage, ...]
 
 
 def _sha256_file(path: Path) -> str:
@@ -71,7 +84,9 @@ def _sha256_file(path: Path) -> str:
             for chunk in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(chunk)
     except OSError as error:
-        raise CapabilityInventoryError(f"cannot read PPTX package: {path.name}") from error
+        raise CapabilityInventoryError(
+            f"cannot read PPTX package: {path.name}", code="package-read"
+        ) from error
     return digest.hexdigest()
 
 
@@ -87,10 +102,14 @@ def compute_registry_fingerprint(registry: CapabilityRegistry) -> str:
 
 def _validate_member_name(name: str) -> None:
     if not name or "\x00" in name or "\\" in name:
-        raise CapabilityInventoryError(f"unsafe ZIP member path: {name!r}")
+        raise CapabilityInventoryError(
+            f"unsafe ZIP member path: {name!r}", code="unsafe-zip-member"
+        )
     path = PurePosixPath(name)
     if path.is_absolute() or ".." in path.parts:
-        raise CapabilityInventoryError(f"unsafe ZIP member path: {name}")
+        raise CapabilityInventoryError(
+            f"unsafe ZIP member path: {name}", code="unsafe-zip-member"
+        )
 
 
 def _selected_capabilities(
@@ -163,7 +182,8 @@ def _scan_xml_part(
     matches: set[str] = set()
     if re.search(br"<!\s*(?:DOCTYPE|ENTITY)\b", data, flags=re.IGNORECASE):
         raise CapabilityInventoryError(
-            f"DTD or entity declaration is not allowed in XML part: {part_name}"
+            f"DTD or entity declaration is not allowed in XML part: {part_name}",
+            code="xml-dtd-entity",
         )
     try:
         events = ElementTree.iterparse(io.BytesIO(data), events=("start",))
@@ -179,7 +199,9 @@ def _scan_xml_part(
                     matches.add(capability.id)
             element.clear()
     except ElementTree.ParseError as error:
-        raise CapabilityInventoryError(f"invalid XML part {part_name}: {error}") from error
+        raise CapabilityInventoryError(
+            f"invalid XML part {part_name}: {error}", code="invalid-xml"
+        ) from error
     return matches
 
 
@@ -196,7 +218,8 @@ def scan_pptx(
             entries = archive.infolist()
             if len(entries) > limits.max_entries:
                 raise CapabilityInventoryError(
-                    f"ZIP entry count {len(entries)} exceeds limit {limits.max_entries}"
+                    f"ZIP entry count {len(entries)} exceeds limit {limits.max_entries}",
+                    code="zip-entry-count",
                 )
             total_size = 0
             for entry in entries:
@@ -204,13 +227,15 @@ def scan_pptx(
                 if entry.file_size > limits.max_entry_uncompressed_bytes:
                     raise CapabilityInventoryError(
                         f"ZIP entry size {entry.file_size} exceeds limit "
-                        f"{limits.max_entry_uncompressed_bytes}: {entry.filename}"
+                        f"{limits.max_entry_uncompressed_bytes}: {entry.filename}",
+                        code="zip-entry-size",
                     )
                 total_size += entry.file_size
                 if total_size > limits.max_total_uncompressed_bytes:
                     raise CapabilityInventoryError(
                         f"ZIP decoded total {total_size} exceeds limit "
-                        f"{limits.max_total_uncompressed_bytes}"
+                        f"{limits.max_total_uncompressed_bytes}",
+                        code="zip-total-size",
                     )
 
             for entry in sorted(entries, key=lambda item: item.filename):
@@ -221,14 +246,19 @@ def scan_pptx(
                     data = stream.read(limits.max_entry_uncompressed_bytes + 1)
                 if len(data) > limits.max_entry_uncompressed_bytes:
                     raise CapabilityInventoryError(
-                        f"ZIP entry size exceeds limit while reading: {entry.filename}"
+                        f"ZIP entry size exceeds limit while reading: {entry.filename}",
+                        code="zip-entry-size",
                     )
                 for capability_id in _scan_xml_part(entry.filename, data, capabilities):
                     matching_parts.setdefault(capability_id, set()).add(entry.filename)
     except BadZipFile as error:
-        raise CapabilityInventoryError(f"invalid PPTX ZIP package: {path.name}") from error
+        raise CapabilityInventoryError(
+            f"invalid PPTX ZIP package: {path.name}", code="invalid-zip"
+        ) from error
     except OSError as error:
-        raise CapabilityInventoryError(f"cannot scan PPTX package: {path.name}") from error
+        raise CapabilityInventoryError(
+            f"cannot scan PPTX package: {path.name}", code="package-read"
+        ) from error
 
     frozen_matches = {
         capability_id: tuple(sorted(parts))
@@ -251,7 +281,9 @@ def _iter_packages(roots: Iterable[Path]) -> Iterable[tuple[str, Path]]:
                 yield f"corpus-{root_index}/{root.name}", root
             continue
         if not root.is_dir():
-            raise CapabilityInventoryError(f"corpus root does not exist: corpus-{root_index}")
+            raise CapabilityInventoryError(
+                f"corpus root does not exist: corpus-{root_index}", code="corpus-root-missing"
+            )
         for path in sorted(root.rglob("*.pptx")):
             alias = f"corpus-{root_index}/{path.relative_to(root).as_posix()}"
             yield alias, path
@@ -264,10 +296,24 @@ def scan_corpus(
 ) -> InventoryReport:
     observations: dict[str, PackageObservation] = {}
     aliases_by_sha: dict[str, list[str]] = {}
+    rejected: dict[str, tuple[str | None, str, str, list[str]]] = {}
     raw_package_count = 0
+    rejected_package_count = 0
     for alias, path in _iter_packages(roots):
         raw_package_count += 1
-        observation = scan_pptx(path, registry, limits)
+        try:
+            observation = scan_pptx(path, registry, limits)
+        except CapabilityInventoryError as error:
+            rejected_package_count += 1
+            try:
+                sha256 = _sha256_file(path)
+            except CapabilityInventoryError:
+                sha256 = None
+            rejection_key = sha256 or f"alias:{alias}"
+            if rejection_key not in rejected:
+                rejected[rejection_key] = (sha256, error.code, str(error), [])
+            rejected[rejection_key][3].append(alias)
+            continue
         aliases_by_sha.setdefault(observation.sha256, []).append(alias)
         observations.setdefault(observation.sha256, observation)
 
@@ -278,12 +324,25 @@ def scan_corpus(
         )
         for sha256 in sorted(observations)
     )
+    rejected_packages = tuple(
+        RejectedPackage(
+            package_id=f"sha256:{sha256}" if sha256 else rejection_key,
+            sha256=sha256,
+            aliases=tuple(sorted(values[3])),
+            reason_code=values[1],
+            reason=values[2],
+        )
+        for rejection_key, values in sorted(rejected.items())
+        for sha256 in (values[0],)
+    )
     return InventoryReport(
         schema_version=INVENTORY_SCHEMA_VERSION,
         registry_fingerprint=compute_registry_fingerprint(registry),
         raw_package_count=raw_package_count,
         unique_package_count=len(packages),
         packages=packages,
+        rejected_package_count=rejected_package_count,
+        rejected_packages=rejected_packages,
     )
 
 
@@ -293,6 +352,8 @@ def inventory_to_dict(report: InventoryReport) -> dict:
         "registryFingerprint": report.registry_fingerprint,
         "rawPackageCount": report.raw_package_count,
         "uniquePackageCount": report.unique_package_count,
+        "rejectedPackageCount": report.rejected_package_count,
+        "uniqueRejectedPackageCount": len(report.rejected_packages),
         "packages": [
             {
                 "packageId": package.package_id,
@@ -305,6 +366,16 @@ def inventory_to_dict(report: InventoryReport) -> dict:
                 },
             }
             for package in report.packages
+        ],
+        "rejectedPackages": [
+            {
+                "packageId": package.package_id,
+                "sha256": package.sha256,
+                "aliases": list(package.aliases),
+                "reasonCode": package.reason_code,
+                "reason": package.reason,
+            }
+            for package in report.rejected_packages
         ],
     }
 

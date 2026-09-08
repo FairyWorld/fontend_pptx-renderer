@@ -164,3 +164,27 @@ def test_scan_corpus_deduplicates_identical_packages_and_serializes_deterministi
     assert first_output == second_output
     payload = json.loads(first_output)
     assert payload["packages"][0]["sha256"] == report.packages[0].sha256
+
+
+def test_scan_corpus_records_one_rejected_package_and_continues(tmp_path: Path, registry):
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    write_test_pptx(corpus / "valid.pptx")
+    write_test_pptx(
+        corpus / "oversized.pptx",
+        slide_xml="<s/>",
+        chart_xml=None,
+        extra_entries={"ppt/media/large.bin": b"x" * 2049},
+    )
+
+    report = scan_corpus(
+        [corpus],
+        registry,
+        ScanLimits(max_entry_uncompressed_bytes=2048),
+    )
+
+    assert report.raw_package_count == 2
+    assert report.unique_package_count == 1
+    assert report.rejected_package_count == 1
+    assert report.rejected_packages[0].aliases == ("corpus-0/oversized.pptx",)
+    assert report.rejected_packages[0].reason_code == "zip-entry-size"

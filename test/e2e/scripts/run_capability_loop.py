@@ -148,9 +148,14 @@ def command_inventory(args: argparse.Namespace) -> int:
         }
     output = _path(args.out, repo, "test/e2e/reports/capability-loop/inventory.json")
     _write_json(output, payload)
+    if args.fail_on_rejected and report.rejected_package_count:
+        raise CapabilityLoopError(
+            f"inventory rejected {report.rejected_package_count} package(s); report written to {output}"
+        )
     print(
         f"inventoried {report.raw_package_count} packages, "
-        f"{report.unique_package_count} unique -> {output}"
+        f"{report.unique_package_count} unique, "
+        f"{report.rejected_package_count} rejected -> {output}"
     )
     return 0
 
@@ -356,6 +361,7 @@ def build_parser() -> argparse.ArgumentParser:
     inventory.add_argument("--corpus", action="append")
     inventory.add_argument("--issues")
     inventory.add_argument("--out")
+    inventory.add_argument("--fail-on-rejected", action="store_true")
     inventory.set_defaults(handler=command_inventory)
 
     rank = subparsers.add_parser("rank", help="reconcile and rank capability evidence")

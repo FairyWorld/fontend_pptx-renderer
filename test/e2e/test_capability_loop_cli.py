@@ -158,10 +158,13 @@ def test_inventory_is_deterministic_and_rejects_unsafe_zip(tmp_path: Path):
         corpus,
         "--out",
         repo / "unsafe.json",
+        "--fail-on-rejected",
     )
     assert unsafe.returncode == 2
-    assert "unsafe ZIP member" in unsafe.stderr
-    assert not (repo / "unsafe.json").exists()
+    assert "rejected 1 package" in unsafe.stderr
+    rejected = json.loads((repo / "unsafe.json").read_text(encoding="utf-8"))
+    assert rejected["rejectedPackageCount"] == 1
+    assert rejected["rejectedPackages"][0]["reasonCode"] == "unsafe-zip-member"
 
 
 def test_rank_and_work_packet_keep_unreproduced_issue_out_of_demand(tmp_path: Path):

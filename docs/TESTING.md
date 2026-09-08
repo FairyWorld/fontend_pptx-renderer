@@ -423,7 +423,9 @@ The scanner reads ZIP members in memory without extracting them. It rejects path
 than 4,000 entries, a decoded entry over 32 MiB, or more than 256 MiB decoded in total. Identical
 PPTX bytes count once for ranking while all corpus aliases remain available in the ignored report.
 Selectors match XML namespace, local name, and optional attribute predicates; similarly named
-elements from unrelated namespaces do not count.
+elements from unrelated namespaces do not count. A rejected package is isolated and recorded with
+a stable reason so the rest of a private corpus still produces evidence; add `--fail-on-rejected`
+when any rejected package must also make the command exit nonzero.
 
 Ranking is lexicographic and retains every input dimension: impact, currently reproduced issues,
 unique observed packages, failure type, native-oracle readiness, dependency depth, then capability
