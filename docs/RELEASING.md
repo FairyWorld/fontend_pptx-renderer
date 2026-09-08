@@ -5,7 +5,7 @@
 - [ ] Update changelog/release notes
 - [ ] Verify tests pass: `pnpm test`
 - [ ] Verify build passes: `pnpm build`
-- [ ] Verify package entries and real browser paths: `pnpm test:package && pnpm test:browser`
+- [ ] Verify package entries, packlist/notices, and real browser paths: `pnpm test:package && pnpm test:browser`
 - [ ] Verify PDF.js contracts: `pnpm test:pdfjs-contract` and the CI PDF.js 6 matrix job
 - [ ] Verify lint/types/exports: `pnpm lint && pnpm typecheck && pnpm knip && pnpm publint`
 - [ ] Verify bundle size: `pnpm size`

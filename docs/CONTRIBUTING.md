@@ -78,7 +78,7 @@ pnpm format:check  # Prettier check
 pnpm typecheck     # tsc --noEmit
 pnpm test          # vitest unit tests
 pnpm test:browser  # Chromium package/runtime/PDF.js smoke tests
-pnpm test:package  # ESM, CJS, and standalone export checks
+pnpm test:package  # Package entries, packlist boundaries, and notice links
 pnpm knip          # detect unused exports/dependencies
 pnpm size          # enforce primary and standalone gzip budgets
 ```

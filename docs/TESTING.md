@@ -329,6 +329,33 @@ For complex shape regressions (curved arrows, multi-segment geometry, 3D faces):
 
 Do not use blind parameter tuning. When topology or shape semantics are wrong, derive the fix from the OOXML spec.
 
+### Spec-Compiled Geometry Source Gate
+
+The M0 geometry source contract is independent of local PowerPoint ground-truth files:
+
+```bash
+pnpm geometry:generate  # regenerate after an intentional source or contract change
+pnpm geometry:check     # validate source hashes and fail on generated drift
+pnpm exec vitest run test/unit/build/ooxmlGeometrySource.test.ts
+```
+
+`geometry:check` validates the unchanged ECMA archive and nested XML hashes, all 17 formula
+operators and arities, document-order guide references, DrawingML path namespaces and
+command structure, duplicate-source handling, source reconciliation, and deterministic
+catalog bytes. It runs in CI before the package build.
+
+The generated catalog is evidence about source coverage; it is not renderer acceptance.
+Before any generated definition enters the production renderer, add tests for formula
+semantics and path topology plus browser checks for both ordinary shapes and picture clips.
+Then compare square, wide, and tall shapes and relevant adjustment bounds against native
+PowerPoint ground truth. Group, flip, rotation, line-like, and multi-path cases require their
+own coverage when applicable.
+
+M0 rejects active source overrides. Before enabling one, add an offline check that reads the
+alternative source bytes, verifies their SHA-256 and requested shape, and resolves an
+existing native PowerPoint oracle record. Do not update a visual baseline merely to make a
+generated definition pass.
+
 ## Chart Fix Protocol
 
 Chart rendering is validated at two levels:

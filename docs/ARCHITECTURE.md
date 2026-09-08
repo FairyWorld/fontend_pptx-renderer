@@ -84,6 +84,28 @@ The normal ESM/CJS builds externalize `echarts/*` and JSZip for application bund
 `./browser` entry bundles JSZip and the registered ECharts subset while keeping PDF.js
 optional and external.
 
+## OOXML Geometry Compilation Boundary
+
+Preset geometry currently remains in the handwritten `src/shapes/presets.ts` registry. The
+M0 source tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML
+geometry addendum and generates a deterministic inventory catalog. Nothing under `src/`
+imports this tooling or the generated catalog, so M0 cannot change rendered output or bundle
+size.
+
+The future geometry engine has three internal responsibilities: evaluate guide formulas,
+hold renderer-independent geometry definitions, and emit path commands. SVG fill/theme
+resolution, browser masks, connector markers, picture/media ownership, effects, and render
+lifecycle stay in their existing render modules. Generated definitions are resolved during
+render and retain the current per-node geometry cache; they are not added to the serialized
+presentation model.
+
+ECMA source differences are recorded through `source-reconciliation.json`. M0 rejects active
+alternative definitions because it does not yet verify their bytes or native PowerPoint
+evidence. A later override gate must verify the local source bytes and hash, confirm the
+requested shape exists, and resolve native-oracle metadata before activation. Production
+migration is per shape or shape family, so the existing handwritten implementation remains
+available for shapes that have not passed that gate.
+
 ## Rendering Strategies
 
 `renderList()` supports:

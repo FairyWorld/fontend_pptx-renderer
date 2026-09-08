@@ -87,6 +87,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm geometry:check
       - run: pnpm test:pdfjs-contract
       - run: pnpm build
       - run: pnpm test:package

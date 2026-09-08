@@ -557,7 +557,7 @@ import type {
 
 ## Rendering Capabilities
 
-### Shapes — 187+ Presets + Custom Geometry
+### Shapes — Broad Preset Coverage + Custom Geometry
 
 All commonly used OOXML `DrawingML` preset shapes, organized by category:
 
@@ -573,7 +573,10 @@ All commonly used OOXML `DrawingML` preset shapes, organized by category:
 | Math & Brackets   |    12 | Plus, minus, multiply, division, brackets, braces              |
 | **Multi-path 3D** |   33+ | Bevel, cube, can, ribbons — multi-layer SVG with 3D appearance |
 
-Custom geometry (`<a:custGeom>`) is also supported via a general-purpose OOXML path interpreter.
+Custom geometry (`<a:custGeom>`) supports numeric move, line, quadratic/cubic Bézier, arc,
+and close commands, including multiple paths and inferred source extents. Symbolic `gdLst`
+formula evaluation is planned through the spec-compiled geometry work and is not part of the
+current custom-geometry renderer.
 
 ### Text — 7-Level Style Inheritance
 
@@ -704,7 +707,7 @@ pnpm dev          # Vite dev server
 pnpm test         # Unit tests (vitest)
 pnpm test:coverage # Coverage report → coverage/
 pnpm build        # Production build
-pnpm test:package # Verify ESM, CJS, and standalone package entries
+pnpm test:package # Verify package entries, packlist boundaries, and notice links
 pnpm test:browser # Real Chromium checks for standalone, charts, and PDF.js
 pnpm dev:e2e      # Dev server + Python E2E API server
 pnpm lint         # ESLint

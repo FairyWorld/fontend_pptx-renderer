@@ -3,6 +3,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import {
+  getNpmPackInvocation,
+  getPackageAuditManifest,
+} from '../../../scripts/package-contract.mjs';
 import libraryConfig from '../../../vite.config';
 import browserConfig from '../../../vite.config.browser';
 
@@ -109,6 +113,60 @@ describe('browser distribution contract', () => {
 
     expect(packageJson.scripts['test:package']).toBe('node scripts/verify-package.mjs');
     expect(ci).toContain('pnpm test:package');
+  });
+
+  it('builds a lifecycle-silent npm pack command on POSIX and Windows', () => {
+    expect(
+      getNpmPackInvocation({
+        cachePath: '/tmp/npm-cache',
+        platform: 'darwin',
+      }),
+    ).toEqual({
+      arguments: [
+        'pack',
+        '--dry-run',
+        '--json',
+        '--ignore-scripts',
+        '--foreground-scripts=false',
+        '--cache',
+        '/tmp/npm-cache',
+      ],
+      executable: 'npm',
+    });
+
+    expect(
+      getNpmPackInvocation({
+        cachePath: 'C:\\Temp\\npm cache',
+        comSpec: 'C:\\Windows\\System32\\cmd.exe',
+        platform: 'win32',
+      }),
+    ).toEqual({
+      arguments: [
+        '/d',
+        '/c',
+        'npm.cmd',
+        'pack',
+        '--dry-run',
+        '--json',
+        '--ignore-scripts',
+        '--foreground-scripts=false',
+        '--cache',
+        'C:\\Temp\\npm cache',
+      ],
+      executable: 'C:\\Windows\\System32\\cmd.exe',
+    });
+  });
+
+  it('removes lifecycle scripts from the isolated package-audit manifest', () => {
+    const auditManifest = getPackageAuditManifest({
+      files: ['dist'],
+      name: 'fixture',
+      scripts: { prepare: 'node destructive-prepare.mjs', test: 'vitest run' },
+      version: '1.0.0',
+    });
+
+    expect(auditManifest).toEqual({ files: ['dist'], name: 'fixture', version: '1.0.0' });
+    expect(auditManifest).not.toHaveProperty('scripts');
   });
 
   it('runs the standalone and PDF.js paths in a real Chromium browser', () => {

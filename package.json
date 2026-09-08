@@ -46,7 +46,8 @@
     "CHANGELOG.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
-    "licenses"
+    "licenses",
+    "scripts/ooxml-geometry/source-manifest.json"
   ],
   "sideEffects": [
     "./src/renderer/chart/echartsRuntime.ts",
@@ -70,6 +71,8 @@
     "test:pdfjs-contract": "node scripts/verify-pdfjs-contract.mjs",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
+    "geometry:generate": "node scripts/ooxml-geometry/generate.mjs",
+    "geometry:check": "node scripts/ooxml-geometry/generate.mjs --check",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write 'src/**/*.ts'",
