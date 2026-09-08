@@ -438,6 +438,28 @@ Selecting anything other than the first executable row requires `work-packet --s
 the resulting packet records both the original rank and the reason, such as a previously committed
 release goal.
 
+Normalize committed, clean native API results before promotion:
+
+```bash
+python3 test/e2e/scripts/run_capability_loop.py verify \
+  --capability drawingml.shape.geometry.adjustment.donut \
+  --case-report test/e2e/reports/capability-loop/donut-thin-native.json \
+  --case-report test/e2e/reports/capability-loop/donut-thick-native.json \
+  --baseline-report test/e2e/reports/capability-loop/donut-thin-baseline.json \
+  --baseline-report test/e2e/reports/capability-loop/donut-thick-baseline.json \
+  --oracle powerpoint-macos \
+  --passed-gate source --passed-gate structural --passed-gate unit \
+  --passed-gate browser --passed-gate docs
+```
+
+`verify` checks one clean renderer revision, exact case/input/ground-truth hashes, API runtime
+errors, PowerPoint quality status, matching baseline case IDs, and the 0.02 SSIM regression budget.
+Regression baselines must use one earlier clean revision with identical source, ground-truth, and
+runtime-environment fingerprints.
+It derives `native-powerpoint`, `manual-visual`, and `regression`; callers cannot self-attest those
+three gates. `--passed-gate` records separate checks that have already run and does not execute
+them. A `needsReview` case requires `--manual-verdict CASE_ID=passed` (or `accepted`).
+
 Promotion uses the `accept` command only after the capability registry says `renderMode=native` and
 the candidate implementation is committed. The command requires a clean tracked tree, matching
 HEAD and relevant-file fingerprints, source and ground-truth SHA-256 values, every declared gate,

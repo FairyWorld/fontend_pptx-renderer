@@ -15,6 +15,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   hashes.
 - Added `pnpm capability:check` as a CI-safe contract gate and `pnpm capability:inventory` for local
   ignored corpora; generated evidence stays outside the published package and tracked source tree.
+- Added capability verification normalization for raw native API reports, with clean-revision,
+  input-hash, manual-review, and before/after SSIM regression checks.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,

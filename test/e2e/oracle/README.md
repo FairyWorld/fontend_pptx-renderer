@@ -18,9 +18,10 @@ pnpm capability:inventory
 python3 test/e2e/scripts/run_capability_loop.py --help
 ```
 
-`capability_contract.py`, `capability_inventory.py`, `capability_evidence.py`, and
-`capability_ranking.py` contain the domain rules. `scripts/run_capability_loop.py` only composes
-them. Local outputs are written below `test/e2e/reports/capability-loop/` and remain ignored because
+`capability_contract.py`, `capability_inventory.py`, `capability_evidence.py`,
+`capability_verification.py`, and `capability_ranking.py` contain the domain rules.
+`scripts/run_capability_loop.py` only composes them. Local outputs are written below
+`test/e2e/reports/capability-loop/` and remain ignored because
 they may refer to private case aliases. Tracked receipts keep stable case IDs and SHA-256 values,
 but remove absolute paths, usernames, free-form issue bodies, and private labels.
 
@@ -33,6 +34,12 @@ a strict nonzero exit after the report is written. Unknown, verified, and extern
 remain in the ledger for observation but are not selected as the next implementation cohort.
 When a committed goal deliberately selects a lower-ranked cohort, pass `--selection-reason`; the
 work packet records the override instead of silently hiding the global ordering.
+
+`verify` consumes raw `/api/evaluate` JSON reports from one clean committed renderer revision. It
+derives native-PowerPoint, manual-review, and regression status, including a matching baseline case
+set, identical input/runtime fingerprints from an earlier revision, and the 0.02 SSIM budget. Other
+`--passed-gate` values only record checks already executed by
+the caller; they are not run by the command. Review rows require an explicit case verdict.
 
 ## Current Implemented Pieces
 

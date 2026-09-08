@@ -16,17 +16,19 @@ declares namespace-aware OOXML selectors, a bounded scope, current render mode, 
 implementation/test paths, and required gates. `capability-acceptance.json` stores only sanitized
 promotion receipts; private PPTX/PDF/PNG artifacts and generated inventory remain ignored.
 
-The loop has four domain modules and a thin CLI:
+The loop has five domain modules and a thin CLI:
 
 - `capability_contract.py` validates immutable registry and receipt types.
 - `capability_inventory.py` scans PPTX ZIP/XML within fixed entry and decoded-byte limits and
   deduplicates packages by SHA-256.
 - `capability_evidence.py` binds receipts to capability definitions, relevant file content, source
   PPTX, ground truth, gates, environment, and revision.
+- `capability_verification.py` normalizes native evaluation API results, rejects mixed or dirty
+  revisions, and derives native, manual-review, and SSIM-regression gate outcomes.
 - `capability_ranking.py` applies a documented lexicographic priority and emits one bounded work
   packet.
-- `scripts/run_capability_loop.py` composes `validate`, `inventory`, `rank`, `work-packet`, and
-  `accept`; it does not edit GitHub issues or accept visual baselines.
+- `scripts/run_capability_loop.py` composes `validate`, `inventory`, `rank`, `work-packet`,
+  `verify`, and `accept`; it does not edit GitHub issues or accept visual baselines.
 
 Render mode and evidence state are independent. Render modes are `none`, `fallback`, `approximate`,
 `native`, and `excluded`; evidence moves through `unknown`, `observed`, `reproducible`, `candidate`,

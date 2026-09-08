@@ -93,6 +93,37 @@ def create_repo(tmp_path: Path, *, render_mode: str = "fallback") -> tuple[Path,
     return repo, registry, acceptance
 
 
+def write_native_evaluation(path: Path, case_id: str, revision: str) -> Path:
+    path.write_text(
+        json.dumps(
+            {
+                "testFile": case_id,
+                "evaluationErrorCount": 0,
+                "evaluationErrors": [],
+                "oracleMismatchCount": 0,
+                "avgSsim": 0.99,
+                "supported": True,
+                "quality": {"passed": True, "needsReview": False},
+                "provenance": {
+                    "inputs": {
+                        "sourcePptx": {"sha256": "c" * 64},
+                        "groundTruth": {"kind": "png", "combinedSha256": "d" * 64},
+                    },
+                    "renderer": {"revision": revision, "dirty": False},
+                    "runtime": {
+                        "platform": "macOS-test",
+                        "python": "3.11.11",
+                        "browser": {"name": "chrome", "version": "152"},
+                        "fontProfile": None,
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_validate_rejects_invalid_contract_and_accepts_valid_contract(tmp_path: Path):
     repo, registry, acceptance = create_repo(tmp_path)
     valid = run_cli(
@@ -331,6 +362,54 @@ def test_accept_writes_fresh_receipt_and_rejects_dirty_repo(tmp_path: Path):
     assert rejected.returncode == 2
     assert "clean repository" in rejected.stderr
     assert json.loads(acceptance.read_text(encoding="utf-8"))["receipts"] == []
+
+
+def test_verify_normalizes_api_output_at_the_current_clean_revision(tmp_path: Path):
+    repo, registry_path, _acceptance = create_repo(tmp_path, render_mode="native")
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=repo, check=True)
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    raw = write_native_evaluation(tmp_path / "native.json", "donut-thin", revision)
+    output = tmp_path / "verification.json"
+
+    result = run_cli(
+        "verify",
+        "--repo-root",
+        repo,
+        "--registry",
+        registry_path,
+        "--capability",
+        "drawingml.shape.geometry.donut",
+        "--case-report",
+        raw,
+        "--oracle",
+        "powerpoint-macos",
+        "--passed-gate",
+        "source",
+        "--passed-gate",
+        "unit",
+        "--passed-gate",
+        "browser",
+        "--passed-gate",
+        "docs",
+        "--out",
+        output,
+    )
+
+    assert result.returncode == 0, result.stderr
+    verification = json.loads(output.read_text(encoding="utf-8"))
+    assert verification["renderer"]["revision"] == revision
+    assert set(verification["gates"].values()) == {"passed"}
+    assert verification["caseResults"][0]["caseId"] == "donut-thin"
 
 
 def test_tracked_cli_contract_validates_current_repository():

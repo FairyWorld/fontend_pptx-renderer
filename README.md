@@ -47,6 +47,7 @@ PPTX inputs, PowerPoint ground truth, environment, and revision hashes.
 ```bash
 pnpm capability:check      # validate tracked contracts and relevant file paths
 pnpm capability:inventory  # scan the local ignored corpus into an ignored evidence report
+python3 test/e2e/scripts/run_capability_loop.py verify --help
 ```
 
 Inventory, ledger, ranking, work-packet, and verification reports stay under the ignored
@@ -54,6 +55,9 @@ Inventory, ledger, ranking, work-packet, and verification reports stay under the
 the public `supported` claim additionally requires a fresh `verified` receipt. A report from a
 dirty tree, a changed capability scope, changed implementation files, changed input/ground-truth
 hashes, skipped cases, or an unresolved manual review cannot promote a capability.
+The `verify` command converts raw `/api/evaluate` results into the promotion schema and derives
+native-PowerPoint, manual-review, and regression gates from those results. Other `--passed-gate`
+values record checks already run by the caller; the command does not execute or infer them.
 
 ## Install
 

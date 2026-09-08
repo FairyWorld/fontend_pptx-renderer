@@ -34,6 +34,9 @@ from oracle.capability_inventory import (  # noqa: E402
     inventory_to_dict,
     scan_corpus,
 )
+from oracle.capability_verification import (  # noqa: E402
+    normalize_native_evaluation_reports,
+)
 from oracle.capability_ranking import (  # noqa: E402
     build_ledger_rows,
     build_work_packet,
@@ -278,6 +281,65 @@ def command_work_packet(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_object_reports(values: Sequence[str], repo: Path, label: str) -> list[Mapping[str, Any]]:
+    reports: list[Mapping[str, Any]] = []
+    for value in values:
+        report = _load_json(_path(value, repo, value))
+        if not isinstance(report, Mapping):
+            raise CapabilityLoopError(f"{label} must contain JSON objects")
+        reports.append(report)
+    return reports
+
+
+def _manual_verdicts(values: Sequence[str]) -> dict[str, str]:
+    verdicts: dict[str, str] = {}
+    for value in values:
+        case_id, separator, verdict = value.partition("=")
+        if not separator or not case_id or verdict not in {"passed", "accepted"}:
+            raise CapabilityLoopError(
+                "manual verdict must use CASE_ID=passed or CASE_ID=accepted"
+            )
+        if case_id in verdicts:
+            raise CapabilityLoopError(f"duplicate manual verdict for case: {case_id}")
+        verdicts[case_id] = verdict
+    return verdicts
+
+
+def command_verify(args: argparse.Namespace) -> int:
+    repo = _repo(args)
+    registry_path = _path(args.registry, repo, "test/e2e/oracle/capabilities.json")
+    registry = load_capability_registry(registry_path)
+    capability = registry.by_id().get(args.capability)
+    if capability is None:
+        raise CapabilityLoopError(f"unknown capability: {args.capability}")
+    if capability.render_mode != "native":
+        raise CapabilityLoopError("verify requires renderMode=native for the bounded capability")
+    revision, dirty = detect_renderer_git_state(repo)
+    if revision is None or dirty is not False:
+        raise CapabilityLoopError("verify requires a clean repository with a readable HEAD")
+    reports = _load_object_reports(args.case_report, repo, "case report")
+    baselines = _load_object_reports(args.baseline_report, repo, "baseline report")
+    verification = normalize_native_evaluation_reports(
+        capability,
+        reports,
+        repo,
+        oracle=args.oracle,
+        baseline_reports=baselines,
+        passed_gates=args.passed_gate,
+        manual_verdicts=_manual_verdicts(args.manual_verdict),
+    )
+    if verification["renderer"]["revision"] != revision:
+        raise CapabilityLoopError("native case reports do not match current HEAD")
+    output = _path(
+        args.out,
+        repo,
+        "test/e2e/reports/capability-loop/verification.json",
+    )
+    _write_json(output, verification)
+    print(f"verified {len(reports)} native case report(s) for {capability.id} -> {output}")
+    return 0
+
+
 def _assert_tracked(repo: Path, path: Path) -> None:
     try:
         relative = path.resolve().relative_to(repo.resolve()).as_posix()
@@ -385,6 +447,17 @@ def build_parser() -> argparse.ArgumentParser:
     work_packet.add_argument("--selection-reason")
     work_packet.add_argument("--out")
     work_packet.set_defaults(handler=command_work_packet)
+
+    verify = subparsers.add_parser("verify", help="normalize native evaluation evidence")
+    _add_common_contract_arguments(verify)
+    verify.add_argument("--capability", required=True)
+    verify.add_argument("--case-report", action="append", required=True)
+    verify.add_argument("--baseline-report", action="append", default=[])
+    verify.add_argument("--oracle", required=True)
+    verify.add_argument("--passed-gate", action="append", default=[])
+    verify.add_argument("--manual-verdict", action="append", default=[])
+    verify.add_argument("--out")
+    verify.set_defaults(handler=command_verify)
 
     accept = subparsers.add_parser("accept", help="write one fresh promotion receipt")
     _add_common_contract_arguments(accept)
