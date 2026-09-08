@@ -5,6 +5,7 @@
 import { SafeXmlNode } from '../../parser/XmlParser';
 import { emuToPx, angleToDeg } from '../../parser/units';
 import { BaseNodeData, parseBaseProps } from './BaseNode';
+import { parseShape3DProperties, Shape3DProperties } from './Shape3D';
 
 export interface TextRun {
   text: string;
@@ -58,6 +59,7 @@ export interface ShapeNodeData extends BaseNodeData {
   fill?: SafeXmlNode;
   /** @internal Raw XML node — opaque to consumers. Use serializePresentation() for JSON-safe data. */
   line?: SafeXmlNode;
+  shape3d?: Shape3DProperties;
   headEnd?: LineEndInfo;
   tailEnd?: LineEndInfo;
   textBody?: TextBody;
@@ -219,6 +221,7 @@ export function parseShapeNode(spNode: SafeXmlNode): ShapeNodeData {
   // --- Line ---
   const ln = spPr.child('ln');
   const line = ln.exists() ? ln : undefined;
+  const shape3d = parseShape3DProperties(spPr);
 
   // --- Line end markers (arrowheads) ---
   let headEnd: LineEndInfo | undefined;
@@ -288,6 +291,7 @@ export function parseShapeNode(spNode: SafeXmlNode): ShapeNodeData {
     customGeometry,
     fill,
     line,
+    shape3d,
     headEnd,
     tailEnd,
     textBody,

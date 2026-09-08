@@ -5,6 +5,7 @@
 import { SafeXmlNode } from '../../parser/XmlParser';
 import { BaseNodeData, parseBaseProps } from './BaseNode';
 import { parseAdjustments } from './ShapeNode';
+import { parseShape3DProperties, Shape3DProperties } from './Shape3D';
 
 export interface CropRect {
   top: number;
@@ -22,6 +23,7 @@ export interface PicNodeData extends BaseNodeData {
   fill?: SafeXmlNode;
   /** @internal Raw XML node — opaque to consumers. Use serializePresentation() for JSON-safe data. */
   line?: SafeXmlNode;
+  shape3d?: Shape3DProperties;
   /** Picture preset geometry, when the picture is clipped to a non-rectangular preset. */
   presetGeometry?: string;
   /** Adjustment values for the picture's preset clipping geometry. */
@@ -86,6 +88,7 @@ export function parsePicNode(picNode: SafeXmlNode): PicNodeData {
 
   const ln = spPr.child('ln');
   const line = ln.exists() ? ln : undefined;
+  const shape3d = parseShape3DProperties(spPr);
   const prstGeom = spPr.child('prstGeom');
   const presetGeometry = prstGeom.exists() ? prstGeom.attr('prst') : undefined;
   const geometryAdjustments = prstGeom.exists()
@@ -119,6 +122,7 @@ export function parsePicNode(picNode: SafeXmlNode): PicNodeData {
     crop,
     fill,
     line,
+    shape3d,
     presetGeometry,
     geometryAdjustments,
     customGeometry,

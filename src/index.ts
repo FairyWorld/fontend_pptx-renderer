@@ -72,6 +72,14 @@ export type {
   TextBoxBounds,
 } from './model/nodes/ShapeNode';
 export type { PicNodeData, CropRect } from './model/nodes/PicNode';
+export type {
+  Shape3DProperties,
+  Scene3DProperties,
+  Shape3DFormatProperties,
+  Shape3DBevelProperties,
+  Shape3DRotation,
+  Shape3DUnsupportedReason,
+} from './model/nodes/Shape3D';
 export type { TableNodeData, TableCell, TableRow } from './model/nodes/TableNode';
 export type { GroupNodeData } from './model/nodes/GroupNode';
 export type { ChartNodeData } from './model/nodes/ChartNode';

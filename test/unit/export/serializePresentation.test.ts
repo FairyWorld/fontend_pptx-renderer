@@ -226,6 +226,59 @@ describe('serializePresentation', () => {
     expect(node.blipEmbed).toBe('rId1');
   });
 
+  it('serializes 3D observations without raw XML nodes', () => {
+    const contourColorSource = parseXml('<contourClr><schemeClr val="lt1"/></contourClr>');
+    const shape: ShapeNodeData = {
+      ...makeBase(),
+      nodeType: 'shape',
+      adjustments: new Map(),
+      shape3d: {
+        scene: {
+          cameraPreset: 'orthographicFront',
+          lightRig: 'twoPt',
+          lightDirection: 't',
+          lightRotation: { latitude: 0, longitude: 0, revolution: 120 },
+        },
+        shape: {
+          extrusionHeight: 0,
+          contourWidth: 0,
+          bevelTop: {
+            preset: 'circle',
+            presetExplicit: false,
+            width: 8 / 3,
+            height: 2,
+          },
+          contourColor: { type: 'schemeClr', value: 'lt1' },
+          contourColorSource,
+        },
+        unsupportedReasons: [],
+      },
+    };
+
+    const serialized = serializePresentation(makePres([shape])).slides[0].nodes[0];
+    expect(serialized.shape3d).toEqual({
+      scene: {
+        cameraPreset: 'orthographicFront',
+        lightRig: 'twoPt',
+        lightDirection: 't',
+        lightRotation: { latitude: 0, longitude: 0, revolution: 120 },
+      },
+      shape: {
+        extrusionHeight: 0,
+        contourWidth: 0,
+        bevelTop: {
+          preset: 'circle',
+          presetExplicit: false,
+          width: 8 / 3,
+          height: 2,
+        },
+        contourColor: { type: 'schemeClr', value: 'lt1' },
+      },
+      unsupportedReasons: [],
+    });
+    expect(JSON.stringify(serialized)).not.toContain('contourColorSource');
+  });
+
   it('serializes table node', () => {
     const table: TableNodeData = {
       ...makeBase(),

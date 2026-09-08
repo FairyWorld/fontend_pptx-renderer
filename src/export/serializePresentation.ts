@@ -20,6 +20,7 @@ import { parseRenderableChildren } from '../model/RenderableChild';
 import type { RelEntry } from '../parser/RelParser';
 import type { LayoutData } from '../model/Layout';
 import type { MasterData } from '../model/Master';
+import type { Shape3DProperties } from '../model/nodes/Shape3D';
 
 // ---------------------------------------------------------------------------
 // Serialized Types (JSON-safe)
@@ -56,6 +57,7 @@ export interface SerializedNode {
   flipH: boolean;
   flipV: boolean;
   presetGeometry?: string;
+  shape3d?: SerializedShape3D;
   textBody?: SerializedTextBody;
   columns?: number[];
   rows?: SerializedRow[];
@@ -64,6 +66,10 @@ export interface SerializedNode {
   chartPath?: string;
   children?: SerializedNode[];
 }
+
+export type SerializedShape3D = Omit<Shape3DProperties, 'shape'> & {
+  shape?: Omit<NonNullable<Shape3DProperties['shape']>, 'contourColorSource'>;
+};
 
 export interface SerializedSlide {
   index: number;
@@ -106,6 +112,25 @@ function serializeRow(row: TableRow): SerializedRow {
   return {
     height: row.height,
     cells: row.cells.map(serializeCell),
+  };
+}
+
+function serializeShape3D(shape3d: Shape3DProperties | undefined): SerializedShape3D | undefined {
+  if (!shape3d) return undefined;
+  const shape = shape3d.shape;
+  return {
+    scene: shape3d.scene,
+    shape: shape
+      ? {
+          extrusionHeight: shape.extrusionHeight,
+          contourWidth: shape.contourWidth,
+          ...(shape.presetMaterial !== undefined ? { presetMaterial: shape.presetMaterial } : {}),
+          ...(shape.bevelTop ? { bevelTop: shape.bevelTop } : {}),
+          ...(shape.bevelBottom ? { bevelBottom: shape.bevelBottom } : {}),
+          ...(shape.contourColor ? { contourColor: shape.contourColor } : {}),
+        }
+      : undefined,
+    unsupportedReasons: [...shape3d.unsupportedReasons],
   };
 }
 
@@ -152,11 +177,13 @@ function serializeNode(
       const s = node as ShapeNodeData;
       base.presetGeometry = s.presetGeometry;
       base.textBody = serializeTextBody(s.textBody);
+      base.shape3d = serializeShape3D(s.shape3d);
       break;
     }
     case 'picture': {
       const p = node as PicNodeData;
       base.blipEmbed = p.blipEmbed;
+      base.shape3d = serializeShape3D(p.shape3d);
       break;
     }
     case 'table': {

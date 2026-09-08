@@ -87,6 +87,26 @@ function makePicXml(
 }
 
 describe('parsePicNode', () => {
+  it('attaches parsed static 3D properties to pictures', () => {
+    const node = parsePicNode(
+      parseXml(`
+        <pic>
+          <nvPicPr><cNvPr id="5" name="3D picture"/><nvPr/></nvPicPr>
+          <blipFill><blip embed="rId1"/></blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="914400" cy="914400"/></xfrm>
+            <prstGeom prst="rect"><avLst/></prstGeom>
+            <scene3d><camera prst="orthographicFront"/><lightRig rig="twoPt" dir="t"/></scene3d>
+            <sp3d extrusionH="0"><bevelT w="127000" h="127000" prst="circle"/></sp3d>
+          </spPr>
+        </pic>
+      `),
+    );
+
+    expect(node.shape3d?.scene?.lightRig).toBe('twoPt');
+    expect(node.shape3d?.unsupportedReasons).toEqual([]);
+  });
+
   it('parses basic picture node', () => {
     const node = parsePicNode(makePicXml());
     expect(node.nodeType).toBe('picture');

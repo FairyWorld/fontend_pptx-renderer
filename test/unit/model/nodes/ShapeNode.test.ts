@@ -7,6 +7,23 @@ function shape(xml: string) {
 }
 
 describe('parseShapeNode', () => {
+  it('attaches parsed static 3D properties to ordinary shapes', () => {
+    const s = shape(`
+      <sp>
+        <nvSpPr><cNvPr id="1" name="3D shape"/><nvPr/></nvSpPr>
+        <spPr>
+          <xfrm><off x="0" y="0"/><ext cx="914400" cy="914400"/></xfrm>
+          <prstGeom prst="rect"><avLst/></prstGeom>
+          <scene3d><camera prst="orthographicFront"/><lightRig rig="threePt" dir="t"/></scene3d>
+          <sp3d extrusionH="0"><bevelT w="127000" h="127000" prst="circle"/></sp3d>
+        </spPr>
+      </sp>
+    `);
+
+    expect(s.shape3d?.shape?.bevelTop?.preset).toBe('circle');
+    expect(s.shape3d?.unsupportedReasons).toEqual([]);
+  });
+
   it('parses preset geometry', () => {
     const s = shape(`
       <sp>
