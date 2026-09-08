@@ -4,7 +4,7 @@
 
 A high-fidelity, browser-native PPTX renderer that parses Office Open XML (`.pptx`) files and renders slides as HTML/SVG DOM.
 
-Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
+Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded static DrawingML bevels, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
 
 ## Rendering Example
 
@@ -607,6 +607,25 @@ rendering. Other presets retain the handwritten implementation until their own l
 adjustment, and oracle gates pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content
 remain unsupported.
 
+### Static DrawingML 3D — Bounded Top Bevel
+
+The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
+parsed observations in serialized model output. A native-oracle-backed static subset renders an
+orthographic circular top bevel and optional contour with SVG lighting:
+
+- shape lane: opaque resolved solid-fill `rect` and `roundRect`;
+- picture lane: rectangular, stretch-filled pictures;
+- `orthographicFront`, no camera rotation, `twoPt:t` or `threePt:t` lighting, with either no light
+  rotation or the observed `twoPt:t` rotation `lat=0`, `lon=0`, `rev=120°`;
+- zero or omitted extrusion, an absent/zero contour or a positive contour with a resolvable color,
+  no bottom bevel or preset material, and no effect-list entry other than a coexisting outer shadow.
+
+The renderer keeps the normal flat shape or picture whenever the complete tuple does not match.
+This support does not include perspective cameras, nonzero extrusion, arbitrary light rotation,
+other bevel presets, tiled pictures, gradient/pattern/group/image-filled shapes, or pixel-identical
+PowerPoint material simulation. Text stays outside the SVG lighting filter, picture outlines remain
+centered on the source bounds, and group transforms retain the existing coordinate mapping.
+
 ### Text — 7-Level Style Inheritance
 
 Full OOXML text cascade: master → layout → shape → paragraph → run. Supports theme fonts, numbered/symbol/picture bullets, multi-level indent, vertical text, superscript/subscript, hyperlinks, and per-shape text insets.
@@ -619,7 +638,7 @@ The renderer registers only the ECharts charts, components, features, and Canvas
 that it uses. Bundler consumers keep ECharts external; the standalone browser entry
 contains this same tree-shakeable runtime.
 
-OOXML 3D chart elements such as `bar3DChart`, `line3DChart`, `pie3DChart`, `area3DChart`, and `surface3DChart` are parsed as graceful 2D fallbacks where possible. True 3D perspective, depth walls, and surface meshes are not PowerPoint-perfect.
+OOXML 3D chart elements such as `bar3DChart`, `line3DChart`, `pie3DChart`, `area3DChart`, and `surface3DChart` are parsed as graceful 2D fallbacks where possible. Their perspective, depth walls, and surface meshes are not rendered as native 3D.
 
 ### Fill, Stroke & Color
 
@@ -766,14 +785,15 @@ Dev pages at `http://127.0.0.1:5173`:
 
 ## What's Not Yet Supported
 
-DrawingML `a:scene3d`/`a:sp3d` camera, lighting, bevel, contour, and extrusion semantics currently
-retain the flat 2D shape fallback. True 3D chart perspective/depth/surface meshes, Office 2017
-embedded 3D models, animations/transitions, equations (OMML), full EMF/WMF vector rendering,
-executing/editing embedded OLE objects, and slide notes rendering are also outside the verified
-native scope. Available OLE picture previews can render; they are not an OLE object engine. EMF
-bitmap and embedded-PDF previews remain supported (PDF previews require PDF.js); arbitrary EMF/WMF
-vector records remain excluded. Exact current boundaries live in the capability registry described
-above.
+DrawingML shape/picture 3D outside the bounded orthographic circular top-bevel tuple above retains
+the flat 2D fallback. This includes perspective or rotated cameras, nonzero extrusion, bottom or
+non-circular bevels, preset materials, unsupported lighting, tiled pictures, and unsupported paint
+or effect combinations. True 3D chart perspective/depth/surface meshes, Office 2017 embedded 3D
+models, animations/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing
+embedded OLE objects, and slide notes rendering are outside the verified native scope. Available OLE
+picture previews can render; they are not an OLE object engine. EMF bitmap and embedded-PDF previews
+remain supported (PDF previews require PDF.js); arbitrary EMF/WMF vector records remain excluded.
+Exact current boundaries live in the capability registry described above.
 
 ## FAQ
 

@@ -155,6 +155,38 @@ active for shapes that have not passed that gate. Expanding the production subse
 formula/IR parity, SVG structure, parent renderer, picture clip, browser, package, and current
 native PowerPoint oracle evidence for the selected shape family.
 
+### Bounded static DrawingML 3D
+
+`src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,
+light, bevel, contour, extrusion, material, and color observations. It attaches those observations
+to both shape and picture nodes and emits stable unsupported-reason codes. Serialization removes
+the retained `SafeXmlNode` color source while preserving its JSON-safe observation, so detection is
+available without exposing parser internals.
+
+`src/renderer/Shape3DRenderer.ts` is a narrow decision and effect layer. It returns either an
+`orthographic-top-bevel` plan or an explicit flat-fallback reason before touching the DOM. The
+supported plan requires all of the following:
+
+- `orthographicFront` without camera rotation;
+- `twoPt:t` or `threePt:t` light, with no rotation except the real-corpus
+  `twoPt:t/lat=0/lon=0/rev=120°` tuple;
+- a positive circular top bevel, zero or omitted extrusion, an absent/zero contour or a positive
+  contour with a resolvable color, no bottom bevel or preset material, and only an optional outer
+  shadow in `effectLst`;
+- an opaque resolved solid-fill `rect`/`roundRect` shape, or a rectangular stretch-filled picture.
+
+The renderer builds one clipped SVG bevel overlay from `SourceAlpha`, `feDiffuseLighting`, and
+`feSpecularLighting`, using bounded `userSpaceOnUse` filter coordinates and `linearRGB` filter
+interpolation. It adds the contour as a separate unfiltered path, keeps shape text outside the
+filter, and draws a 3D picture's ordinary outline as a centered SVG path so the image bounds do not
+shrink. Unique per-effect IDs prevent cross-slide collisions. Existing wrapper transforms, outer
+shadows, media ownership, and cleanup remain in their owning renderers.
+
+Anything outside that full tuple stays on the existing flat path with a stable reason. Perspective,
+nonzero extrusion, other materials/bevels/lights, gradient/pattern/group/image-filled shapes,
+tiled pictures, chart `view3D`, and Office 2017 `model3d` are separate capability lanes. This SVG
+surface model is a bounded static rendering, not a general mesh or PowerPoint material engine.
+
 ## Rendering Strategies
 
 `renderList()` supports:

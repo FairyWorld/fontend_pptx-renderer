@@ -20,6 +20,7 @@ export type StaticShape3DFallbackReason =
   | 'line-like'
   | 'geometry-preset'
   | 'paint-kind'
+  | 'contour-paint'
   | 'tiled-picture';
 
 export interface StaticShape3DTarget {
@@ -161,6 +162,11 @@ export function buildStaticShape3DPlan(
     return flat('parser-unsupported');
   }
 
+  const contour = resolveContour(properties, ctx);
+  if ((properties.shape?.contourWidth ?? 0) > 0 && !contour) {
+    return flat('contour-paint');
+  }
+
   const width = Math.min(bevel.width!, target.width / 2);
   const height = Math.min(bevel.height!, target.height / 2);
   if (!(width > 0) || !(height > 0)) return flat('invalid-bounds');
@@ -181,7 +187,7 @@ export function buildStaticShape3DPlan(
         : undefined,
     bounds: { width: target.width, height: target.height },
     bevel: { preset: 'circle', width, height },
-    contour: resolveContour(properties, ctx),
+    contour,
     light: {
       rig,
       direction: 't',

@@ -128,8 +128,8 @@
     },
     {
       "id": "drawingml.shape.3d.top-bevel-contour",
-      "component": "shape",
-      "renderMode": "fallback",
+      "component": "shape-picture",
+      "renderMode": "native",
       "impact": "fidelity",
       "selectors": [
         {
@@ -141,11 +141,22 @@
       "scope": {
         "bevelTopPresets": ["circle"],
         "camera": ["orthographicFront"],
+        "cameraRotation": ["absent"],
+        "coexistingEffects": ["outerShdw"],
+        "contour": ["absent-or-zero", "positive-with-resolvable-color"],
         "extrusionHeight": [0],
-        "presets": ["rect", "roundRect"]
+        "lightDirection": ["t"],
+        "lightRig": ["twoPt", "threePt"],
+        "lightRotation": ["absent", "twoPt:t:lat0-lon0-rev120"],
+        "nodeKinds": ["shape", "picture"],
+        "pictureFill": ["stretch"],
+        "picturePresets": ["rect"],
+        "presetMaterial": ["absent"],
+        "shapeFill": ["resolved-opaque-solid"],
+        "shapePresets": ["rect", "roundRect"]
       },
-      "fallback": "Render the existing flat two-dimensional shape and report omitted bevel and contour semantics.",
-      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts"],
+      "fallback": "Render the existing flat two-dimensional shape or picture when any camera, light, bevel, material, extrusion, effect, geometry, or paint value falls outside this bounded tuple.",
+      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/export/serializePresentation.ts", "src/model/nodes/PicNode.ts", "src/model/nodes/Shape3D.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/ImageRenderer.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/pypptx-case-definitions.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/model/nodes/ShapeNode.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
       "issueUrls": []
     },

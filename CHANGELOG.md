@@ -17,6 +17,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   ignored corpora; generated evidence stays outside the published package and tracked source tree.
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, manual-review, and before/after SSIM regression checks.
+- Added typed, serializable `a:scene3d`/`a:sp3d` observations for shapes and pictures, including
+  stable fallback reasons, plus a seven-case native PowerPoint matrix covering the bounded static
+  3D cohort and a real-corpus picture sentinel.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -34,6 +37,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
   polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
+- Render the verified `orthographicFront` circular top-bevel subset for opaque solid
+  `rect`/`roundRect` shapes and rectangular stretch-filled pictures, including bounded lighting,
+  contour, group, outline, and outer-shadow interactions; unmatched 3D tuples remain flat.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
   renderer, browser, picture-clip, and native PowerPoint comparison gates.

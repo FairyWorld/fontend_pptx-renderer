@@ -222,6 +222,12 @@ shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white cont
 aspect ratios, a non-identity group, and the light rotation plus implicit defaults observed in the
 local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
 outline and outer shadow so the 3D effect is not tested in isolation from its actual container.
+The seven cases are one opt-out control, five synthetic interaction cases, and one property-level
+slice copied from the ignored local corpus. Together they pin picture versus shape rendering,
+wide/tall extents, a non-identity parent group, contour layering, stable repeated frames, unique SVG
+effect IDs, no horizontal growth, picture-URL disposal, and the flat fallback for an unsupported
+camera. The accepted support claim is limited to the exact tuple in
+`drawingml.shape.3d.top-bevel-contour`; a high aggregate score cannot broaden that registry scope.
 The CJK text matrix at IDs 0040-0051 covers square/no-wrap behavior, omitted and explicit autofit
 modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, and centered
 text inside a parent shape.
@@ -478,6 +484,15 @@ sanitized receipt atomically and never changes GitHub issues or visual baselines
 
 DrawingML shape 3D, chart 3D, Office 2017 embedded models, and PresentationML animation are separate
 capability IDs. A verified flat 2D fallback in one lane cannot promote native behavior in another.
+The static shape/picture 3D cohort promotes only `orthographicFront` circular top bevels on opaque
+solid `rect`/`roundRect` shapes and rectangular stretch-filled pictures, with the documented
+`twoPt:t`/`threePt:t` lighting tuple, zero extrusion, an optional contour with a resolvable color,
+and an optional outer shadow. Verification
+uses all seven `oracle-pypptx-shape3d-*` case reports, the same seven earlier-revision baselines,
+explicit manual verdicts for review rows, and the `source`, `structural`, `unit`, `browser`,
+`performance`, `package-size`, and `docs` caller-run gates. Perspective, arbitrary rotations,
+nonzero extrusion, materials, bottom bevels, tiled pictures, other paint/effect combinations, and
+other shape or picture presets remain flat fallbacks.
 
 ## Chart Fix Protocol
 

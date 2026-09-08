@@ -170,6 +170,28 @@ describe('buildStaticShape3DPlan', () => {
 
     expect(plan).toMatchObject({ mode: 'flat', reason: 'paint-kind' });
   });
+
+  it('rejects a positive contour width without a resolvable contour color', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(
+        supportedScene,
+        `<a:sp3d contourW="12700">
+           <a:bevelT w="127000" h="127000" prst="circle"/>
+         </a:sp3d>`,
+      ),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({ mode: 'flat', reason: 'contour-paint' });
+  });
 });
 
 describe('appendStaticShape3DEffects', () => {
