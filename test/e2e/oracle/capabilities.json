@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "capabilities": [
+    {
+      "id": "drawingml.chart.3d.bar",
+      "component": "chart",
+      "renderMode": "fallback",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "bar3DChart"
+        }
+      ],
+      "scope": {
+        "families": ["bar3DChart"]
+      },
+      "fallback": "Render the chart series as a two-dimensional bar chart and record omitted depth and scene semantics.",
+      "implementationPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
+      "requiredGates": ["source", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.chart.3d.pie",
+      "component": "chart",
+      "renderMode": "fallback",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "pie3DChart"
+        }
+      ],
+      "scope": {
+        "families": ["pie3DChart"]
+      },
+      "fallback": "Render the chart series as a two-dimensional pie chart and record omitted depth and scene semantics.",
+      "implementationPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
+      "requiredGates": ["source", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.chart.3d.view",
+      "component": "chart",
+      "renderMode": "fallback",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "view3D"
+        }
+      ],
+      "scope": {
+        "properties": ["rotX", "rotY", "rAngAx", "perspective", "depthPercent", "heightPercent"]
+      },
+      "fallback": "Ignore the three-dimensional chart camera while preserving the chart's two-dimensional series.",
+      "implementationPaths": ["src/renderer/ChartRenderer.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.model3d.office2017",
+      "component": "media",
+      "renderMode": "none",
+      "impact": "missing",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.microsoft.com/office/drawing/2017/model3d",
+          "localName": "model3d"
+        }
+      ],
+      "scope": {
+        "extensionNamespace": ["http://schemas.microsoft.com/office/drawing/2017/model3d"]
+      },
+      "fallback": "Render an available poster or raster preview; otherwise retain slide layout and report the omitted model.",
+      "implementationPaths": ["src/model/Slide.ts", "src/renderer/SlideRenderer.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "security", "performance", "native-powerpoint", "manual-visual", "package-size", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.shape.3d.extrusion-perspective",
+      "component": "shape",
+      "renderMode": "fallback",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "sp3d"
+        }
+      ],
+      "scope": {
+        "cameraFamilies": ["perspective"],
+        "extrusionHeight": ["nonzero"],
+        "projection": ["perspective"]
+      },
+      "fallback": "Render the existing flat two-dimensional shape and report omitted extrusion or perspective semantics.",
+      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "security", "performance", "native-powerpoint", "manual-visual", "package-size", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.shape.3d.scene",
+      "component": "shape",
+      "renderMode": "fallback",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "scene3d"
+        }
+      ],
+      "scope": {
+        "properties": ["camera", "lightRig", "backdrop"]
+      },
+      "fallback": "Render child shapes in two dimensions and report omitted scene camera and lighting semantics.",
+      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.shape.3d.top-bevel-contour",
+      "component": "shape",
+      "renderMode": "fallback",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "sp3d"
+        }
+      ],
+      "scope": {
+        "bevelTopPresets": ["circle"],
+        "camera": ["orthographicFront"],
+        "extrusionHeight": [0],
+        "presets": ["rect", "roundRect"]
+      },
+      "fallback": "Render the existing flat two-dimensional shape and report omitted bevel and contour semantics.",
+      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.shape.geometry.adjustment.donut",
+      "component": "shape",
+      "renderMode": "approximate",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "prstGeom",
+          "attributes": {
+            "prst": ["donut"]
+          }
+        }
+      ],
+      "scope": {
+        "adjustment": ["adj"],
+        "bounds": [0, 50000],
+        "default": [25000],
+        "presets": ["donut"]
+      },
+      "fallback": "Use the existing handwritten donut geometry for invalid or degenerate generated-runtime inputs.",
+      "implementationPaths": ["scripts/ooxml-geometry/generate.mjs", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/unit/shapes/presets.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.shape.geometry.flowchart-zero-adjustment",
+      "component": "shape",
+      "renderMode": "native",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "prstGeom",
+          "attributes": {
+            "prst": ["flowChartAlternateProcess", "flowChartCollate", "flowChartConnector", "flowChartDecision", "flowChartDelay", "flowChartDisplay", "flowChartDocument", "flowChartExtract", "flowChartInputOutput", "flowChartInternalStorage", "flowChartMagneticDisk", "flowChartMagneticDrum", "flowChartMagneticTape", "flowChartManualInput", "flowChartManualOperation", "flowChartMerge", "flowChartMultidocument", "flowChartOffpageConnector", "flowChartOnlineStorage", "flowChartOr", "flowChartPredefinedProcess", "flowChartPreparation", "flowChartProcess", "flowChartPunchedCard", "flowChartPunchedTape", "flowChartSort", "flowChartSummingJunction", "flowChartTerminator"]
+          }
+        }
+      ],
+      "scope": {
+        "adjustmentGuideCount": [0],
+        "presetCount": [28]
+      },
+      "fallback": "Use the handwritten preset implementation when generated runtime evaluation rejects invalid dimensions.",
+      "implementationPaths": ["scripts/ooxml-geometry/generate.mjs", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.text.body.wrap-overflow",
+      "component": "text",
+      "renderMode": "native",
+      "impact": "semantics",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "bodyPr"
+        }
+      ],
+      "scope": {
+        "properties": ["wrap", "horzOverflow", "vertOverflow", "spAutoFit", "normAutofit", "noAutofit"]
+      },
+      "fallback": "Use explicit inline text-container styles so host white-space rules cannot replace PowerPoint wrapping semantics.",
+      "implementationPaths": ["src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/browser/rendering-coverage.spec.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/17", "https://github.com/aiden0z/pptx-renderer/issues/23"]
+    },
+    {
+      "id": "drawingml.text.run.defrpr-color-precedence",
+      "component": "text",
+      "renderMode": "native",
+      "impact": "semantics",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "defRPr"
+        }
+      ],
+      "scope": {
+        "precedence": ["paragraph-defRPr-over-shape-fontRef"],
+        "properties": ["solidFill", "schemeClr", "srgbClr"]
+      },
+      "fallback": "Resolve the nearest available inherited text color and record missing explicit precedence evidence.",
+      "implementationPaths": ["src/renderer/TextRenderer.ts", "src/renderer/StyleResolver.ts", "test/unit/renderer/TextRenderer.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/21", "https://github.com/aiden0z/pptx-renderer/issues/23"]
+    },
+    {
+      "id": "presentation.animation.timing",
+      "component": "presentation",
+      "renderMode": "fallback",
+      "impact": "enhancement",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+          "localName": "timing"
+        }
+      ],
+      "scope": {
+        "behavior": ["static-final-state"],
+        "unsupported": ["timeline", "triggers", "seek", "pause", "media-sync"]
+      },
+      "fallback": "Render the slide's static object state without animation playback.",
+      "implementationPaths": ["src/model/Slide.ts", "src/renderer/SlideRenderer.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "performance", "native-powerpoint", "manual-visual", "docs"],
+      "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/18"]
+    }
+  ]
+}
