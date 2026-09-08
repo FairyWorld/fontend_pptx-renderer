@@ -1,0 +1,154 @@
+import json
+from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
+
+import pytest
+
+from oracle.capability_contract import load_capability_registry
+from oracle.capability_inventory import (
+    CapabilityInventoryError,
+    ScanLimits,
+    scan_corpus,
+    scan_pptx,
+    write_inventory,
+)
+
+
+A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+C_NS = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+
+SLIDE_WITH_SCENE_AND_SP3D = f"""
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+       xmlns:a="{A_NS}">
+  <p:cSld><p:spTree><p:sp><p:spPr>
+    <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+    <a:scene3d>
+      <a:camera prst="orthographicFront"/>
+      <a:lightRig rig="threePt" dir="t"/>
+    </a:scene3d>
+    <a:sp3d extrusionH="0" contourW="12700">
+      <a:bevelT w="127000" h="127000" prst="circle"/>
+      <a:contourClr><a:srgbClr val="FFFFFF"/></a:contourClr>
+    </a:sp3d>
+  </p:spPr></p:sp></p:spTree></p:cSld>
+</p:sld>
+"""
+
+CHART_WITH_VIEW3D = f"""
+<c:chartSpace xmlns:c="{C_NS}">
+  <c:chart><c:view3D><c:rotX val="20"/></c:view3D></c:chart>
+</c:chartSpace>
+"""
+
+
+def write_test_pptx(
+    path: Path,
+    *,
+    slide_xml: str = SLIDE_WITH_SCENE_AND_SP3D,
+    chart_xml: str | None = CHART_WITH_VIEW3D,
+    extra_entries: dict[str, bytes] | None = None,
+) -> Path:
+    with ZipFile(path, "w", compression=ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/slides/slide1.xml", slide_xml)
+        if chart_xml is not None:
+            archive.writestr("ppt/charts/chart1.xml", chart_xml)
+        for name, data in (extra_entries or {}).items():
+            archive.writestr(name, data)
+    return path
+
+
+@pytest.fixture
+def registry():
+    return load_capability_registry(Path("oracle/capabilities.json"))
+
+
+def test_scan_pptx_detects_shape_and_chart_3d_by_namespace(tmp_path: Path, registry):
+    package = write_test_pptx(tmp_path / "sample.pptx")
+
+    observation = scan_pptx(package, registry)
+
+    assert observation.capability_ids == (
+        "drawingml.chart.3d.view",
+        "drawingml.shape.3d.scene",
+        "drawingml.shape.3d.top-bevel-contour",
+    )
+    assert observation.sha256 == observation.package_id.removeprefix("sha256:")
+    assert observation.matching_parts["drawingml.chart.3d.view"] == (
+        "ppt/charts/chart1.xml",
+    )
+    assert observation.matching_parts["drawingml.shape.3d.top-bevel-contour"] == (
+        "ppt/slides/slide1.xml",
+    )
+
+
+def test_scan_pptx_matches_attribute_scopes_and_ignores_unrelated_namespaces(
+    tmp_path: Path,
+    registry,
+):
+    slide = f"""
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+           xmlns:a="{A_NS}" xmlns:x="urn:not-drawingml">
+      <p:cSld><p:spTree><p:sp><p:spPr>
+        <a:prstGeom prst="donut"><a:avLst/></a:prstGeom>
+        <x:scene3d/><x:sp3d><x:bevelT/></x:sp3d>
+      </p:spPr></p:sp></p:spTree></p:cSld>
+    </p:sld>
+    """
+
+    observation = scan_pptx(
+        write_test_pptx(tmp_path / "donut.pptx", slide_xml=slide, chart_xml=None),
+        registry,
+    )
+
+    assert observation.capability_ids == ("drawingml.shape.geometry.adjustment.donut",)
+
+
+@pytest.mark.parametrize(
+    ("entries", "limits", "message"),
+    [
+        ({"../escape.xml": b"x"}, ScanLimits(), "unsafe ZIP member"),
+        ({"extra.bin": b"x"}, ScanLimits(max_entries=1), "entry count"),
+        ({"large.bin": b"12345"}, ScanLimits(max_entry_uncompressed_bytes=4), "entry size"),
+        ({"a.bin": b"123", "b.bin": b"456"}, ScanLimits(max_total_uncompressed_bytes=5), "total"),
+    ],
+)
+def test_scan_pptx_rejects_unsafe_or_oversized_archives(
+    tmp_path: Path,
+    registry,
+    entries: dict[str, bytes],
+    limits: ScanLimits,
+    message: str,
+):
+    package = write_test_pptx(
+        tmp_path / "unsafe.pptx",
+        slide_xml="<s/>",
+        chart_xml=None,
+        extra_entries=entries,
+    )
+
+    with pytest.raises(CapabilityInventoryError, match=message):
+        scan_pptx(package, registry, limits)
+
+
+def test_scan_corpus_deduplicates_identical_packages_and_serializes_deterministically(
+    tmp_path: Path,
+    registry,
+):
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    first = write_test_pptx(corpus / "first.pptx")
+    (corpus / "copy.pptx").write_bytes(first.read_bytes())
+
+    report = scan_corpus([corpus], registry)
+    first_output = write_inventory(report, tmp_path / "first.json").read_bytes()
+    second_output = write_inventory(report, tmp_path / "second.json").read_bytes()
+
+    assert report.raw_package_count == 2
+    assert report.unique_package_count == 1
+    assert report.packages[0].aliases == (
+        "corpus-0/copy.pptx",
+        "corpus-0/first.pptx",
+    )
+    assert first_output == second_output
+    payload = json.loads(first_output)
+    assert payload["packages"][0]["sha256"] == report.packages[0].sha256

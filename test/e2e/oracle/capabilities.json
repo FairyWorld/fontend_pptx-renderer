@@ -90,7 +90,10 @@
         {
           "partGlob": "ppt/slides/slide*.xml",
           "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
-          "localName": "sp3d"
+          "localName": "sp3d",
+          "attributes": {
+            "extrusionH": ["$nonzero"]
+          }
         }
       ],
       "scope": {
@@ -132,7 +135,7 @@
         {
           "partGlob": "ppt/slides/slide*.xml",
           "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
-          "localName": "sp3d"
+          "localName": "bevelT"
         }
       ],
       "scope": {
