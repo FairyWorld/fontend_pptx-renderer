@@ -1435,6 +1435,57 @@ def _build_shape3d_cases() -> list[CaseDef]:
         ],
     )
 
+    def _add_cropped_picture(prs, crop: dict[str, float]) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        picture = slide.shapes.add_picture(
+            _shape3d_fixture_image(),
+            _emu(3.0),
+            _emu(1.4),
+            _emu(7.333),
+            _emu(4.7),
+        )
+        picture.name = "Cropped static 3D picture"
+        for edge, value in crop.items():
+            setattr(picture, f"crop_{edge}", value)
+        _apply_bounded_shape3d(picture, light_rig="twoPt")
+
+    _add(
+        "picture-horizontal-crop-bevel",
+        lambda prs: _add_cropped_picture(prs, {"left": 0.22, "right": 0.08}),
+        features=[
+            "p:pic",
+            "a:srcRect=22%,0%,8%,0%",
+            "crop.axis=horizontal",
+            "a:scene3d.lightRig=twoPt:t",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+    _add(
+        "picture-vertical-crop-bevel",
+        lambda prs: _add_cropped_picture(prs, {"top": 0.18, "bottom": 0.12}),
+        features=[
+            "p:pic",
+            "a:srcRect=0%,18%,0%,12%",
+            "crop.axis=vertical",
+            "a:scene3d.lightRig=twoPt:t",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+    _add(
+        "picture-asymmetric-crop-bevel",
+        lambda prs: _add_cropped_picture(
+            prs,
+            {"left": 0.12, "top": 0.08, "right": 0.18, "bottom": 0.10},
+        ),
+        features=[
+            "p:pic",
+            "a:srcRect=12%,8%,18%,10%",
+            "crop.axis=combined",
+            "a:scene3d.lightRig=twoPt:t",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
     return cases
 
 
@@ -1598,33 +1649,6 @@ def _build_local_shape3d_cases() -> list[CaseDef]:
             "p:grpSp/p:grpSp/p:sp",
             "group.nested",
             "group.nonIdentityScale",
-            "a:sp3d.bevelT=circle",
-        ],
-    )
-
-    def _build_cropped_picture(prs) -> None:
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        picture = slide.shapes.add_picture(
-            _shape3d_fixture_image(),
-            _emu(3.0),
-            _emu(1.4),
-            _emu(7.333),
-            _emu(4.7),
-        )
-        picture.name = "Cropped static 3D picture discovery probe"
-        picture.crop_left = 0.12
-        picture.crop_top = 0.08
-        picture.crop_right = 0.18
-        picture.crop_bottom = 0.10
-        _apply_bounded_shape3d(picture, light_rig="twoPt")
-
-    _add(
-        "cropped-picture-bevel",
-        _build_cropped_picture,
-        features=[
-            "p:pic",
-            "a:srcRect=12%,8%,18%,10%",
-            "a:scene3d.lightRig=twoPt:t",
             "a:sp3d.bevelT=circle",
         ],
     )

@@ -18,10 +18,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus a seven-case native PowerPoint
-  matrix covering the bounded static 3D cohort and a real-corpus picture sentinel.
-- Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored eight-case
-  3D discovery matrix for curved, holed, concave, transformed, cropped, and effect-bearing inputs.
+  shapes and pictures, with stable renderer fallback reasons, plus a ten-case native PowerPoint
+  matrix covering the bounded static 3D cohort, a real-corpus picture sentinel, and horizontal,
+  vertical, and combined source crops.
+- Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored seven-case
+  3D discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -43,6 +44,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
   polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
+- Promote finite nonnegative `a:srcRect` picture crops into the bounded static 3D top-bevel lane;
+  negative or degenerate crops keep the ordinary flat picture path with a stable fallback reason.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
   `rect`/`roundRect` shapes and rectangular stretch-filled pictures with a silhouette-aware interior
   distance field, continuous perimeter normals, and a circular cross-section. Bevel width controls

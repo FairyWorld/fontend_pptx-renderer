@@ -190,6 +190,44 @@ describe('buildStaticShape3DPlan', () => {
     });
   });
 
+  it('accepts only bounded nonnegative source crops with a visible picture area', () => {
+    const shape3d = parseShape3D(
+      `<a:scene3d>
+         <a:camera prst="orthographicFront"/>
+         <a:lightRig rig="twoPt" dir="t"/>
+       </a:scene3d>`,
+      `<a:sp3d extrusionH="0"><a:bevelT w="127000" h="127000" prst="circle"/></a:sp3d>`,
+    );
+    const target = {
+      nodeType: 'picture' as const,
+      presetGeometry: 'rect',
+      width: 200,
+      height: 100,
+    };
+    const ctx = createMockRenderContext();
+
+    expect(
+      buildStaticShape3DPlan(
+        shape3d,
+        {
+          ...target,
+          sourceCrop: { left: 0.22, top: 0.18, right: 0.08, bottom: 0.12 },
+        },
+        ctx,
+      ),
+    ).toMatchObject({ mode: 'orthographic-top-bevel', surface: 'picture' });
+    for (const sourceCrop of [
+      { left: -0.1, top: 0, right: 0, bottom: 0 },
+      { left: 0.6, top: 0, right: 0.5, bottom: 0 },
+      { left: 0, top: 0.999, right: 0, bottom: 0 },
+    ]) {
+      expect(buildStaticShape3DPlan(shape3d, { ...target, sourceCrop }, ctx)).toEqual({
+        mode: 'flat',
+        reason: 'picture-source-crop',
+      });
+    }
+  });
+
   it.each([
     [
       'conflicting effect',

@@ -252,6 +252,7 @@ function renderImageUrl(
       height: node.size.h,
       paintKind: 'picture',
       isTiledPicture: tile.exists(),
+      sourceCrop: node.crop,
     },
     ctx,
   );

@@ -215,7 +215,9 @@ supported plan requires all of the following:
 - a positive circular top bevel, zero or omitted extrusion, an absent/zero contour or a positive
   contour with a resolvable color, no bottom bevel or preset material, and only an optional outer
   shadow in `effectLst`;
-- an opaque resolved solid-fill `rect`/`roundRect` shape, or a rectangular stretch-filled picture.
+- an opaque resolved solid-fill `rect`/`roundRect` shape, or a rectangular stretch-filled picture;
+- for pictures, no `a:srcRect`, or finite nonnegative crop fractions whose left/right and
+  top/bottom sums each leave more than the renderer's `0.001` visible-fraction tolerance.
 
 The renderer treats `bevelT@w` as the inward face extent and `bevelT@h` as elevation that scales
 lighting contrast. It immediately paints four clipped `userSpaceOnUse` gradients as a synchronous
@@ -242,12 +244,12 @@ picture's ordinary outline remains centered on its source bounds. Unique per-eff
 cross-slide collisions. Existing wrapper transforms, outer shadows, media ownership, and cleanup
 remain in their owning renderers.
 
-Anything outside that full tuple stays on the existing flat path with a stable planner reason. Perspective,
-nonzero extrusion, other materials/bevels/lights, gradient/pattern/group/image-filled shapes,
-tiled pictures, chart `view3D`, and Office 2017 `model3d` are separate capability lanes. The raster
-lighting backend can consume arbitrary silhouettes, but support is still constrained by the planner
-and native evidence. This is a bounded static rendering, not a general mesh or PowerPoint material
-engine.
+Anything outside that full tuple stays on the existing flat path with a stable planner reason.
+Perspective, nonzero extrusion, other materials/bevels/lights, negative or degenerate picture
+source crops, gradient/pattern/group/image-filled shapes, tiled pictures, chart `view3D`, and Office
+2017 `model3d` are separate capability lanes. The raster lighting backend can consume arbitrary
+silhouettes, but support is still constrained by the planner and native evidence. This is a bounded
+static rendering, not a general mesh or PowerPoint material engine.
 
 ## Rendering Strategies
 

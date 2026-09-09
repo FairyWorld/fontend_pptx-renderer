@@ -248,7 +248,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
         <p:nvPicPr><p:cNvPr id="30" name="3D picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
-        <p:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
+        <p:blipFill><a:blip r:embed="rId1"/><a:srcRect l="22000" t="18000" r="8000" b="12000"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
         <p:spPr>
           <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
           <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${scene}${bevel}
@@ -272,6 +272,15 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     const disposableHadLighting = !!handle.element.querySelector(
       '[data-pptx-shape3d-lighting="distance-field"]',
     );
+    const croppedPicture = handle.element.querySelector('svg image');
+    const croppedPictureBounds = croppedPicture
+      ? {
+          x: Number(croppedPicture.getAttribute('x')),
+          y: Number(croppedPicture.getAttribute('y')),
+          width: Number(croppedPicture.getAttribute('width')),
+          height: Number(croppedPicture.getAttribute('height')),
+        }
+      : null;
     handle.dispose();
     URL.revokeObjectURL = originalRevoke;
     handle.element.remove();
@@ -313,6 +322,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
       },
       disposableHadBevel,
       disposableHadLighting,
+      croppedPictureBounds,
       revokedCount: revoked.length,
     };
   });
@@ -332,6 +342,12 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   expect(result.groupBounds).toEqual({ width: 200, height: 100, childWidth: 100, childHeight: 50 });
   expect(result.roundRectLightingBounds).toEqual({ width: 220, height: 100 });
   expect(result.groupLightingBounds).toEqual({ width: 100, height: 50 });
+  expect(result.croppedPictureBounds).toEqual({
+    x: expect.closeTo(-62.857, 2),
+    y: expect.closeTo(-25.714, 2),
+    width: expect.closeTo(285.714, 2),
+    height: expect.closeTo(142.857, 2),
+  });
 
   const host = page.locator('#shape3d-browser-host');
   const first = await host.screenshot();

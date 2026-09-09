@@ -614,7 +614,8 @@ parsed observations in serialized model output. A native-oracle-backed static su
 orthographic circular top bevel and optional contour with silhouette-aware lighting:
 
 - shape lane: opaque resolved solid-fill `rect` and `roundRect`;
-- picture lane: rectangular, stretch-filled pictures;
+- picture lane: rectangular, stretch-filled pictures with no `a:srcRect`, or nonnegative source
+  crops whose remaining horizontal and vertical extents are both positive;
 - `orthographicFront`, no camera rotation, `twoPt:t` or `threePt:t` lighting, with either no light
   rotation or the observed `twoPt:t` rotation `lat=0`, `lon=0`, `rev=120°`;
 - zero or omitted extrusion, an absent/zero contour or a positive contour with a resolvable color,
@@ -637,11 +638,12 @@ overlay, picture outlines remain centered on the source bounds, and group transf
 existing coordinate mapping.
 
 This support does not include perspective cameras, nonzero extrusion, arbitrary light rotation,
-other bevel presets, tiled pictures, gradient/pattern/group/image-filled shapes, or pixel-identical
-PowerPoint material simulation. Although the distance-field backend can follow arbitrary alpha
-silhouettes, the public support claim remains limited to native-verified `rect`/`roundRect` shapes
-and rectangular pictures. Ellipse, donut, star, freeform, rotation, nested-group, cropped-picture,
-and glow probes stay in an opt-in ignored discovery matrix until their own native gates pass.
+other bevel presets, tiled pictures, negative or degenerate source crops,
+gradient/pattern/group/image-filled shapes, or pixel-identical PowerPoint material simulation.
+Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
+claim remains limited to native-verified `rect`/`roundRect` shapes and rectangular pictures.
+Ellipse, donut, star, freeform, rotation, nested-group, and glow probes stay in an opt-in ignored
+discovery matrix until their own native gates pass.
 
 ### Text — 7-Level Style Inheritance
 

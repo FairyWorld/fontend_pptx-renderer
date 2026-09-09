@@ -420,6 +420,9 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0005-tall-bevel",
         "oracle-pypptx-shape3d-0006-grouped-bevel",
         "oracle-pypptx-shape3d-0007-real-picture-bevel-slice",
+        "oracle-pypptx-shape3d-0008-picture-horizontal-crop-bevel",
+        "oracle-pypptx-shape3d-0009-picture-vertical-crop-bevel",
+        "oracle-pypptx-shape3d-0010-picture-asymmetric-crop-bevel",
     }
 
 
@@ -464,6 +467,9 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
             in {
                 "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel",
                 "oracle-pypptx-shape3d-0007-real-picture-bevel-slice",
+                "oracle-pypptx-shape3d-0008-picture-horizontal-crop-bevel",
+                "oracle-pypptx-shape3d-0009-picture-vertical-crop-bevel",
+                "oracle-pypptx-shape3d-0010-picture-asymmetric-crop-bevel",
             }
             else "threePt"
         )
@@ -527,6 +533,25 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         namespaces=ns,
     )
 
+    horizontal_crop = roots["oracle-pypptx-shape3d-0008-picture-horizontal-crop-bevel"]
+    assert horizontal_crop.xpath(
+        "boolean(.//p:pic/p:blipFill/a:srcRect[@l='22000'][@r='8000'][not(@t)][not(@b)])",
+        namespaces=ns,
+    )
+
+    vertical_crop = roots["oracle-pypptx-shape3d-0009-picture-vertical-crop-bevel"]
+    assert vertical_crop.xpath(
+        "boolean(.//p:pic/p:blipFill/a:srcRect[@t='18000'][@b='12000'][not(@l)][not(@r)])",
+        namespaces=ns,
+    )
+
+    asymmetric_crop = roots["oracle-pypptx-shape3d-0010-picture-asymmetric-crop-bevel"]
+    assert asymmetric_crop.xpath(
+        "boolean(.//p:pic/p:blipFill/a:srcRect"
+        "[@l='12000'][@t='8000'][@r='18000'][@b='10000'])",
+        namespaces=ns,
+    )
+
 
 def test_static_shape3d_case_json_records_exact_scope(tmp_path: Path):
     generator = _load_generator_module()
@@ -568,8 +593,7 @@ def test_local_shape3d_experiment_matrix_is_opt_in_and_separate_from_support_cas
         "oracle-local-shape3d-0004-freeform-concave-circle-bevel",
         "oracle-local-shape3d-0005-rotated-roundrect-bevel",
         "oracle-local-shape3d-0006-nested-group-scaled-bevel",
-        "oracle-local-shape3d-0007-cropped-picture-bevel",
-        "oracle-local-shape3d-0008-glow-roundrect-bevel",
+        "oracle-local-shape3d-0007-glow-roundrect-bevel",
     }
     assert all(case["local_only"] is True for case in local_cases)
     assert all(case["coverage"]["cohort"] == "experimental-local" for case in local_cases)
@@ -630,11 +654,7 @@ def test_local_shape3d_experiment_matrix_serializes_geometry_transform_and_effec
         "[a:ext/@cx != a:chExt/@cx or a:ext/@cy != a:chExt/@cy])",
         namespaces=ns,
     )
-    assert roots["oracle-local-shape3d-0007-cropped-picture-bevel"].xpath(
-        "boolean(.//p:pic/p:blipFill/a:srcRect[@l][@t][@r][@b])",
-        namespaces=ns,
-    )
-    assert roots["oracle-local-shape3d-0008-glow-roundrect-bevel"].xpath(
+    assert roots["oracle-local-shape3d-0007-glow-roundrect-bevel"].xpath(
         "boolean(.//p:sp/p:spPr/a:effectLst/a:glow[@rad='114300']"
         "/a:srgbClr[@val='00B0F0']/a:alpha[@val='65000'])",
         namespaces=ns,

@@ -155,11 +155,12 @@
         "nodeKinds": ["shape", "picture"],
         "pictureFill": ["stretch"],
         "picturePresets": ["rect"],
+        "pictureSourceCrop": ["absent", "srcRect-nonnegative-positive-visible-area"],
         "presetMaterial": ["absent"],
         "shapeFill": ["resolved-opaque-solid"],
         "shapePresets": ["rect", "roundRect"]
       },
-      "fallback": "Render the existing flat two-dimensional shape or picture when any camera, light, bevel, material, extrusion, effect, geometry, or paint value falls outside this bounded tuple.",
+      "fallback": "Render the existing flat two-dimensional shape or picture when any camera, light, bevel, material, extrusion, effect, geometry, paint, or source-crop value falls outside this bounded tuple.",
       "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/export/serializePresentation.ts", "src/index.ts", "src/model/nodes/PicNode.ts", "src/model/nodes/Shape3D.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/ImageRenderer.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/shape3d/*.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_verification.py", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/scripts/shape3d_bevel_metrics.py", "test/e2e/server.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/e2e/test_shape3d_bevel_metrics.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/model/nodes/ShapeNode.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/shape3d/*.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "bevel-local", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
       "issueUrls": []

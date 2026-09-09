@@ -3768,6 +3768,62 @@ describe('renderImage', () => {
   });
 
   describe('bounded static DrawingML 3D', () => {
+    it('combines a valid asymmetric srcRect crop with the bounded picture bevel', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="90" name="Cropped 3D picture"/><nvPr/></nvPicPr>
+          <blipFill>
+            <blip r:embed="rId1"/>
+            <srcRect l="22000" t="18000" r="8000" b="12000"/>
+            <stretch><fillRect/></stretch>
+          </blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="1905000" cy="952500"/></xfrm>
+            <prstGeom prst="rect"><avLst/></prstGeom>
+            <scene3d><camera prst="orthographicFront"/><lightRig rig="twoPt" dir="t"/></scene3d>
+            <sp3d extrusionH="0"><bevelT w="127000" h="127000" prst="circle"/></sp3d>
+          </spPr>
+        </pic>`,
+      );
+
+      const el = renderImage(parsePicNode(source), ctx);
+      const image = el.querySelector('svg image');
+
+      expect(el.querySelector('[data-pptx-shape3d-bevel]')).toBeTruthy();
+      expect(Number(image?.getAttribute('x'))).toBeCloseTo(-62.857, 2);
+      expect(Number(image?.getAttribute('y'))).toBeCloseTo(-25.714, 2);
+      expect(Number(image?.getAttribute('width'))).toBeCloseTo(285.714, 2);
+      expect(Number(image?.getAttribute('height'))).toBeCloseTo(142.857, 2);
+    });
+
+    it('keeps a degenerate srcRect crop on the ordinary flat picture path', () => {
+      const ctx = createCtxWithMedia();
+      const source = xmlNode(
+        `<pic xmlns="http://schemas.openxmlformats.org/drawingml/2006/main"
+              xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+          <nvPicPr><cNvPr id="90" name="Degenerate cropped 3D picture"/><nvPr/></nvPicPr>
+          <blipFill>
+            <blip r:embed="rId1"/>
+            <srcRect l="60000" r="50000"/>
+            <stretch><fillRect/></stretch>
+          </blipFill>
+          <spPr>
+            <xfrm><off x="0" y="0"/><ext cx="1905000" cy="952500"/></xfrm>
+            <prstGeom prst="rect"><avLst/></prstGeom>
+            <scene3d><camera prst="orthographicFront"/><lightRig rig="twoPt" dir="t"/></scene3d>
+            <sp3d extrusionH="0"><bevelT w="127000" h="127000" prst="circle"/></sp3d>
+          </spPr>
+        </pic>`,
+      );
+
+      const el = renderImage(parsePicNode(source), ctx);
+
+      expect(el.querySelector(':scope > img')).toBeTruthy();
+      expect(el.querySelector('[data-pptx-shape3d-bevel]')).toBeNull();
+    });
+
     it('renders a rect picture through SVG so bevel, outline, and outer shadow coexist', () => {
       const ctx = createCtxWithMedia();
       const source = xmlNode(

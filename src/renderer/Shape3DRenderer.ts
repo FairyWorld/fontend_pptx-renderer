@@ -2,8 +2,9 @@
  * Bounded DrawingML static 3D renderer.
  *
  * This module deliberately supports one small, native-oracle-backed tuple: orthographic-front
- * circle top bevels on solid rect/roundRect shapes and rectangular pictures. Everything else
- * returns an explicit flat plan so detection cannot be confused with rendering support.
+ * circle top bevels on solid rect/roundRect shapes and rectangular pictures with bounded source
+ * crops. Everything else returns an explicit flat plan so detection cannot be confused with
+ * rendering support.
  */
 
 import type { Shape3DProperties, Shape3DRotation } from '../model/nodes/Shape3D';
@@ -40,7 +41,15 @@ type StaticShape3DFallbackReason =
   | 'geometry-preset'
   | 'paint-kind'
   | 'contour-paint'
+  | 'picture-source-crop'
   | 'tiled-picture';
+
+interface StaticShape3DSourceCrop {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
 
 interface StaticShape3DTarget {
   nodeType: StaticShape3DSurface;
@@ -53,6 +62,8 @@ interface StaticShape3DTarget {
   /** Resolved opaque solid paint used for the native-material face adjustment. */
   baseFill?: string;
   isTiledPicture?: boolean;
+  /** Parsed a:srcRect fractions removed from each source-image edge. */
+  sourceCrop?: StaticShape3DSourceCrop;
 }
 
 export interface StaticShape3DFlatPlan {
@@ -138,6 +149,16 @@ function normalizedPreset(target: StaticShape3DTarget): string {
   return target.presetGeometry?.toLowerCase() ?? '';
 }
 
+function hasSupportedPictureSourceCrop(crop: StaticShape3DSourceCrop | undefined): boolean {
+  if (!crop) return true;
+  const values = [crop.top, crop.right, crop.bottom, crop.left];
+  return (
+    values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1) &&
+    crop.left + crop.right < 0.999 &&
+    crop.top + crop.bottom < 0.999
+  );
+}
+
 function resolveContour(
   properties: Shape3DProperties,
   ctx: RenderContext,
@@ -170,6 +191,9 @@ export function buildStaticShape3DPlan(
   }
   if (target.isLineLike) return flat('line-like');
   if (target.isTiledPicture) return flat('tiled-picture');
+  if (target.nodeType === 'picture' && !hasSupportedPictureSourceCrop(target.sourceCrop)) {
+    return flat('picture-source-crop');
+  }
 
   const scene = properties.scene;
   if (!scene) return flat('missing-scene');
