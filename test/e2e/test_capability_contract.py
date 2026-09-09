@@ -100,6 +100,59 @@ def test_registry_rejects_unknown_keys_and_unsafe_paths(tmp_path: Path):
         load_capability_registry(unsafe_path)
 
 
+def test_selector_parent_scope_is_parsed_immutably_and_changes_its_fingerprint(tmp_path: Path):
+    unscoped_entry = capability()
+    scoped_entry = capability()
+    scoped_entry["selectors"][0]["parent"] = {
+        "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "localNames": ["spPr", "grpSpPr"],
+    }
+    unscoped_registry = load_capability_registry(
+        write_json(
+            tmp_path / "unscoped.json",
+            {"schemaVersion": 1, "capabilities": [unscoped_entry]},
+        )
+    )
+    scoped_registry = load_capability_registry(
+        write_json(
+            tmp_path / "scoped.json",
+            {"schemaVersion": 1, "capabilities": [scoped_entry]},
+        )
+    )
+
+    selector = scoped_registry.capabilities[0].selectors[0]
+    assert selector.parent_namespace == scoped_entry["selectors"][0]["parent"]["namespace"]
+    assert selector.parent_local_names == ("spPr", "grpSpPr")
+    assert capability_definition_fingerprint(scoped_registry.capabilities[0]) != (
+        capability_definition_fingerprint(unscoped_registry.capabilities[0])
+    )
+
+
+def test_selector_parent_scope_rejects_incomplete_or_duplicate_names(tmp_path: Path):
+    incomplete = capability()
+    incomplete["selectors"][0]["parent"] = {"localNames": ["spPr"]}
+    with pytest.raises(ValueError, match="parent missing keys: namespace"):
+        load_capability_registry(
+            write_json(
+                tmp_path / "incomplete-parent.json",
+                {"schemaVersion": 1, "capabilities": [incomplete]},
+            )
+        )
+
+    duplicate = capability()
+    duplicate["selectors"][0]["parent"] = {
+        "namespace": "urn:test",
+        "localNames": ["spPr", "spPr"],
+    }
+    with pytest.raises(ValueError, match="localNames contains duplicates"):
+        load_capability_registry(
+            write_json(
+                tmp_path / "duplicate-parent.json",
+                {"schemaVersion": 1, "capabilities": [duplicate]},
+            )
+        )
+
+
 def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Path):
     registry_path = write_json(
         tmp_path / "capabilities.json",
@@ -203,7 +256,7 @@ def test_tracked_capability_contract_is_valid():
     history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
 
     validate_acceptance_history(registry, history)
-    assert len(registry.capabilities) == 12
+    assert len(registry.capabilities) == 13
 
 
 def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path: Path):

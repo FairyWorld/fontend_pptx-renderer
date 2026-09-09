@@ -165,8 +165,15 @@ def _selector_matches(
     namespace: str,
     local_name: str,
     attributes: dict[str, str],
+    parent_namespace: str | None,
+    parent_local_name: str | None,
 ) -> bool:
     if selector.namespace != namespace or selector.local_name != local_name:
+        return False
+    if selector.parent_namespace is not None and (
+        selector.parent_namespace != parent_namespace
+        or parent_local_name not in selector.parent_local_names
+    ):
         return False
     return all(
         _attribute_matches(_attribute_value(attributes, name), accepted)
@@ -186,18 +193,31 @@ def _scan_xml_part(
             code="xml-dtd-entity",
         )
     try:
-        events = ElementTree.iterparse(io.BytesIO(data), events=("start",))
-        for _, element in events:
+        ancestors: list[tuple[str, str]] = []
+        events = ElementTree.iterparse(io.BytesIO(data), events=("start", "end"))
+        for event, element in events:
             namespace, local_name = _split_tag(element.tag)
-            attributes = dict(element.attrib)
-            for capability in capabilities:
-                if any(
-                    fnmatch.fnmatchcase(part_name, selector.part_glob)
-                    and _selector_matches(selector, namespace, local_name, attributes)
-                    for selector in capability.selectors
-                ):
-                    matches.add(capability.id)
-            element.clear()
+            if event == "start":
+                parent_namespace, parent_local_name = ancestors[-1] if ancestors else (None, None)
+                attributes = dict(element.attrib)
+                for capability in capabilities:
+                    if any(
+                        fnmatch.fnmatchcase(part_name, selector.part_glob)
+                        and _selector_matches(
+                            selector,
+                            namespace,
+                            local_name,
+                            attributes,
+                            parent_namespace,
+                            parent_local_name,
+                        )
+                        for selector in capability.selectors
+                    ):
+                        matches.add(capability.id)
+                ancestors.append((namespace, local_name))
+            else:
+                ancestors.pop()
+                element.clear()
     except ElementTree.ParseError as error:
         raise CapabilityInventoryError(
             f"invalid XML part {part_name}: {error}", code="invalid-xml"

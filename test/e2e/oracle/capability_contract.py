@@ -44,9 +44,13 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 @dataclass(frozen=True)
 class XmlSelector:
+    """One element selector with an optional direct-parent namespace/name constraint."""
+
     part_glob: str
     namespace: str
     local_name: str
+    parent_namespace: str | None
+    parent_local_names: tuple[str, ...]
     attributes: Mapping[str, tuple[str, ...]]
 
 
@@ -177,9 +181,28 @@ def _parse_selector(value: Any, index: int, capability_id: str) -> XmlSelector:
     _check_keys(
         value,
         required={"partGlob", "namespace", "localName"},
-        optional={"attributes"},
+        optional={"attributes", "parent"},
         label=label,
     )
+    parent_namespace: str | None = None
+    parent_local_names: tuple[str, ...] = ()
+    if "parent" in value:
+        parent_value = value["parent"]
+        if not isinstance(parent_value, dict):
+            raise ValueError(f"{label} parent must be an object")
+        _check_keys(
+            parent_value,
+            required={"namespace", "localNames"},
+            label=f"{label} parent",
+        )
+        parent_namespace = _nonempty_string(
+            parent_value["namespace"],
+            f"{label} parent namespace",
+        )
+        parent_local_names = _unique_strings(
+            parent_value["localNames"],
+            f"{label} parent localNames",
+        )
     attributes_value = value.get("attributes", {})
     if not isinstance(attributes_value, dict):
         raise ValueError(f"{label} attributes must be an object")
@@ -194,6 +217,8 @@ def _parse_selector(value: Any, index: int, capability_id: str) -> XmlSelector:
         part_glob=_repository_relative_path(value["partGlob"], f"{label} partGlob"),
         namespace=_nonempty_string(value["namespace"], f"{label} namespace"),
         local_name=_nonempty_string(value["localName"], f"{label} localName"),
+        parent_namespace=parent_namespace,
+        parent_local_names=parent_local_names,
         attributes=MappingProxyType(attributes),
     )
 
@@ -323,6 +348,16 @@ def capability_definition_fingerprint(capability: CapabilityDefinition) -> str:
                 "localName": selector.local_name,
                 "namespace": selector.namespace,
                 "partGlob": selector.part_glob,
+                **(
+                    {
+                        "parent": {
+                            "localNames": list(selector.parent_local_names),
+                            "namespace": selector.parent_namespace,
+                        }
+                    }
+                    if selector.parent_namespace is not None
+                    else {}
+                ),
             }
             for selector in capability.selectors
         ],

@@ -103,6 +103,70 @@ def test_scan_pptx_matches_attribute_scopes_and_ignores_unrelated_namespaces(
     assert observation.capability_ids == ("drawingml.shape.geometry.adjustment.donut",)
 
 
+def test_scan_pptx_separates_shape_group_and_text_body_scene3d_by_parent(tmp_path: Path, registry):
+    slide = f"""
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+           xmlns:a="{A_NS}">
+      <p:cSld><p:spTree>
+        <p:grpSp>
+          <p:nvGrpSpPr><p:cNvPr id="1" name="Group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+          <p:grpSpPr>
+            <a:xfrm><a:off x="0" y="0"/><a:ext cx="1" cy="1"/><a:chOff x="0" y="0"/><a:chExt cx="1" cy="1"/></a:xfrm>
+            <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          </p:grpSpPr>
+          <p:sp>
+            <p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+            <p:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+            <p:txBody>
+              <a:bodyPr>
+                <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+                <a:sp3d><a:contourClr><a:srgbClr val="FFFFFF"/></a:contourClr></a:sp3d>
+              </a:bodyPr>
+              <a:lstStyle/><a:p/>
+            </p:txBody>
+          </p:sp>
+        </p:grpSp>
+      </p:spTree></p:cSld>
+    </p:sld>
+    """
+
+    observation = scan_pptx(
+        write_test_pptx(tmp_path / "parent-scoped-scenes.pptx", slide_xml=slide, chart_xml=None),
+        registry,
+    )
+
+    assert "drawingml.shape.3d.scene" in observation.capability_ids
+    assert "drawingml.text.3d.scene" in observation.capability_ids
+    assert observation.matching_parts["drawingml.shape.3d.scene"] == ("ppt/slides/slide1.xml",)
+    assert observation.matching_parts["drawingml.text.3d.scene"] == ("ppt/slides/slide1.xml",)
+
+
+def test_text_body_scene3d_does_not_count_as_shape_scene3d(tmp_path: Path, registry):
+    slide = f"""
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+           xmlns:a="{A_NS}">
+      <p:cSld><p:spTree><p:sp>
+        <p:nvSpPr><p:cNvPr id="1" name="Text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+        <p:txBody>
+          <a:bodyPr>
+            <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          </a:bodyPr>
+          <a:lstStyle/><a:p/>
+        </p:txBody>
+      </p:sp></p:spTree></p:cSld>
+    </p:sld>
+    """
+
+    observation = scan_pptx(
+        write_test_pptx(tmp_path / "text-scene.pptx", slide_xml=slide, chart_xml=None),
+        registry,
+    )
+
+    assert "drawingml.text.3d.scene" in observation.capability_ids
+    assert "drawingml.shape.3d.scene" not in observation.capability_ids
+
+
 @pytest.mark.parametrize(
     ("entries", "limits", "message"),
     [

@@ -115,14 +115,18 @@
         {
           "partGlob": "ppt/slides/slide*.xml",
           "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
-          "localName": "scene3d"
+          "localName": "scene3d",
+          "parent": {
+            "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "localNames": ["grpSpPr", "spPr"]
+          }
         }
       ],
       "scope": {
         "properties": ["camera", "lightRig", "backdrop"]
       },
       "fallback": "Render child shapes in two dimensions and report omitted scene camera and lighting semantics.",
-      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts"],
+      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
     },
@@ -220,6 +224,31 @@
       "fallback": "Use the handwritten preset implementation when generated runtime evaluation rejects invalid dimensions.",
       "implementationPaths": ["CHANGELOG.md", "README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "scripts/ooxml-geometry/README.md", "scripts/ooxml-geometry/generate.mjs", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-flowchart-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": []
+    },
+    {
+      "id": "drawingml.text.3d.scene",
+      "component": "text",
+      "renderMode": "fallback",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "scene3d",
+          "parent": {
+            "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "localNames": ["bodyPr"]
+          }
+        }
+      ],
+      "scope": {
+        "properties": ["camera", "lightRig", "backdrop"],
+        "target": ["text-body"]
+      },
+      "fallback": "Preserve the two-dimensional text layout while omitting text-body camera and lighting semantics.",
+      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
     },
     {
