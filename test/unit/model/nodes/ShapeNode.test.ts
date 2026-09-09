@@ -21,7 +21,7 @@ describe('parseShapeNode', () => {
     `);
 
     expect(s.shape3d?.shape?.bevelTop?.preset).toBe('circle');
-    expect(s.shape3d?.unsupportedReasons).toEqual([]);
+    expect(s.shape3d?.parseIssues).toEqual([]);
   });
 
   it('parses preset geometry', () => {

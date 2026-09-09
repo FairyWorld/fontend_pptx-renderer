@@ -104,7 +104,7 @@ describe('parsePicNode', () => {
     );
 
     expect(node.shape3d?.scene?.lightRig).toBe('twoPt');
-    expect(node.shape3d?.unsupportedReasons).toEqual([]);
+    expect(node.shape3d?.parseIssues).toEqual([]);
   });
 
   it('parses basic picture node', () => {

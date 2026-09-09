@@ -251,7 +251,8 @@ describe('serializePresentation', () => {
           contourColor: { type: 'schemeClr', value: 'lt1' },
           contourColorSource,
         },
-        unsupportedReasons: [],
+        effectKinds: [],
+        parseIssues: [],
       },
     };
 
@@ -274,7 +275,8 @@ describe('serializePresentation', () => {
         },
         contourColor: { type: 'schemeClr', value: 'lt1' },
       },
-      unsupportedReasons: [],
+      effectKinds: [],
+      parseIssues: [],
     });
     expect(JSON.stringify(serialized)).not.toContain('contourColorSource');
   });

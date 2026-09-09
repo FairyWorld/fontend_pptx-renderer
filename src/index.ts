@@ -79,7 +79,7 @@ export type {
   Shape3DBevelProperties,
   Shape3DColorObservation,
   Shape3DRotation,
-  Shape3DUnsupportedReason,
+  Shape3DParseIssue,
 } from './model/nodes/Shape3D';
 export type { TableNodeData, TableCell, TableRow } from './model/nodes/TableNode';
 export type { GroupNodeData } from './model/nodes/GroupNode';

@@ -17,7 +17,23 @@ type BevelFace = 'top' | 'right' | 'bottom' | 'left';
 
 type StaticShape3DFallbackReason =
   | 'missing-properties'
-  | 'parser-unsupported'
+  | 'parse-issue'
+  | 'missing-scene'
+  | 'missing-camera'
+  | 'missing-light-rig'
+  | 'missing-shape-format'
+  | 'missing-top-bevel'
+  | 'camera-preset'
+  | 'camera-rotation'
+  | 'light-rig'
+  | 'light-direction'
+  | 'light-rotation'
+  | 'extrusion-height'
+  | 'bottom-bevel'
+  | 'top-bevel-preset'
+  | 'top-bevel-dimensions'
+  | 'preset-material'
+  | 'effect-list-conflict'
   | 'invalid-bounds'
   | 'line-like'
   | 'geometry-preset'
@@ -41,7 +57,7 @@ interface StaticShape3DTarget {
 export interface StaticShape3DFlatPlan {
   mode: 'flat';
   reason: StaticShape3DFallbackReason;
-  parserReasons?: readonly string[];
+  parseIssues?: readonly string[];
 }
 
 export interface StaticShape3DSupportedPlan {
@@ -90,9 +106,23 @@ let shape3dIdCounter = 0;
 
 function flat(
   reason: StaticShape3DFallbackReason,
-  parserReasons?: readonly string[],
+  parseIssues?: readonly string[],
 ): StaticShape3DFlatPlan {
-  return parserReasons?.length ? { mode: 'flat', reason, parserReasons } : { mode: 'flat', reason };
+  return parseIssues?.length ? { mode: 'flat', reason, parseIssues } : { mode: 'flat', reason };
+}
+
+function isSupportedLightRotation(
+  rig: string | undefined,
+  direction: string | undefined,
+  rotation: Shape3DRotation,
+): boolean {
+  return (
+    rig === 'twoPt' &&
+    direction === 't' &&
+    rotation.latitude === 0 &&
+    rotation.longitude === 0 &&
+    rotation.revolution === 120
+  );
 }
 
 function normalizedPreset(target: StaticShape3DTarget): string {
@@ -119,8 +149,8 @@ export function buildStaticShape3DPlan(
   ctx: RenderContext,
 ): StaticShape3DPlan {
   if (!properties) return flat('missing-properties');
-  if (properties.unsupportedReasons.length > 0) {
-    return flat('parser-unsupported', properties.unsupportedReasons);
+  if (properties.parseIssues.length > 0) {
+    return flat('parse-issue', properties.parseIssues);
   }
   if (
     !Number.isFinite(target.width) ||
@@ -132,6 +162,40 @@ export function buildStaticShape3DPlan(
   }
   if (target.isLineLike) return flat('line-like');
   if (target.isTiledPicture) return flat('tiled-picture');
+
+  const scene = properties.scene;
+  if (!scene) return flat('missing-scene');
+  if (!scene.cameraPreset) return flat('missing-camera');
+  if (scene.cameraPreset !== 'orthographicFront') return flat('camera-preset');
+  if (scene.cameraRotation) return flat('camera-rotation');
+  if (!scene.lightRig) return flat('missing-light-rig');
+  if (scene.lightRig !== 'twoPt' && scene.lightRig !== 'threePt') return flat('light-rig');
+  if (scene.lightDirection !== 't') return flat('light-direction');
+  if (
+    scene.lightRotation &&
+    !isSupportedLightRotation(scene.lightRig, scene.lightDirection, scene.lightRotation)
+  ) {
+    return flat('light-rotation');
+  }
+
+  const shape = properties.shape;
+  if (!shape) return flat('missing-shape-format');
+  if (properties.effectKinds.some((effect) => effect !== 'outerShdw')) {
+    return flat('effect-list-conflict');
+  }
+  if ((shape.extrusionHeight ?? 0) > 0) return flat('extrusion-height');
+  if (shape.bevelBottom) return flat('bottom-bevel');
+  if (!shape.bevelTop) return flat('missing-top-bevel');
+  if (shape.bevelTop.preset !== 'circle') return flat('top-bevel-preset');
+  if (
+    !Number.isFinite(shape.bevelTop.width) ||
+    !Number.isFinite(shape.bevelTop.height) ||
+    !(shape.bevelTop.width! > 0) ||
+    !(shape.bevelTop.height! > 0)
+  ) {
+    return flat('top-bevel-dimensions');
+  }
+  if (shape.presetMaterial !== undefined) return flat('preset-material');
 
   const preset = normalizedPreset(target);
   const supportedPresets =
@@ -147,22 +211,7 @@ export function buildStaticShape3DPlan(
     return flat('paint-kind');
   }
 
-  const bevel = properties.shape?.bevelTop;
-  const scene = properties.scene;
-  if (
-    !bevel ||
-    bevel.preset !== 'circle' ||
-    !Number.isFinite(bevel.width) ||
-    !Number.isFinite(bevel.height) ||
-    !(bevel.width! > 0) ||
-    !(bevel.height! > 0) ||
-    (scene?.lightRig !== 'twoPt' && scene?.lightRig !== 'threePt') ||
-    scene.lightDirection !== 't'
-  ) {
-    // The model parser normally rejects these first. Keep the renderer total for callers that
-    // construct model objects directly.
-    return flat('parser-unsupported');
-  }
+  const bevel = shape.bevelTop;
 
   const contour = resolveContour(properties, ctx);
   if ((properties.shape?.contourWidth ?? 0) > 0 && !contour) {

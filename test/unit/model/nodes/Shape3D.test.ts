@@ -49,7 +49,8 @@ describe('parseShape3DProperties', () => {
         },
         contourColor: { type: 'srgbClr', value: 'FFFFFF' },
       },
-      unsupportedReasons: [],
+      effectKinds: ['outerShdw'],
+      parseIssues: [],
     });
     expect(result!.shape!.contourColorSource).toBeInstanceOf(SafeXmlNode);
   });
@@ -86,11 +87,12 @@ describe('parseShape3DProperties', () => {
         },
         contourColor: { type: 'schemeClr', value: 'lt1' },
       },
-      unsupportedReasons: [],
+      effectKinds: [],
+      parseIssues: [],
     });
   });
 
-  it('retains unsupported observations and emits stable reason codes', () => {
+  it('retains valid 3D observations without treating renderer support as a parse issue', () => {
     const result = parseSpPr(`
       <spPr>
         <effectLst><glow rad="12700"><srgbClr val="FFFFFF"/></glow></effectLst>
@@ -119,18 +121,8 @@ describe('parseShape3DProperties', () => {
         bevelTop: { preset: 'angle' },
         bevelBottom: { preset: 'circle' },
       },
-      unsupportedReasons: [
-        'camera-preset',
-        'camera-rotation',
-        'light-rig',
-        'light-direction',
-        'light-rotation',
-        'extrusion-height',
-        'bottom-bevel',
-        'top-bevel-preset',
-        'preset-material',
-        'effect-list-conflict',
-      ],
+      effectKinds: ['glow'],
+      parseIssues: [],
     });
   });
 
@@ -150,26 +142,26 @@ describe('parseShape3DProperties', () => {
         contourWidth: undefined,
         bevelTop: { width: undefined, height: undefined },
       },
-      unsupportedReasons: ['malformed-numeric', 'top-bevel-dimensions'],
+      parseIssues: ['malformed-numeric'],
     });
   });
 
-  it('reports incomplete 3D tuples explicitly', () => {
+  it('preserves incomplete 3D tuples for the renderer planner', () => {
     expect(
-      parseSpPr('<spPr><sp3d><bevelT w="12700" h="12700"/></sp3d></spPr>')!.unsupportedReasons,
-    ).toEqual(['missing-scene']);
-    expect(parseSpPr('<spPr><scene3d/></spPr>')!.unsupportedReasons).toEqual([
-      'missing-camera',
-      'missing-light-rig',
-      'missing-shape-format',
-    ]);
+      parseSpPr('<spPr><sp3d><bevelT w="12700" h="12700"/></sp3d></spPr>'),
+    ).toMatchObject({ scene: undefined, parseIssues: [] });
+    expect(parseSpPr('<spPr><scene3d/></spPr>')).toMatchObject({
+      scene: {},
+      shape: undefined,
+      parseIssues: [],
+    });
     expect(
       parseSpPr(`
         <spPr>
           <scene3d><camera prst="orthographicFront"/><lightRig rig="threePt" dir="t"/></scene3d>
           <sp3d/>
         </spPr>
-      `)!.unsupportedReasons,
-    ).toEqual(['missing-top-bevel']);
+      `),
+    ).toMatchObject({ shape: { bevelTop: undefined }, parseIssues: [] });
   });
 });

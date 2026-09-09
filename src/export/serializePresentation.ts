@@ -130,7 +130,8 @@ function serializeShape3D(shape3d: Shape3DProperties | undefined): SerializedSha
           ...(shape.contourColor ? { contourColor: shape.contourColor } : {}),
         }
       : undefined,
-    unsupportedReasons: [...shape3d.unsupportedReasons],
+    effectKinds: [...shape3d.effectKinds],
+    parseIssues: [...shape3d.parseIssues],
   };
 }
 

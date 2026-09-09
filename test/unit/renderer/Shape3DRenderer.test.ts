@@ -96,9 +96,9 @@ describe('buildStaticShape3DPlan', () => {
 
   it.each([
     [
-      'parser rejection',
+      'conflicting effect',
       parseShape3D(supportedScene, supportedShape, '<a:effectLst><a:glow rad="1"/></a:effectLst>'),
-      'parser-unsupported',
+      'effect-list-conflict',
     ],
     ['line-like geometry', parseShape3D(supportedScene, supportedShape), 'line-like'],
   ])('keeps a flat fallback for %s', (label, shape3d, reason) => {
@@ -110,6 +110,49 @@ describe('buildStaticShape3DPlan', () => {
         width: 200,
         height: 100,
         isLineLike: label === 'line-like geometry',
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({ mode: 'flat', reason });
+  });
+
+  it.each([
+    [
+      'camera-preset',
+      `<a:scene3d><a:camera prst="perspectiveRelaxed"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>`,
+      supportedShape,
+    ],
+    [
+      'camera-rotation',
+      `<a:scene3d><a:camera prst="orthographicFront"><a:rot lat="0" lon="0" rev="60000"/></a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>`,
+      supportedShape,
+    ],
+    [
+      'extrusion-height',
+      supportedScene,
+      supportedShape.replace('<a:sp3d ', '<a:sp3d extrusionH="12700" '),
+    ],
+    [
+      'bottom-bevel',
+      supportedScene,
+      supportedShape.replace('</a:sp3d>', '<a:bevelB w="12700" h="12700"/></a:sp3d>'),
+    ],
+    [
+      'preset-material',
+      supportedScene,
+      supportedShape.replace('<a:sp3d ', '<a:sp3d prstMaterial="metal" '),
+    ],
+  ])('classifies %s in the render planner', (reason, sceneXml, shapeXml) => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(sceneXml, shapeXml),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'roundRect',
+        width: 200,
+        height: 100,
         paintKind: 'solid',
         baseFill: '#2F75B5',
       },
