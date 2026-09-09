@@ -60,7 +60,7 @@ caller; they are not run by the command. Review rows require an explicit case ve
 
 3. Case compiler and metrics
 - `case_compiler.py`: compiles JSON case files into a VBA-friendly line spec.
-- `metrics.py`: visual metrics (`ssim`, `fg_iou`, `fg_iou_tolerant`, `chamfer_score`, `color_hist_corr`, `mae`) and quality gate. Pass/fail uses only `ssim ≥ 0.95` and `color_hist_corr ≥ 0.80`; other metrics are diagnostic.
+- `metrics.py`: visual metrics (`ssim`, `fg_iou`, `fg_iou_tolerant`, `chamfer_score`, `color_hist_corr`, `mae`) and quality gate. Pass/fail uses only `ssim ≥ 0.95` and `color_hist_corr ≥ 0.80`; the foreground color metric tolerates one HSV histogram bin and negligible visually blank PDF residue. Other metrics are diagnostic.
 - `../scripts/shape3d_bevel_metrics.py`: source-OOXML-derived bevel-ring and round-corner lighting
   gate for the bounded static 3D cohort.
 - `shape` nodes support `shapeTypeId` (numeric `MsoAutoShapeType`) for forward-compatible shape coverage.

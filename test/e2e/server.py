@@ -718,7 +718,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
             summary,
             {"ssim": VISUAL_EVAL_THRESHOLDS["ssim"]},
         )
-        # --- Pass/fail: only SSIM + color_hist_corr (conservative, zero false positives) ---
+        # Pass/fail combines spatial structure with quantization-tolerant foreground color.
         metric_reasons = []
         if avg_ssim < VISUAL_EVAL_THRESHOLDS["ssim"]:
             metric_reasons.append("metric:ssim")

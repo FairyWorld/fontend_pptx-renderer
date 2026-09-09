@@ -438,7 +438,13 @@ Previously evaluated but rejected: `edge_iou` (too noisy), `fg_area_ratio` (redu
 
 - Computed over H, S, V channels independently (30 H bins, 32 S/V bins), then averaged
 - Only foreground pixels (gray < 245) are compared, ignoring white backgrounds
-- Sparse foreground (< 1.5% coverage) returns 1.0 to avoid anti-aliasing noise on thin-stroke shapes
+- Each channel tolerates a one-bin displacement before correlation (circular for hue, clamped for
+  saturation/value), preventing a small color quantization shift from becoming a false mismatch
+- Sparse foreground in both images (< 1.5% coverage) returns 1.0 to avoid anti-aliasing noise on
+  thin-stroke shapes
+- When only one image has foreground, it remains a mismatch unless that image contains at most
+  0.01% black-equivalent ink, which covers visually blank PDF anti-alias residue without hiding a
+  meaningful missing line
 - Score of 1.0 = identical color distributions; >= 0.80 = pass threshold
 
 ## Shape Fix Protocol (TDD Required)
