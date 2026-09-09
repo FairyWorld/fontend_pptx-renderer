@@ -16,10 +16,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added `pnpm capability:check` as a CI-safe contract gate and `pnpm capability:inventory` for local
   ignored corpora; generated evidence stays outside the published package and tracked source tree.
 - Added capability verification normalization for raw native API reports, with clean-revision,
-  input-hash, manual-review, and before/after SSIM regression checks.
-- Added typed, serializable `a:scene3d`/`a:sp3d` observations for shapes and pictures, including
-  stable fallback reasons, plus a seven-case native PowerPoint matrix covering the bounded static
-  3D cohort and a real-corpus picture sentinel.
+  input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
+- Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
+  shapes and pictures, with stable renderer fallback reasons, plus a seven-case native PowerPoint
+  matrix covering the bounded static 3D cohort and a real-corpus picture sentinel.
+- Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored eight-case
+  3D discovery matrix for curved, holed, concave, transformed, cropped, and effect-bearing inputs.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -42,10 +44,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
   polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
-  `rect`/`roundRect` shapes and rectangular stretch-filled pictures with separate inward top,
-  right, bottom, and left faces. Bevel width now controls edge extent while height controls
-  lighting contrast; contour, group, outline, and outer-shadow interactions remain bounded, and
-  unmatched 3D tuples stay flat.
+  `rect`/`roundRect` shapes and rectangular stretch-filled pictures with a silhouette-aware interior
+  distance field, continuous perimeter normals, and a circular cross-section. Bevel width controls
+  edge extent while height controls lighting contrast; a bounded cached texture replaces a
+  synchronous vector fallback only after decode, preserving contour, group, outline, outer-shadow,
+  abort, and cleanup behavior. Unmatched 3D tuples stay flat.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
   renderer, browser, picture-clip, and native PowerPoint comparison gates.

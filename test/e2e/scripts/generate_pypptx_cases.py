@@ -13,6 +13,8 @@ Usage (from test/e2e/):
   python scripts/generate_pypptx_cases.py              # PDF on macOS; PDF+PNG on Windows
   python scripts/generate_pypptx_cases.py --pptx-only  # generate PPTX only (any platform)
   python scripts/generate_pypptx_cases.py --case 'oracle-pypptx-text-00[45]*'
+  python scripts/generate_pypptx_cases.py --include-local-shape3d-matrix \
+    --case 'oracle-local-shape3d-*'                     # ignored discovery corpus
 """
 from __future__ import annotations
 
@@ -47,6 +49,7 @@ if str(E2E_DIR) not in sys.path:
 CASES_DIR = E2E_DIR / "oracle" / "cases-pypptx"
 TESTDATA_DIR = E2E_DIR / "testdata"
 REPORT_PATH = E2E_DIR / "reports" / "oracle-failures" / "pypptx-ground-truth.json"
+LOCAL_SHAPE3D_CASES_DIR = E2E_DIR / "oracle-runtime" / "local-shape3d-cases"
 
 # Slide dimensions (standard widescreen 13.333" x 7.5")
 SLIDE_W = Inches(13.333)
@@ -1435,6 +1438,232 @@ def _build_shape3d_cases() -> list[CaseDef]:
     return cases
 
 
+def _build_local_shape3d_cases() -> list[CaseDef]:
+    """Build opt-in discovery probes without expanding the supported 3D cohort."""
+    cases: list[CaseDef] = []
+    seq = 0
+
+    def _add(slug: str, build_fn, *, features: list[str]) -> None:
+        nonlocal seq
+        seq += 1
+        cases.append(
+            {
+                "name": f"oracle-local-shape3d-{seq:04d}-{slug}",
+                "build_fn": build_fn,
+                "local_only": True,
+                "coverage": {
+                    "oracle": "native-powerpoint",
+                    "cohort": "experimental-local",
+                    "claim": "discovery-only",
+                    "features": features,
+                },
+            }
+        )
+
+    def _style_probe(shape, *, color: tuple[int, int, int] = (47, 117, 181)) -> None:
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(*color)
+        shape.line.fill.background()
+        _apply_bounded_shape3d(shape)
+
+    def _build_preset(
+        prs,
+        shape_type,
+        *,
+        adjustment: float | None = None,
+        width: float = 5.0,
+        height: float = 5.0,
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_shape(
+            shape_type,
+            _emu((13.333 - width) / 2),
+            _emu((7.5 - height) / 2),
+            _emu(width),
+            _emu(height),
+        )
+        shape.name = "Local static 3D discovery probe"
+        if adjustment is not None:
+            shape.adjustments[0] = adjustment
+        _style_probe(shape)
+
+    _add(
+        "ellipse-circle-bevel",
+        lambda prs: _build_preset(prs, MSO_SHAPE.OVAL),
+        features=["p:sp.prstGeom=ellipse", "geometry.curved", "a:sp3d.bevelT=circle"],
+    )
+    _add(
+        "donut-adjusted-circle-bevel",
+        lambda prs: _build_preset(prs, MSO_SHAPE.DONUT, adjustment=0.32),
+        features=[
+            "p:sp.prstGeom=donut",
+            "geometry.hole",
+            "geometry.adjustment=0.32",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+    _add(
+        "star5-adjusted-circle-bevel",
+        lambda prs: _build_preset(
+            prs,
+            MSO_SHAPE.STAR_5_POINT,
+            adjustment=0.36,
+            width=5.6,
+        ),
+        features=[
+            "p:sp.prstGeom=star5",
+            "geometry.concave",
+            "geometry.adjustment=0.36",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _build_freeform(prs) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        builder = slide.shapes.build_freeform(
+            0,
+            0,
+            scale=(Inches(5.2) / 1000, Inches(4.8) / 1000),
+        )
+        builder.add_line_segments(
+            [
+                (1000, 0),
+                (1000, 390),
+                (660, 390),
+                (660, 1000),
+                (340, 670),
+                (0, 1000),
+            ],
+            close=True,
+        )
+        shape = builder.convert_to_shape(Inches(4.05), Inches(1.35))
+        shape.name = "Concave freeform static 3D discovery probe"
+        _style_probe(shape, color=(112, 173, 71))
+
+    _add(
+        "freeform-concave-circle-bevel",
+        _build_freeform,
+        features=["p:sp.custGeom", "geometry.concave", "a:sp3d.bevelT=circle"],
+    )
+
+    def _build_rotated(prs) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            _emu(3.6),
+            _emu(1.75),
+            _emu(6.1),
+            _emu(4.0),
+        )
+        shape.name = "Rotated static 3D discovery probe"
+        shape.rotation = 30
+        _style_probe(shape, color=(237, 125, 49))
+
+    _add(
+        "rotated-roundrect-bevel",
+        _build_rotated,
+        features=[
+            "p:sp.prstGeom=roundRect",
+            "shape.rotation=30deg",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _build_nested_group(prs) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        outer = slide.shapes.add_group_shape()
+        inner = outer.shapes.add_group_shape()
+        shape = inner.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            _emu(0.8),
+            _emu(0.6),
+            _emu(3.8),
+            _emu(2.4),
+        )
+        shape.name = "Nested grouped static 3D discovery probe"
+        _style_probe(shape, color=(112, 48, 160))
+        inner.left = _emu(1.0)
+        inner.top = _emu(0.8)
+        inner.width = _emu(5.8)
+        inner.height = _emu(3.1)
+        outer.left = _emu(2.25)
+        outer.top = _emu(1.35)
+        outer.width = _emu(8.6)
+        outer.height = _emu(4.8)
+
+    _add(
+        "nested-group-scaled-bevel",
+        _build_nested_group,
+        features=[
+            "p:grpSp/p:grpSp/p:sp",
+            "group.nested",
+            "group.nonIdentityScale",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _build_cropped_picture(prs) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        picture = slide.shapes.add_picture(
+            _shape3d_fixture_image(),
+            _emu(3.0),
+            _emu(1.4),
+            _emu(7.333),
+            _emu(4.7),
+        )
+        picture.name = "Cropped static 3D picture discovery probe"
+        picture.crop_left = 0.12
+        picture.crop_top = 0.08
+        picture.crop_right = 0.18
+        picture.crop_bottom = 0.10
+        _apply_bounded_shape3d(picture, light_rig="twoPt")
+
+    _add(
+        "cropped-picture-bevel",
+        _build_cropped_picture,
+        features=[
+            "p:pic",
+            "a:srcRect=12%,8%,18%,10%",
+            "a:scene3d.lightRig=twoPt:t",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _build_glow(prs) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            _emu(3.0),
+            _emu(1.75),
+            _emu(7.333),
+            _emu(4.0),
+        )
+        shape.name = "Glow and static 3D discovery probe"
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
+        shape.line.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        shape.line.width = Pt(2)
+        effect_list = etree.Element(qn("a:effectLst"))
+        glow = etree.SubElement(effect_list, qn("a:glow"), rad="114300")
+        glow_color = etree.SubElement(glow, qn("a:srgbClr"), val="00B0F0")
+        etree.SubElement(glow_color, qn("a:alpha"), val="65000")
+        _insert_before_ext_lst(shape._element.spPr, effect_list)
+        _apply_bounded_shape3d(shape)
+
+    _add(
+        "glow-roundrect-bevel",
+        _build_glow,
+        features=[
+            "p:sp.prstGeom=roundRect",
+            "a:effectLst.glow=114300",
+            "a:ln=2pt",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    return cases
+
+
 # ---------------------------------------------------------------------------
 # P2: Composite (multi-component) cases
 # ---------------------------------------------------------------------------
@@ -2183,11 +2412,13 @@ def _build_chart_cases() -> list[CaseDef]:
 # Orchestrator
 # ---------------------------------------------------------------------------
 
-def _build_all_case_defs() -> list[CaseDef]:
+def _build_all_case_defs(*, include_local_shape3d: bool = False) -> list[CaseDef]:
     all_cases: list[CaseDef] = []
     all_cases.extend(_build_text_cases())
     all_cases.extend(_build_shape_adj_cases())
     all_cases.extend(_build_shape3d_cases())
+    if include_local_shape3d:
+        all_cases.extend(_build_local_shape3d_cases())
     all_cases.extend(_build_composite_cases())
     all_cases.extend(_build_chart_cases())
     return all_cases
@@ -2269,6 +2500,12 @@ def main() -> int:
         description="Generate ground truth cases using python-pptx + PowerPoint PDF export.",
     )
     parser.add_argument("--cases-dir", type=Path, default=CASES_DIR)
+    parser.add_argument(
+        "--local-cases-dir",
+        type=Path,
+        default=LOCAL_SHAPE3D_CASES_DIR,
+        help="Ignored metadata directory for opt-in local 3D discovery cases.",
+    )
     parser.add_argument("--testdata-dir", type=Path, default=TESTDATA_DIR)
     parser.add_argument("--report-path", type=Path, default=REPORT_PATH)
     parser.add_argument("--pptx-only", action="store_true",
@@ -2284,6 +2521,11 @@ def main() -> int:
     parser.add_argument("--no-reuse", action="store_true",
                         help="Force regeneration even if files exist.")
     parser.add_argument(
+        "--include-local-shape3d-matrix",
+        action="store_true",
+        help="Include ignored 3D discovery cases without changing supported capability claims.",
+    )
+    parser.add_argument(
         "--case",
         action="append",
         dest="case_patterns",
@@ -2294,10 +2536,11 @@ def main() -> int:
     args = parser.parse_args()
 
     cases_dir = args.cases_dir.resolve()
+    local_cases_dir = args.local_cases_dir.resolve()
     testdata_dir = args.testdata_dir.resolve()
     report_path = args.report_path.resolve()
 
-    all_cases = _build_all_case_defs()
+    all_cases = _build_all_case_defs(include_local_shape3d=args.include_local_shape3d_matrix)
     selected_cases = _select_case_defs(all_cases, args.case_patterns)
     print(f"Total case definitions: {len(all_cases)}; selected: {len(selected_cases)}")
     if args.case_patterns and not selected_cases:
@@ -2334,7 +2577,8 @@ def main() -> int:
         slides_d = case_d / "slides"
 
         # Keep the tracked case index aligned even when ignored binary ground truth is reused.
-        _write_case_json(case_def, cases_dir)
+        definition_dir = local_cases_dir if case_def.get("local_only") else cases_dir
+        _write_case_json(case_def, definition_dir)
 
         # Reuse check
         if not args.no_reuse:
@@ -2393,6 +2637,8 @@ def main() -> int:
         "total_definitions": len(all_cases),
         "selected_definitions": len(selected_cases),
         "case_patterns": args.case_patterns,
+        "local_shape3d_matrix": args.include_local_shape3d_matrix,
+        "local_cases_dir": str(local_cases_dir),
         "generated_count": len(generated),
         "skipped_reused": skipped,
         "failed_count": len(failures),

@@ -327,6 +327,11 @@ def command_verify(args: argparse.Namespace) -> int:
         baseline_reports=baselines,
         passed_gates=args.passed_gate,
         manual_verdicts=_manual_verdicts(args.manual_verdict),
+        bevel_report=(
+            _load_json(_path(args.bevel_report, repo, args.bevel_report))
+            if args.bevel_report
+            else None
+        ),
     )
     if verification["renderer"]["revision"] != revision:
         raise CapabilityLoopError("native case reports do not match current HEAD")
@@ -456,6 +461,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--oracle", required=True)
     verify.add_argument("--passed-gate", action="append", default=[])
     verify.add_argument("--manual-verdict", action="append", default=[])
+    verify.add_argument("--bevel-report")
     verify.add_argument("--out")
     verify.set_defaults(handler=command_verify)
 

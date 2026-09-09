@@ -24,7 +24,9 @@ The loop has five domain modules and a thin CLI:
 - `capability_evidence.py` binds receipts to capability definitions, relevant file content, source
   PPTX, ground truth, gates, environment, and revision.
 - `capability_verification.py` normalizes native evaluation API results, rejects mixed or dirty
-  revisions, and derives native, manual-review, and SSIM-regression gate outcomes.
+  revisions, and derives native, manual-review, SSIM-regression, and capability-specific local
+  metric gate outcomes. Local visual gates must match the per-slide reference/candidate hashes in
+  the API report and the current raster files.
 - `capability_ranking.py` applies a documented lexicographic priority and emits one bounded work
   packet.
 - `scripts/run_capability_loop.py` composes `validate`, `inventory`, `rank`, `work-packet`,
@@ -199,9 +201,9 @@ does not claim pixel-identical font metrics across every host font installation.
 
 `src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,
 light, bevel, contour, extrusion, material, and color observations. It attaches those observations
-to both shape and picture nodes and emits stable unsupported-reason codes. Serialization removes
-the retained `SafeXmlNode` color source while preserving its JSON-safe observation, so detection is
-available without exposing parser internals.
+to both shape and picture nodes; only malformed numeric values become parse issues. Serialization
+removes the retained `SafeXmlNode` color source while preserving its JSON-safe observation, so
+detection remains independent from renderer support policy.
 
 `src/renderer/Shape3DRenderer.ts` is a narrow decision and effect layer. It returns either an
 `orthographic-top-bevel` plan or an explicit flat-fallback reason before touching the DOM. The
@@ -216,18 +218,33 @@ supported plan requires all of the following:
 - an opaque resolved solid-fill `rect`/`roundRect` shape, or a rectangular stretch-filled picture.
 
 The renderer treats `bevelT@w` as the inward face extent and `bevelT@h` as elevation that scales
-lighting contrast. It partitions the clipped bevel ring into top, right, bottom, and left regions,
-then paints each region with an independent `userSpaceOnUse` gradient. Solid shapes use opaque
-material-color stops so specular highlights retain the source hue; pictures use translucent
-overlays so their pixels remain visible. It adds the contour as a separate path, keeps shape text
-outside the lighting overlay, and draws a 3D picture's ordinary outline as a centered SVG path so
-the image bounds do not shrink. Unique per-effect IDs prevent cross-slide collisions. Existing
-wrapper transforms, outer shadows, media ownership, and cleanup remain in their owning renderers.
+lighting contrast. It immediately paints four clipped `userSpaceOnUse` gradients as a synchronous
+fallback. When a render context is available, it rasterizes the exact even-odd SVG path into a
+Canvas alpha mask at up to 2x scale within a 262,144-pixel budget. `DistanceField.ts` computes the
+exact interior Euclidean distance transform, and `BevelLighting.ts` smooths its gradient into
+continuous perimeter normals, applies a circular bevel cross-section, and evaluates the bounded
+light direction. This allows rounded corners to bend the light field around their silhouette rather
+than retaining rectangular face boundaries.
 
-Anything outside that full tuple stays on the existing flat path with a stable reason. Perspective,
+The resulting transparent texture replaces only the fallback lighting after its object URL decodes.
+Solid shapes map light and shadow through material-color lookup tables so highlights retain the
+source hue; pictures use relative black/white overlays so their pixels remain visible. Texture work
+is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry, dimensions,
+bevel, light, surface, raster size, and algorithm version, and guarded by the slide abort signal.
+Failure, insufficient raster scale, or disposal leaves the vector fallback in place and prevents
+late DOM writes or cache repopulation.
+
+The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
+picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent
+cross-slide collisions. Existing wrapper transforms, outer shadows, media ownership, and cleanup
+remain in their owning renderers.
+
+Anything outside that full tuple stays on the existing flat path with a stable planner reason. Perspective,
 nonzero extrusion, other materials/bevels/lights, gradient/pattern/group/image-filled shapes,
-tiled pictures, chart `view3D`, and Office 2017 `model3d` are separate capability lanes. This SVG
-surface model is a bounded static rendering, not a general mesh or PowerPoint material engine.
+tiled pictures, chart `view3D`, and Office 2017 `model3d` are separate capability lanes. The raster
+lighting backend can consume arbitrary silhouettes, but support is still constrained by the planner
+and native evidence. This is a bounded static rendering, not a general mesh or PowerPoint material
+engine.
 
 ## Rendering Strategies
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import importlib.util
 from pathlib import Path
 
@@ -10,6 +11,30 @@ import server
 
 
 RUN_ALL_PATH = Path(__file__).resolve().parent / "scripts" / "run_all_shapes_eval.py"
+
+
+def test_render_artifacts_bind_reference_and_candidate_screenshots(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "PROJECT_ROOT", tmp_path)
+    reference = tmp_path / "test/e2e/reports/case_pdf.png"
+    candidate = tmp_path / "test/e2e/reports/case_html.png"
+    reference.parent.mkdir(parents=True)
+    reference.write_bytes(b"native")
+    candidate.write_bytes(b"renderer")
+
+    artifacts = server._render_artifacts(reference, candidate)
+
+    assert artifacts == {
+        "reference": {
+            "path": "test/e2e/reports/case_pdf.png",
+            "sizeBytes": 6,
+            "sha256": hashlib.sha256(b"native").hexdigest(),
+        },
+        "candidate": {
+            "path": "test/e2e/reports/case_html.png",
+            "sizeBytes": 8,
+            "sha256": hashlib.sha256(b"renderer").hexdigest(),
+        },
+    }
 
 
 def _load_run_all_module():

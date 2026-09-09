@@ -225,9 +225,14 @@ outline and outer shadow so the 3D effect is not tested in isolation from its ac
 The seven cases are one opt-out control, five synthetic interaction cases, and one property-level
 slice copied from the ignored local corpus. Together they pin picture versus shape rendering,
 wide/tall extents, a non-identity parent group, contour layering, stable repeated frames, unique SVG
-effect IDs, no horizontal growth, picture-URL disposal, and the flat fallback for an unsupported
-camera. The accepted support claim is limited to the exact tuple in
+effect IDs, distance-field texture readiness, no horizontal growth, picture-URL disposal, abort-safe
+cleanup, and the flat fallback for an unsupported camera. The accepted support claim is limited to
+the exact tuple in
 `drawingml.shape.3d.top-bevel-contour`; a high aggregate score cannot broaden that registry scope.
+An opt-in eight-case local matrix adds ellipse, adjusted donut, adjusted star, concave freeform,
+rotation, nested non-identity groups, cropped pictures, and glow interaction. Those cases use the
+`oracle-local-shape3d-*` prefix, write metadata only below the ignored `oracle-runtime` directory,
+and remain discovery evidence until a separately bounded capability and native gate promote them.
 The CJK text matrix at IDs 0040-0055 covers square/no-wrap behavior, omitted and explicit autofit
 modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, centered text
 inside a parent shape, and square/wide/tall `spAutoFit` growth. IDs 0052-0054 require native
@@ -254,6 +259,11 @@ cd test/e2e
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-shape3d-*'
 
+# Generate the ignored local 3D discovery matrix. Add --pptx-only without PowerPoint.
+.venv/bin/python scripts/generate_pypptx_cases.py \
+  --include-local-shape3d-matrix \
+  --case 'oracle-local-shape3d-*'
+
 # Package-only inspection on a host without PowerPoint.
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --pptx-only \
@@ -264,6 +274,32 @@ macOS PowerPoint exports PDF ground truth. Windows PowerPoint exports PDF and, b
 per-slide PNG. The generator refreshes tracked case metadata even when cached local binaries are
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
+The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
+into tracked `oracle/cases-pypptx/` and do not change the 138-case default matrix.
+
+The 3D capability also has a region-level lighting gate. After the seven clean native API reports
+have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
+
+```bash
+# Run from the repository root; report paths are repository-relative.
+test/e2e/.venv/bin/python test/e2e/scripts/shape3d_bevel_metrics.py \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0001-flat-optout.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0002-picture-rect-circle-bevel.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0003-roundrect-bevel-contour.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0004-wide-bevel.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0005-tall-bevel.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0006-grouped-bevel.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0007-real-picture-bevel-slice.json \
+  --out test/e2e/reports/capability-loop/shape3d-bevel-local-<revision>.json
+```
+
+The metric extracts shape bounds and group transforms independently from source OOXML, then compares
+luminance only in the inward bevel ring. The general field score must be at least `0.60`; verified
+`roundRect` corners also require `0.78`. A band below four output pixels is explicitly recorded as
+resolution-limited and remains covered by full-slide and manual gates rather than guessed from too
+few pixels. The flat control has no applicable region. This local metric complements the full-page
+SSIM/color-histogram gate; it does not replace it. Each native API slide row fingerprints the exact
+reference and HTML rasters. The metric generator rejects a stale or replaced raster before scoring.
 
 PowerPoint automation on macOS requires an unlocked interactive session. Error `-9074` while the
 same known-good deck exports normally in an unlocked session is an environment failure, not a
@@ -481,8 +517,11 @@ errors, PowerPoint quality status, matching baseline case IDs, and the 0.02 SSIM
 Regression baselines must use one earlier clean revision with identical source, ground-truth, and
 runtime-environment fingerprints.
 It derives `native-powerpoint`, `manual-visual`, and `regression`; callers cannot self-attest those
-three gates. `--passed-gate` records separate checks that have already run and does not execute
-them. A `needsReview` case requires `--manual-verdict CASE_ID=passed` (or `accepted`).
+gates. A capability that requires `bevel-local` must also supply `--bevel-report`; verification
+derives that gate only when the clean revision, exact case set, source hashes, ground-truth hashes,
+native per-slide raster hashes, on-disk raster hashes, and every local result match. `--passed-gate`
+records separate checks that have already run and does not execute them. A `needsReview` case
+requires `--manual-verdict CASE_ID=passed` (or `accepted`).
 
 Promotion uses the `accept` command only after the capability registry says `renderMode=native` and
 the candidate implementation is committed. The command requires a clean tracked tree, matching
@@ -496,13 +535,14 @@ The static shape/picture 3D cohort promotes only `orthographicFront` circular to
 solid `rect`/`roundRect` shapes and rectangular stretch-filled pictures, with the documented
 `twoPt:t`/`threePt:t` lighting tuple, zero extrusion, an optional contour with a resolvable color,
 and an optional outer shadow. The visual gate checks that `bevelT@w` controls the inward edge width,
-`bevelT@h` changes contrast rather than geometry, and the four directional faces remain distinct.
-Verification
+`bevelT@h` changes contrast rather than geometry, directional lighting remains distinct, and rounded
+corners follow continuous silhouette normals. Verification
 uses all seven `oracle-pypptx-shape3d-*` case reports, the same seven earlier-revision baselines,
-explicit manual verdicts for review rows, and the `source`, `structural`, `unit`, `browser`,
-`performance`, `package-size`, and `docs` caller-run gates. Perspective, arbitrary rotations,
-nonzero extrusion, materials, bottom bevels, tiled pictures, other paint/effect combinations, and
-other shape or picture presets remain flat fallbacks.
+the derived `bevel-local` report, explicit manual verdicts for review rows, and the `source`,
+`structural`, `unit`, `browser`, `performance`, `package-size`, and `docs` caller-run gates.
+Perspective, arbitrary rotations, nonzero extrusion, materials, bottom bevels, tiled pictures, other
+paint/effect combinations, and other shape or picture presets remain flat fallbacks. Opt-in local
+probes for these contexts do not promote the public support boundary.
 
 ## Chart Fix Protocol
 

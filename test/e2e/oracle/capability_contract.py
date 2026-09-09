@@ -33,6 +33,7 @@ GATES = frozenset(
         "lint",
         "build",
         "docs",
+        "bevel-local",
     }
 )
 

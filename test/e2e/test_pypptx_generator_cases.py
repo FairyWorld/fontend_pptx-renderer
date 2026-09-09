@@ -308,7 +308,7 @@ def test_generator_uses_one_shared_powerpoint_runtime_directory(
 
     import oracle.powerpoint_oracle as powerpoint_oracle
 
-    monkeypatch.setattr(generator, "_build_all_case_defs", lambda: [case])
+    monkeypatch.setattr(generator, "_build_all_case_defs", lambda **_kwargs: [case])
     monkeypatch.setattr(powerpoint_oracle, "export_pptx_ground_truth", fake_export)
 
     cases_dir = tmp_path / "definitions"
@@ -549,3 +549,132 @@ def test_static_shape3d_case_json_records_exact_scope(tmp_path: Path):
             "a:sp3d.bevelT=circle",
         ],
     }
+
+
+def test_local_shape3d_experiment_matrix_is_opt_in_and_separate_from_support_cases():
+    generator = _load_generator_module()
+
+    default_names = {case["name"] for case in generator._build_all_case_defs()}
+    expanded = generator._build_all_case_defs(include_local_shape3d=True)
+    local_cases = [
+        case for case in expanded if case["name"].startswith("oracle-local-shape3d-")
+    ]
+
+    assert not any(name.startswith("oracle-local-shape3d-") for name in default_names)
+    assert {case["name"] for case in local_cases} == {
+        "oracle-local-shape3d-0001-ellipse-circle-bevel",
+        "oracle-local-shape3d-0002-donut-adjusted-circle-bevel",
+        "oracle-local-shape3d-0003-star5-adjusted-circle-bevel",
+        "oracle-local-shape3d-0004-freeform-concave-circle-bevel",
+        "oracle-local-shape3d-0005-rotated-roundrect-bevel",
+        "oracle-local-shape3d-0006-nested-group-scaled-bevel",
+        "oracle-local-shape3d-0007-cropped-picture-bevel",
+        "oracle-local-shape3d-0008-glow-roundrect-bevel",
+    }
+    assert all(case["local_only"] is True for case in local_cases)
+    assert all(case["coverage"]["cohort"] == "experimental-local" for case in local_cases)
+    assert all(case["coverage"]["claim"] == "discovery-only" for case in local_cases)
+
+
+def test_local_shape3d_experiment_matrix_serializes_geometry_transform_and_effect_probes(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    cases = {
+        case["name"]: case
+        for case in generator._build_all_case_defs(include_local_shape3d=True)
+        if case["name"].startswith("oracle-local-shape3d-")
+    }
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    roots = {}
+
+    for name, case in cases.items():
+        pptx_path = tmp_path / name / "source.pptx"
+        generator._generate_pptx(case, pptx_path)
+        with ZipFile(pptx_path) as zf:
+            roots[name] = etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+
+    for name, root in roots.items():
+        assert root.xpath(
+            "boolean(.//*[self::p:sp or self::p:pic][p:spPr/a:scene3d and p:spPr/a:sp3d])",
+            namespaces=ns,
+        ), name
+
+    assert roots["oracle-local-shape3d-0001-ellipse-circle-bevel"].xpath(
+        "boolean(.//p:sp/p:spPr/a:prstGeom[@prst='ellipse'])",
+        namespaces=ns,
+    )
+    assert roots["oracle-local-shape3d-0002-donut-adjusted-circle-bevel"].xpath(
+        "boolean(.//p:sp/p:spPr/a:prstGeom[@prst='donut']/a:avLst/a:gd)",
+        namespaces=ns,
+    )
+    assert roots["oracle-local-shape3d-0003-star5-adjusted-circle-bevel"].xpath(
+        "boolean(.//p:sp/p:spPr/a:prstGeom[@prst='star5']/a:avLst/a:gd)",
+        namespaces=ns,
+    )
+    assert roots["oracle-local-shape3d-0004-freeform-concave-circle-bevel"].xpath(
+        "boolean(.//p:sp/p:spPr/a:custGeom/a:pathLst/a:path/a:lnTo)",
+        namespaces=ns,
+    )
+    assert roots["oracle-local-shape3d-0005-rotated-roundrect-bevel"].xpath(
+        "boolean(.//p:sp[p:spPr/a:sp3d]/p:spPr/a:xfrm[@rot='1800000'])",
+        namespaces=ns,
+    )
+    nested = roots["oracle-local-shape3d-0006-nested-group-scaled-bevel"]
+    assert nested.xpath("count(.//p:grpSp/p:grpSp/p:sp[p:spPr/a:sp3d])", namespaces=ns) == 1
+    assert nested.xpath(
+        "boolean(.//p:grpSp/p:grpSp/p:grpSpPr/a:xfrm"
+        "[a:ext/@cx != a:chExt/@cx or a:ext/@cy != a:chExt/@cy])",
+        namespaces=ns,
+    )
+    assert roots["oracle-local-shape3d-0007-cropped-picture-bevel"].xpath(
+        "boolean(.//p:pic/p:blipFill/a:srcRect[@l][@t][@r][@b])",
+        namespaces=ns,
+    )
+    assert roots["oracle-local-shape3d-0008-glow-roundrect-bevel"].xpath(
+        "boolean(.//p:sp/p:spPr/a:effectLst/a:glow[@rad='114300']"
+        "/a:srgbClr[@val='00B0F0']/a:alpha[@val='65000'])",
+        namespaces=ns,
+    )
+
+
+def test_local_shape3d_cli_writes_metadata_to_ignored_directory(tmp_path: Path, monkeypatch):
+    generator = _load_generator_module()
+    tracked_cases_dir = tmp_path / "tracked-definitions"
+    local_cases_dir = tmp_path / "oracle-runtime" / "local-shape3d-cases"
+    testdata_dir = tmp_path / "testdata"
+    report_path = tmp_path / "report.json"
+    case_name = "oracle-local-shape3d-0001-ellipse-circle-bevel"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            str(GENERATOR_PATH),
+            "--cases-dir",
+            str(tracked_cases_dir),
+            "--local-cases-dir",
+            str(local_cases_dir),
+            "--testdata-dir",
+            str(testdata_dir),
+            "--report-path",
+            str(report_path),
+            "--pptx-only",
+            "--no-reuse",
+            "--include-local-shape3d-matrix",
+            "--case",
+            case_name,
+        ],
+    )
+
+    assert generator.main() == 0
+    assert not (tracked_cases_dir / f"{case_name}.json").exists()
+    local_definition = local_cases_dir / f"{case_name}.json"
+    assert local_definition.exists()
+    payload = __import__("json").loads(local_definition.read_text(encoding="utf-8"))
+    assert payload["coverage"]["cohort"] == "experimental-local"
+    report = __import__("json").loads(report_path.read_text(encoding="utf-8"))
+    assert report["local_shape3d_matrix"] is True
+    assert report["local_cases_dir"] == str(local_cases_dir.resolve())

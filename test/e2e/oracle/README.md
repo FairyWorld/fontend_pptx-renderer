@@ -37,9 +37,11 @@ work packet records the override instead of silently hiding the global ordering.
 
 `verify` consumes raw `/api/evaluate` JSON reports from one clean committed renderer revision. It
 derives native-PowerPoint, manual-review, and regression status, including a matching baseline case
-set, identical input/runtime fingerprints from an earlier revision, and the 0.02 SSIM budget. Other
-`--passed-gate` values only record checks already executed by
-the caller; they are not run by the command. Review rows require an explicit case verdict.
+set, identical input/runtime fingerprints from an earlier revision, and the 0.02 SSIM budget. The
+bounded shape-3D capability additionally requires a `--bevel-report`; the derived `bevel-local` gate
+binds its exact case set, source/ground-truth hashes, and per-slide raster hashes to the same clean
+revision and current files. Other `--passed-gate` values only record checks already executed by the
+caller; they are not run by the command. Review rows require an explicit case verdict.
 
 ## Current Implemented Pieces
 
@@ -59,6 +61,8 @@ the caller; they are not run by the command. Review rows require an explicit cas
 3. Case compiler and metrics
 - `case_compiler.py`: compiles JSON case files into a VBA-friendly line spec.
 - `metrics.py`: visual metrics (`ssim`, `fg_iou`, `fg_iou_tolerant`, `chamfer_score`, `color_hist_corr`, `mae`) and quality gate. Pass/fail uses only `ssim ≥ 0.95` and `color_hist_corr ≥ 0.80`; other metrics are diagnostic.
+- `../scripts/shape3d_bevel_metrics.py`: source-OOXML-derived bevel-ring and round-corner lighting
+  gate for the bounded static 3D cohort.
 - `shape` nodes support `shapeTypeId` (numeric `MsoAutoShapeType`) for forward-compatible shape coverage.
 
 4. VBA probe module
@@ -78,8 +82,9 @@ the caller; they are not run by the command. Review rows require an explicit cas
 
 6. Reproducible evaluation provenance
 - Every `/api/evaluate/{case}` result fingerprints the source PPTX and PDF/PNG ground truth.
-- Reports also record the renderer Git state, actual browser version, and the configured local
-  font-profile manifest/font hashes.
+- Reports also record the exact reference/HTML raster pair used for each visual metric row, the
+  renderer Git state, actual browser version, and the configured local font-profile
+  manifest/font hashes.
 - `font-profile.example.json` documents the ignored local profile format without distributing
   font binaries.
 
@@ -193,6 +198,11 @@ cd test/e2e
 # Generate only the bounded static DrawingML 3D matrix.
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-shape3d-*'
+
+# Generate eight ignored discovery probes without widening the supported cohort.
+.venv/bin/python3 scripts/generate_pypptx_cases.py \
+  --include-local-shape3d-matrix \
+  --case 'oracle-local-shape3d-*'
 ```
 
 macOS exports PDF; Windows exports PDF plus optional per-slide PNG. `--pptx-only` works without
@@ -203,6 +213,20 @@ full path matches that staged input. Unrelated user presentations stay outside t
 lifecycle. The binary artifacts remain ignored under `testdata/`, while tracked case JSON records
 coverage and font requirements. The generation report includes the selected patterns and SHA-256
 fingerprints.
+
+The opt-in `oracle-local-shape3d-*` matrix explores ellipse, adjusted donut/star, concave freeform,
+shape rotation, nested group scaling, picture cropping, and glow interaction. Its definition files
+default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 138-case matrix
+or the `drawingml.shape.3d.top-bevel-contour` support claim.
+
+After evaluating the seven tracked shape-3D cases, run `../scripts/shape3d_bevel_metrics.py` with one
+`--case-report` per case. It reads the source OOXML to locate supported regions, compares the native
+and HTML luminance fields only inside the bevel ring, requires a general score of `0.60`, and applies
+an additional `0.78` corner score to `roundRect`. Bands below four pixels are reported as
+resolution-limited and remain subject to full-slide and manual checks. Pass the resulting JSON to
+`run_capability_loop.py verify --bevel-report ...`; both commands verify the API and on-disk raster
+hashes, and callers cannot self-attest `bevel-local`.
 
 On macOS the PowerPoint session must be unlocked. A locked session can return `-9074` even for a
 known-good PPTX. Export and macro timeouts stop immediately and point to the unlock state or a

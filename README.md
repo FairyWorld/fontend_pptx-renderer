@@ -611,7 +611,7 @@ remain unsupported.
 
 The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
 parsed observations in serialized model output. A native-oracle-backed static subset renders an
-orthographic circular top bevel and optional contour with clipped SVG face gradients:
+orthographic circular top bevel and optional contour with silhouette-aware lighting:
 
 - shape lane: opaque resolved solid-fill `rect` and `roundRect`;
 - picture lane: rectangular, stretch-filled pictures;
@@ -621,13 +621,25 @@ orthographic circular top bevel and optional contour with clipped SVG face gradi
   no bottom bevel or preset material, and no effect-list entry other than a coexisting outer shadow.
 
 The renderer keeps the normal flat shape or picture whenever the complete tuple does not match.
+For a supported tuple it first paints a synchronous four-gradient vector fallback, then rasterizes
+the exact SVG silhouette into an alpha mask. An exact interior Euclidean distance field supplies
+continuous perimeter normals; a circular cross-section and the bounded light rig produce the final
+bevel texture. This makes rounded corners follow the source contour instead of inheriting rectangular
+face edges. Shape textures retain the resolved material hue, while picture textures remain relative
+black/white lighting so the source pixels stay visible.
+
+The asynchronous texture work is serialized per slide, capped at 262,144 pixels per texture, cached
+with the render context, and tied to slide abort and blob-URL cleanup. If Canvas, decoding, scale, or
+rendering is unavailable, the vector fallback remains visible. Text stays outside the SVG lighting
+overlay, picture outlines remain centered on the source bounds, and group transforms retain the
+existing coordinate mapping.
+
 This support does not include perspective cameras, nonzero extrusion, arbitrary light rotation,
 other bevel presets, tiled pictures, gradient/pattern/group/image-filled shapes, or pixel-identical
-PowerPoint material simulation. The bevel width controls its inward extent, while bevel height
-changes face-lighting contrast without widening the edge. Top, right, bottom, and left faces are
-shaded independently so wide, tall, rounded, grouped, and picture surfaces retain directional depth.
-Text stays outside the SVG lighting overlay, picture outlines remain centered on the source bounds,
-and group transforms retain the existing coordinate mapping.
+PowerPoint material simulation. Although the distance-field backend can follow arbitrary alpha
+silhouettes, the public support claim remains limited to native-verified `rect`/`roundRect` shapes
+and rectangular pictures. Ellipse, donut, star, freeform, rotation, nested-group, cropped-picture,
+and glow probes stay in an opt-in ignored discovery matrix until their own native gates pass.
 
 ### Text — 7-Level Style Inheritance
 

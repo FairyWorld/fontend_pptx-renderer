@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
 
 from oracle.capability_contract import (
@@ -12,8 +13,13 @@ from oracle.capability_contract import (
 from oracle.capability_evidence import compute_implementation_fingerprint
 
 
-DERIVED_GATES = frozenset({"native-powerpoint", "manual-visual", "regression"})
+DERIVED_GATES = frozenset(
+    {"native-powerpoint", "manual-visual", "regression", "bevel-local"}
+)
 SSIM_REGRESSION_BUDGET = 0.02
+BEVEL_SCORE_THRESHOLD = 0.60
+BEVEL_CORNER_SCORE_THRESHOLD = 0.78
+BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 
 
 class CapabilityVerificationError(ValueError):
@@ -182,6 +188,185 @@ def _validate_regression(
             )
 
 
+def _validate_bevel_local(
+    report: Mapping[str, Any],
+    current: Mapping[str, Mapping[str, Any]],
+    current_revision: str,
+    repo: Path,
+) -> None:
+    if report.get("schemaVersion") != 1:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=1")
+    renderer = _mapping(report.get("renderer"), "bevel-local renderer")
+    if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
+        raise CapabilityVerificationError(
+            "bevel-local report must match the clean native-report revision"
+        )
+    thresholds = _mapping(report.get("thresholds"), "bevel-local thresholds")
+    if thresholds != {
+        "score": BEVEL_SCORE_THRESHOLD,
+        "cornerScore": BEVEL_CORNER_SCORE_THRESHOLD,
+    }:
+        raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
+    values = report.get("caseResults")
+    if not isinstance(values, list) or any(not isinstance(value, Mapping) for value in values):
+        raise CapabilityVerificationError("bevel-local caseResults must be a list of objects")
+    by_case: dict[str, Mapping[str, Any]] = {}
+    for value in values:
+        case_id = value.get("caseId")
+        if not isinstance(case_id, str) or not case_id or case_id in by_case:
+            raise CapabilityVerificationError("bevel-local case IDs must be unique strings")
+        by_case[case_id] = value
+    if set(by_case) != set(current):
+        raise CapabilityVerificationError("bevel-local case IDs must match native reports")
+    applicable_count = 0
+    all_cases_passed = True
+    for case_id, value in by_case.items():
+        source_hash, ground_truth_hash = _case_hashes(current[case_id], case_id)
+        if value.get("sourceSha256") != source_hash or value.get(
+            "groundTruthSha256"
+        ) != ground_truth_hash:
+            raise CapabilityVerificationError(
+                f"{case_id} bevel-local input hashes must match native reports"
+            )
+        slides = value.get("slides")
+        if not isinstance(slides, list) or any(not isinstance(slide, Mapping) for slide in slides):
+            raise CapabilityVerificationError(f"{case_id} bevel-local slides must be objects")
+        native_slide_values = current[case_id].get("perSlide")
+        if not isinstance(native_slide_values, list) or any(
+            not isinstance(slide, Mapping) for slide in native_slide_values
+        ):
+            raise CapabilityVerificationError(
+                f"{case_id} native report is missing per-slide artifacts"
+            )
+        native_slides = {
+            slide.get("slideIdx"): slide
+            for slide in native_slide_values
+            if isinstance(slide.get("slideIdx"), int) and slide.get("hidden") is not True
+        }
+        evaluable_regions = 0
+        slide_passes: list[bool] = []
+        for slide_index, slide in enumerate(slides):
+            context = f"{case_id} bevel-local slide {slide_index}"
+            if not isinstance(slide.get("slideIdx"), int) or slide.get("slideIdx") < 0:
+                raise CapabilityVerificationError(f"{context} index is invalid")
+            native_slide = native_slides.get(slide.get("slideIdx"))
+            if native_slide is None:
+                raise CapabilityVerificationError(f"{context} is absent from the native report")
+            native_artifacts = _mapping(
+                native_slide.get("renderArtifacts"), f"{context} native render artifacts"
+            )
+            for kind in ("reference", "candidate"):
+                path_value = slide.get(f"{kind}Path")
+                expected_hash = _sha256(slide.get(f"{kind}Sha256"), f"{context} {kind}")
+                native_artifact = _mapping(
+                    native_artifacts.get(kind), f"{context} native {kind} artifact"
+                )
+                if (
+                    native_artifact.get("path") != path_value
+                    or native_artifact.get("sha256") != expected_hash
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} does not match native report artifacts"
+                    )
+                if not isinstance(path_value, str) or "\\" in path_value:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                relative = PurePosixPath(path_value)
+                if relative.is_absolute() or ".." in relative.parts or "." in relative.parts:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                artifact = (repo / relative.as_posix()).resolve()
+                try:
+                    artifact.relative_to(repo.resolve())
+                except ValueError as error:
+                    raise CapabilityVerificationError(
+                        f"{context} {kind} path escapes the repository"
+                    ) from error
+                if not artifact.is_file():
+                    raise CapabilityVerificationError(f"{context} {kind} artifact is missing")
+                digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+                if digest != expected_hash:
+                    raise CapabilityVerificationError(f"{context} {kind} artifact hash changed")
+            regions = slide.get("regions")
+            if not isinstance(regions, list) or not regions or any(
+                not isinstance(region, Mapping) for region in regions
+            ):
+                raise CapabilityVerificationError(f"{context} regions must be non-empty objects")
+            region_passes: list[bool] = []
+            for region_index, region in enumerate(regions):
+                metric_context = f"{context} region {region_index}"
+                _mapping(region.get("region"), f"{metric_context} geometry")
+                metrics = _mapping(region.get("metrics"), f"{metric_context} metrics")
+                evaluable = metrics.get("evaluable")
+                if not isinstance(evaluable, bool):
+                    raise CapabilityVerificationError(f"{metric_context} evaluable is invalid")
+                if not isinstance(metrics.get("passed"), bool):
+                    raise CapabilityVerificationError(f"{metric_context} pass status is invalid")
+                metric_thresholds = _mapping(
+                    metrics.get("thresholds"), f"{metric_context} thresholds"
+                )
+                if evaluable:
+                    evaluable_regions += 1
+                    score = _finite_metric(metrics.get("score"), f"{metric_context} score")
+                    corner_required = metrics.get("cornerRequired")
+                    if not isinstance(corner_required, bool):
+                        raise CapabilityVerificationError(
+                            f"{metric_context} corner requirement is invalid"
+                        )
+                    corner_score = _finite_metric(
+                        metrics.get("cornerScore"), f"{metric_context} corner score"
+                    )
+                    if metric_thresholds != thresholds:
+                        raise CapabilityVerificationError(
+                            f"{metric_context} uses unexpected thresholds"
+                        )
+                    expected_pass = score >= BEVEL_SCORE_THRESHOLD and (
+                        not corner_required or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD
+                    )
+                else:
+                    if metrics.get("reason") != "bevel-band-below-resolution-floor":
+                        raise CapabilityVerificationError(
+                            f"{metric_context} has an unknown unevaluable reason"
+                        )
+                    band_width = _finite_metric(
+                        metrics.get("bandWidthPx"), f"{metric_context} band width"
+                    )
+                    expected_thresholds = {
+                        **thresholds,
+                        "minimumBandWidthPx": BEVEL_MINIMUM_BAND_WIDTH_PX,
+                    }
+                    if (
+                        band_width >= BEVEL_MINIMUM_BAND_WIDTH_PX
+                        or metric_thresholds != expected_thresholds
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{metric_context} resolution limit is inconsistent"
+                        )
+                    expected_pass = True
+                if metrics.get("passed") is not expected_pass:
+                    raise CapabilityVerificationError(
+                        f"{metric_context} metric pass status is inconsistent"
+                    )
+                region_passes.append(expected_pass)
+            slide_passed = all(region_passes)
+            if slide.get("passed") is not slide_passed:
+                raise CapabilityVerificationError(f"{context} pass status is inconsistent")
+            slide_passes.append(slide_passed)
+        applicable = value.get("applicable")
+        if not isinstance(applicable, bool) or applicable is not (evaluable_regions > 0):
+            raise CapabilityVerificationError(f"{case_id} bevel-local applicability is inconsistent")
+        if applicable:
+            applicable_count += 1
+        case_passed = all(slide_passes)
+        if value.get("passed") is not case_passed:
+            raise CapabilityVerificationError(f"{case_id} bevel-local pass status is inconsistent")
+        all_cases_passed = all_cases_passed and case_passed
+        if not case_passed:
+            raise CapabilityVerificationError(f"{case_id} bevel-local report failed")
+    if applicable_count < 1 or report.get("applicableCaseCount") != applicable_count:
+        raise CapabilityVerificationError("bevel-local report requires applicable case evidence")
+    if report.get("passed") is not all_cases_passed or report.get("passed") is not True:
+        raise CapabilityVerificationError("bevel-local report failed")
+
+
 def normalize_native_evaluation_reports(
     capability: CapabilityDefinition,
     reports: Sequence[Mapping[str, Any]],
@@ -191,6 +376,7 @@ def normalize_native_evaluation_reports(
     baseline_reports: Sequence[Mapping[str, Any]] = (),
     passed_gates: Iterable[str] = (),
     manual_verdicts: Mapping[str, str] | None = None,
+    bevel_report: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if oracle not in {"powerpoint-macos", "powerpoint-windows"}:
         raise CapabilityVerificationError(
@@ -232,6 +418,10 @@ def normalize_native_evaluation_reports(
     required = set(capability.required_gates)
     if "regression" in required:
         _validate_regression(current, baseline_reports, next(iter(revisions)))
+    bevel_local_passed = False
+    if bevel_report is not None:
+        _validate_bevel_local(bevel_report, current, next(iter(revisions)), repo)
+        bevel_local_passed = True
     gates = {
         gate: (
             "passed"
@@ -239,6 +429,7 @@ def normalize_native_evaluation_reports(
             or (gate == "native-powerpoint" and all(case["passed"] for case in case_results))
             or (gate == "manual-visual")
             or (gate == "regression" and baseline_reports)
+            or (gate == "bevel-local" and bevel_local_passed)
             else "failed"
             if gate == "native-powerpoint"
             else "missing"

@@ -56,7 +56,7 @@ from oracle.metrics import (  # noqa: E402
     compute_foreground_shape_metrics,
     compute_visual_metrics,
 )
-from oracle.provenance import collect_evaluation_provenance  # noqa: E402
+from oracle.provenance import collect_evaluation_provenance, fingerprint_file  # noqa: E402
 from oracle.support_catalog import (  # noqa: E402
     load_or_init_support_catalog,
     merge_case_results_into_catalog,
@@ -403,6 +403,14 @@ def _save_image(arr: np.ndarray, path: Path):
     Image.fromarray(arr).save(str(path))
 
 
+def _render_artifacts(reference_path: Path, candidate_path: Path) -> dict:
+    """Fingerprint the exact raster pair used for one visual metric row."""
+    return {
+        "reference": fingerprint_file(reference_path, PROJECT_ROOT),
+        "candidate": fingerprint_file(candidate_path, PROJECT_ROOT),
+    }
+
+
 def _testdata_subdir(source: str | None) -> str:
     return "windows-cases" if source == "windows" else "cases"
 
@@ -615,6 +623,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
             pdf_img_path = REPORTS_DIR / f"{prefix}_slide{slide_idx}_pdf.png"
             _save_image(html_img, html_path)
             _save_image(gt_img, pdf_img_path)
+            render_artifacts = _render_artifacts(pdf_img_path, html_path)
 
             oracle_mismatch = None
             if (
@@ -649,6 +658,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
                     "chamferScore": round(chamfer, 4),
                     "needsReview": True,
                     "hidden": False,
+                    "renderArtifacts": render_artifacts,
                     "oracleMismatch": oracle_mismatch,
                     "excludedFromAverage": True,
                 })
@@ -672,6 +682,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
                 "chamferScore": round(chamfer, 4),
                 "needsReview": score < SSIM_WARNING_THRESHOLD,
                 "hidden": False,
+                "renderArtifacts": render_artifacts,
             })
         except Exception as e:
             per_slide.append({

@@ -1,0 +1,281 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from zipfile import ZIP_DEFLATED, ZipFile
+
+import cv2
+import numpy as np
+import pytest
+from PIL import Image
+
+from scripts.shape3d_bevel_metrics import (
+    BevelRegion,
+    build_bevel_report,
+    compute_bevel_ring_metrics,
+    extract_shape3d_regions,
+)
+
+
+def _rounded_mask(height: int, width: int, bounds: tuple[int, int, int, int], radius: int):
+    x, y, w, h = bounds
+    yy, xx = np.mgrid[:height, :width]
+    nearest_x = np.clip(xx, x + radius, x + w - radius - 1)
+    nearest_y = np.clip(yy, y + radius, y + h - radius - 1)
+    return (
+        (xx >= x)
+        & (xx < x + w)
+        & (yy >= y)
+        & (yy < y + h)
+        & ((xx - nearest_x) ** 2 + (yy - nearest_y) ** 2 <= radius**2)
+    )
+
+
+def _bevel_specimen(height: int = 200, width: int = 300):
+    bounds = (60, 50, 180, 100)
+    radius = 20
+    mask = _rounded_mask(height, width, bounds, radius)
+    padded = np.pad(mask.astype(np.uint8), 1)
+    distance = cv2.distanceTransform(padded, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)[1:-1, 1:-1]
+    grad_x = cv2.Sobel(distance, cv2.CV_32F, 1, 0, ksize=3)
+    grad_y = cv2.Sobel(distance, cv2.CV_32F, 0, 1, ksize=3)
+    grad_length = np.maximum(np.hypot(grad_x, grad_y), 1e-6)
+    outward_x = -grad_x / grad_length
+    outward_y = -grad_y / grad_length
+    profile = np.clip(1 - distance / 12, 0, 1)
+    delta = (outward_x * -0.12 + outward_y * -0.82 - 0.16) * profile * 72
+
+    reference = np.full((height, width, 3), 255, dtype=np.uint8)
+    flat = reference.copy()
+    base = np.array([50, 126, 196], dtype=np.float32)
+    reference[mask] = np.clip(base + delta[mask, None], 0, 255).astype(np.uint8)
+    flat[mask] = base.astype(np.uint8)
+    region = BevelRegion(
+        slide_index=0,
+        x=bounds[0] / width,
+        y=bounds[1] / height,
+        width=bounds[2] / width,
+        height=bounds[3] / height,
+        bevel_width_x=12 / width,
+        bevel_width_y=12 / height,
+        preset="roundRect",
+        corner_radius_ratio=radius / min(bounds[2], bounds[3]),
+    )
+    return reference, flat, region
+
+
+def test_bevel_ring_metrics_reject_a_flat_edge_and_accept_directional_curvature():
+    reference, flat, region = _bevel_specimen()
+
+    matched = compute_bevel_ring_metrics(reference, reference, region)
+    flattened = compute_bevel_ring_metrics(reference, flat, region)
+
+    assert matched["passed"] is True
+    assert matched["score"] > 0.99
+    assert matched["cornerScore"] > 0.99
+    assert flattened["passed"] is False
+    assert flattened["score"] < 0.55
+    assert flattened["cornerScore"] < 0.55
+    assert flattened["ringPixelCount"] < reference.shape[0] * reference.shape[1] * 0.2
+
+
+def test_bevel_ring_score_is_not_diluted_by_more_background_pixels():
+    reference, flat, region = _bevel_specimen()
+    small = compute_bevel_ring_metrics(reference, flat, region)
+
+    large_reference = np.full((600, 900, 3), 255, dtype=np.uint8)
+    large_flat = large_reference.copy()
+    large_reference[200:400, 300:600] = reference
+    large_flat[200:400, 300:600] = flat
+    large_region = BevelRegion(
+        slide_index=0,
+        x=(300 + region.x * 300) / 900,
+        y=(200 + region.y * 200) / 600,
+        width=region.width * 300 / 900,
+        height=region.height * 200 / 600,
+        bevel_width_x=region.bevel_width_x * 300 / 900,
+        bevel_width_y=region.bevel_width_y * 200 / 600,
+        preset=region.preset,
+        corner_radius_ratio=region.corner_radius_ratio,
+    )
+    large = compute_bevel_ring_metrics(large_reference, large_flat, large_region)
+
+    assert large["passed"] is False
+    assert abs(large["score"] - small["score"]) < 0.01
+    assert large["ringPixelCount"] == small["ringPixelCount"]
+
+
+def test_bevel_ring_reports_resolution_limited_instead_of_guessing():
+    reference, _flat, region = _bevel_specimen()
+    narrow = BevelRegion(
+        **{
+            **region.__dict__,
+            "bevel_width_x": 2 / reference.shape[1],
+            "bevel_width_y": 2 / reference.shape[0],
+        }
+    )
+
+    result = compute_bevel_ring_metrics(reference, reference, narrow)
+
+    assert result == {
+        "evaluable": False,
+        "passed": True,
+        "reason": "bevel-band-below-resolution-floor",
+        "boundsPx": [60, 50, 180, 100],
+        "bandWidthPx": 2.0,
+        "thresholds": {
+            "minimumBandWidthPx": 4.0,
+            "score": 0.6,
+            "cornerScore": 0.78,
+        },
+    }
+
+
+def test_corner_gate_applies_only_to_roundrect_geometry():
+    reference, _flat, roundrect = _bevel_specimen()
+    rectangle = BevelRegion(
+        **{
+            **roundrect.__dict__,
+            "preset": "rect",
+            "corner_radius_ratio": 0.0,
+        }
+    )
+
+    rectangle_result = compute_bevel_ring_metrics(
+        reference,
+        reference,
+        rectangle,
+        corner_score_threshold=1.01,
+    )
+    roundrect_result = compute_bevel_ring_metrics(
+        reference,
+        reference,
+        roundrect,
+        corner_score_threshold=1.01,
+    )
+
+    assert rectangle_result["score"] > 0.99
+    assert rectangle_result["cornerRequired"] is False
+    assert rectangle_result["passed"] is True
+    assert roundrect_result["cornerRequired"] is True
+    assert roundrect_result["passed"] is False
+
+
+def test_extracts_group_scaled_bounds_and_bevel_width_from_ooxml(tmp_path):
+    source = tmp_path / "grouped.pptx"
+    presentation = """
+      <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:sldSz cx="1000" cy="500"/>
+      </p:presentation>"""
+    slide = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:grpSp>
+          <p:grpSpPr><a:xfrm>
+            <a:off x="100" y="50"/><a:ext cx="400" cy="200"/>
+            <a:chOff x="10" y="20"/><a:chExt cx="200" cy="100"/>
+          </a:xfrm></p:grpSpPr>
+          <p:sp><p:spPr>
+            <a:xfrm><a:off x="10" y="20"/><a:ext cx="100" cy="50"/></a:xfrm>
+            <a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 25000"/></a:avLst></a:prstGeom>
+            <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+            <a:sp3d><a:bevelT w="10" h="8" prst="circle"/></a:sp3d>
+          </p:spPr></p:sp>
+        </p:grpSp></p:spTree></p:cSld>
+      </p:sld>"""
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/presentation.xml", presentation)
+        archive.writestr("ppt/slides/slide1.xml", slide)
+
+    regions = extract_shape3d_regions(source)
+
+    assert regions == [
+        BevelRegion(
+            slide_index=0,
+            x=0.1,
+            y=0.1,
+            width=0.2,
+            height=0.2,
+            bevel_width_x=0.02,
+            bevel_width_y=0.04,
+            preset="roundRect",
+            corner_radius_ratio=0.25,
+        )
+    ]
+
+
+def test_bevel_report_binds_the_exact_native_report_rasters(tmp_path):
+    repo = tmp_path / "repo"
+    case_id = "shape3d-case"
+    source = repo / f"test/e2e/testdata/cases/{case_id}/source.pptx"
+    source.parent.mkdir(parents=True)
+    presentation = """
+      <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:sldSz cx="300" cy="200"/>
+      </p:presentation>"""
+    slide = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:spPr>
+          <a:xfrm><a:off x="60" y="50"/><a:ext cx="180" cy="100"/></a:xfrm>
+          <a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 20000"/></a:avLst></a:prstGeom>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT w="12" h="8" prst="circle"/></a:sp3d>
+        </p:spPr></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/presentation.xml", presentation)
+        archive.writestr("ppt/slides/slide1.xml", slide)
+
+    reference, _flat, _region = _bevel_specimen()
+    reports_dir = repo / "test/e2e/reports"
+    reports_dir.mkdir(parents=True)
+    reference_path = reports_dir / f"{case_id}_slide0_pdf.png"
+    candidate_path = reports_dir / f"{case_id}_slide0_html.png"
+    Image.fromarray(reference).save(reference_path)
+    Image.fromarray(reference).save(candidate_path)
+    artifact = lambda path: {
+        "path": path.relative_to(repo).as_posix(),
+        "sizeBytes": path.stat().st_size,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+    native = {
+        "testFile": case_id,
+        "provenance": {
+            "renderer": {"revision": "a" * 40, "dirty": False},
+            "inputs": {
+                "sourcePptx": {
+                    "path": source.relative_to(repo).as_posix(),
+                    "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                },
+                "groundTruth": {"combinedSha256": "f" * 64},
+            },
+        },
+        "perSlide": [
+            {
+                "slideIdx": 0,
+                "hidden": False,
+                "renderArtifacts": {
+                    "reference": artifact(reference_path),
+                    "candidate": artifact(candidate_path),
+                },
+            }
+        ],
+    }
+    native_path = repo / "native.json"
+    native_path.write_text(json.dumps(native), encoding="utf-8")
+
+    report = build_bevel_report([native_path], repo, reports_dir)
+
+    slide_result = report["caseResults"][0]["slides"][0]
+    assert slide_result["referencePath"] == native["perSlide"][0]["renderArtifacts"][
+        "reference"
+    ]["path"]
+    assert slide_result["candidateSha256"] == native["perSlide"][0]["renderArtifacts"][
+        "candidate"
+    ]["sha256"]
+
+    native["perSlide"][0]["renderArtifacts"]["candidate"]["sha256"] = "0" * 64
+    native_path.write_text(json.dumps(native), encoding="utf-8")
+    with pytest.raises(ValueError, match="native report artifact"):
+        build_bevel_report([native_path], repo, reports_dir)
