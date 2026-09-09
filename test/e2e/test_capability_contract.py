@@ -256,7 +256,7 @@ def test_tracked_capability_contract_is_valid():
     history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
 
     validate_acceptance_history(registry, history)
-    assert len(registry.capabilities) == 13
+    assert len(registry.capabilities) == 14
 
 
 def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path: Path):

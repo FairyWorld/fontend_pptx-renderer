@@ -2547,12 +2547,21 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           isLineLike,
           paintKind: shape3dPaintKind,
           baseFill: /^#[0-9a-f]{6}$/i.test(fillCss) ? fillCss : undefined,
+          hasVisibleText:
+            node.textBody?.paragraphs.some((paragraph) =>
+              paragraph.runs.some((run) => run.text.trim().length > 0),
+            ) ?? false,
+          hasVisibleStroke: path.getAttribute('stroke') !== 'none',
+          rotation: node.rotation,
+          flipH: node.flipH,
+          flipV: node.flipV,
         },
         ctx,
       );
       appendStaticShape3DEffects({
         svg,
         defs,
+        basePath: path,
         pathD,
         bounds: { width: svgW, height: svgH },
         plan: shape3dPlan,

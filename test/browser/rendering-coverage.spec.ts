@@ -395,6 +395,107 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   expect(first.equals(second)).toBe(true);
 });
 
+test('bounded camera planes project in a browser and preserve text opt-out and group mapping', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { parseGroupNode } = await import('/src/model/nodes/GroupNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { renderGroup } = await import('/src/renderer/GroupRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const scene = `<a:scene3d>
+      <a:camera prst="perspectiveRelaxedModerately" fov="7200000">
+        <a:rot lat="18590633" lon="0" rev="0"/>
+      </a:camera>
+      <a:lightRig rig="threePt" dir="t"/>
+    </a:scene3d>`;
+    const shapeXml = (text = '') => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="3D camera plane"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>${scene}<a:sp3d extrusionH="0"/>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p>${
+          text ? `<a:r><a:t>${text}</a:t></a:r>` : ''
+        }</a:p></p:txBody>
+      </p:sp>`;
+    const presentation = {
+      ...createMockRenderContext().presentation,
+      width: 1280,
+      height: 720,
+    };
+    const standalone = renderShape(
+      parseShapeNode(parseXml(shapeXml())),
+      createMockRenderContext({ presentation }),
+    );
+    const textOptOut = renderShape(
+      parseShapeNode(parseXml(shapeXml('Readable'))),
+      createMockRenderContext({ presentation }),
+    );
+    const groupXml = `
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="20" name="Camera group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3657600" cy="2743200"/><a:chOff x="0" y="0"/><a:chExt cx="7315200" cy="3657600"/></a:xfrm></p:grpSpPr>
+        ${shapeXml()}
+      </p:grpSp>`;
+    const group = renderGroup(
+      parseGroupNode(parseXml(groupXml)),
+      createMockRenderContext({ presentation }),
+      (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
+    );
+    document.body.append(standalone, textOptOut, group);
+    const projected = standalone.querySelector(
+      '[data-pptx-shape3d-projected-plane="perspective"]',
+    ) as SVGGraphicsElement;
+    const projectedBounds = projected.getBBox();
+    const gradient = standalone.querySelector('linearGradient');
+    const groupChild = group.firstElementChild as HTMLElement;
+    return {
+      baseVisibility: standalone.querySelector('svg > path')?.getAttribute('visibility'),
+      projectedBounds: {
+        x: projectedBounds.x,
+        y: projectedBounds.y,
+        width: projectedBounds.width,
+        height: projectedBounds.height,
+      },
+      gradientInterpolation: gradient?.getAttribute('color-interpolation'),
+      textOptOutProjected: !!textOptOut.querySelector('[data-pptx-shape3d-projected-plane]'),
+      textOptOutBaseHidden: textOptOut.querySelector('svg > path')?.hasAttribute('visibility'),
+      text: textOptOut.textContent,
+      groupProjected: !!group.querySelector('[data-pptx-shape3d-projected-plane]'),
+      groupChildSize: {
+        width: groupChild.getBoundingClientRect().width,
+        height: groupChild.getBoundingClientRect().height,
+      },
+    };
+  });
+
+  expect(result.baseVisibility).toBe('hidden');
+  expect(result.projectedBounds).toEqual({
+    x: expect.closeTo(-157.6, 1),
+    y: expect.closeTo(112.3, 1),
+    width: expect.closeTo(718.3, 1),
+    height: expect.closeTo(319.4, 1),
+  });
+  expect(result.gradientInterpolation).toBe('linearRGB');
+  expect(result.textOptOutProjected).toBe(false);
+  expect(result.textOptOutBaseHidden).toBe(false);
+  expect(result.text).toContain('Readable');
+  expect(result.groupProjected).toBe(true);
+  expect(result.groupChildSize).toEqual({
+    width: expect.closeTo(201.6, 1),
+    height: expect.closeTo(302.4, 1),
+  });
+});
+
 test('static 3D donut composes with its upper adjustment bound and a solid theme fill', async ({
   page,
 }) => {

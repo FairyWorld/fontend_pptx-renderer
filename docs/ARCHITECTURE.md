@@ -203,21 +203,21 @@ does not claim pixel-identical font metrics across every host font installation.
 ### Bounded static DrawingML 3D
 
 `src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,
-light, bevel, contour, extrusion, material, and color observations. It attaches those observations
-to both shape and picture nodes; only malformed numeric values become parse issues. Serialization
+field-of-view, zoom, light, bevel, contour, extrusion, material, and color observations. It attaches
+those observations to both shape and picture nodes; only malformed numeric values become parse issues. Serialization
 removes the retained `SafeXmlNode` color source while preserving its JSON-safe observation, so
 detection remains independent from renderer support policy.
 
 `src/renderer/Shape3DRenderer.ts` is a narrow decision and effect layer. It returns either an
-`orthographic-top-bevel` plan or an explicit flat-fallback reason before touching the DOM. The
-supported plan requires all of the following:
+`orthographic-top-bevel` plan, a `camera-projected-plane` plan, or an explicit flat-fallback reason
+before touching the DOM. The top-bevel plan requires all of the following:
 
 - `orthographicFront` without camera rotation;
 - `twoPt:t` or `threePt:t` light, with no rotation except the real-corpus
   `twoPt:t/lat=0/lon=0/rev=120°` tuple;
-- a positive circular top bevel, zero or omitted extrusion, an absent/zero contour or a positive
-  contour with a resolvable color, no bottom bevel or preset material, and only an optional outer
-  shadow in `effectLst`;
+- a positive circular top bevel, zero or omitted extrusion and `z`, no scene backdrop or extrusion
+  color, an absent/zero contour or a positive contour with a resolvable color, no bottom bevel or
+  preset material, and only an optional outer shadow in `effectLst`;
 - an opaque resolved solid-fill `donut`/`ellipse`/`rect`/`roundRect` shape, or a rectangular
   stretch-filled picture; the ellipse lane is pinned across square, wide, and tall silhouettes,
   explicit and theme paint sources, and standalone or non-identity-group containers; the donut
@@ -245,17 +245,41 @@ slide abort signal.
 Failure, insufficient raster scale, or disposal leaves the vector fallback in place and prevents
 late DOM writes or cache repopulation.
 
+The camera-plane plan is a separate zero-depth lane. It requires an opaque solid `rect` shape with
+no visible text or stroke, local rotation or flip, backdrop, nonzero `z`, effect, bevel, contour,
+extrusion color, material, or extrusion.
+The accepted camera/light tuples are deliberately finite:
+
+- `orthographicFront` with absent rotation;
+- `orthographicFront` with `lat=20°`, `lon=30°`, `rev=0°`;
+- `perspectiveRelaxedModerately` with `fov=120°`, `lat=18590633/60000°`, `lon=0°`, `rev=0°`;
+- `threePt:t` lighting without light rotation and no camera zoom.
+
+`shape3d/CameraProjection.ts` rotates the four local plane corners around Y, then X, applies camera
+revolution, and performs perspective division when required. The perspective distance uses the
+presentation width and field of view; two preset constants describe the native-observed viewport
+and projected-plane scales. The renderer emits one replacement SVG path and hides the ordinary
+flat path only after that replacement exists. Perspective rows receive a vertical `linearRGB`
+material field; identity and rotated orthographic controls use their native-observed flat material
+responses. This is independent planar math and does not introduce a mesh or WebGL dependency.
+
+The six-slide native matrix covers identity and rotated orthographic controls, square/wide/tall
+perspective shapes, explicit and theme paint, and a non-identity group. Public paint support remains
+limited to its explicit `#2F75B5` and theme `#4F81BD` rows. A local metric binds the exact native
+rasters and checks normalized four-corner geometry, material color, gradient range, and gradient
+direction in addition to the full-page oracle gate.
+
 The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
 picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent
 cross-slide collisions. Existing wrapper transforms, outer shadows, media ownership, and cleanup
 remain in their owning renderers.
 
-Anything outside that full tuple stays on the existing flat path with a stable planner reason.
-Perspective, nonzero extrusion, other materials/bevels/lights, negative or degenerate picture
-source crops, gradient/pattern/group/image-filled shapes, tiled pictures, chart `view3D`, and Office
-2017 `model3d` are separate capability lanes. The raster lighting backend can consume arbitrary
-silhouettes, but support is still constrained by the planner and native evidence. This is a bounded
-static rendering, not a general mesh or PowerPoint material engine.
+Anything outside those two full tuples stays on the existing flat path with a stable planner reason.
+Other perspective and rotated cameras, nonzero extrusion, other materials/bevels/lights, negative
+or degenerate picture source crops, gradient/pattern/group/image-filled shapes, tiled pictures,
+chart `view3D`, and Office 2017 `model3d` are separate capability lanes. The raster lighting backend
+can consume arbitrary silhouettes, but support is still constrained by the planner and native
+evidence. This is bounded static rendering, not a general mesh or PowerPoint material engine.
 
 ## Rendering Strategies
 

@@ -34,6 +34,7 @@ GATES = frozenset(
         "build",
         "docs",
         "bevel-local",
+        "camera-local",
     }
 )
 

@@ -35,6 +35,16 @@ const supportedShape = `
     <a:contourClr><a:srgbClr val="FFFFFF"/></a:contourClr>
   </a:sp3d>`;
 
+const cameraOnlyShape = `<a:sp3d extrusionH="0"/>`;
+
+const perspectiveCameraScene = `
+  <a:scene3d>
+    <a:camera prst="perspectiveRelaxedModerately" fov="7200000">
+      <a:rot lat="18590633" lon="0" rev="0"/>
+    </a:camera>
+    <a:lightRig rig="threePt" dir="t"/>
+  </a:scene3d>`;
+
 const originalImageDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
 
 afterEach(() => {
@@ -100,6 +110,192 @@ function installShape3DRasterMocks() {
 }
 
 describe('buildStaticShape3DPlan', () => {
+  it('builds the native-backed flat-plane perspective camera plan', () => {
+    const ctx = createMockRenderContext({
+      presentation: {
+        ...createMockRenderContext().presentation,
+        width: 1280,
+        height: 720,
+      },
+    });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveCameraScene, cameraOnlyShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+        hasVisibleStroke: false,
+        hasVisibleText: false,
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+      },
+      ctx,
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'camera-projected-plane',
+      surface: 'shape',
+      geometry: 'rect',
+      camera: {
+        kind: 'perspective',
+        preset: 'perspectiveRelaxedModerately',
+        fieldOfView: 120,
+      },
+      fill: { top: '#4b94d6', bottom: '#3c85c7' },
+    });
+    if (plan.mode !== 'camera-projected-plane') throw new Error('expected camera plan');
+    expect(plan.corners[0].x).toBeCloseTo(62.3, 1);
+    expect(plan.corners[2].x).toBeCloseTo(560.8, 1);
+  });
+
+  it('supports the identity control and the exact orthographic rotation tuple', () => {
+    const ctx = createMockRenderContext();
+    const target = {
+      nodeType: 'shape' as const,
+      presetGeometry: 'rect',
+      width: 403.2,
+      height: 403.2,
+      paintKind: 'solid' as const,
+      baseFill: '#2F75B5',
+      hasVisibleStroke: false,
+      hasVisibleText: false,
+      rotation: 0,
+      flipH: false,
+      flipV: false,
+    };
+    const identity = buildStaticShape3DPlan(
+      parseShape3D(
+        '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+        cameraOnlyShape,
+      ),
+      target,
+      ctx,
+    );
+    const rotated = buildStaticShape3DPlan(
+      parseShape3D(
+        '<a:scene3d><a:camera prst="orthographicFront"><a:rot lat="1200000" lon="1800000" rev="0"/></a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+        cameraOnlyShape,
+      ),
+      target,
+      ctx,
+    );
+
+    expect(identity).toMatchObject({
+      mode: 'camera-projected-plane',
+      camera: { kind: 'orthographic' },
+      fill: { top: '#367fc1', bottom: '#367fc1' },
+    });
+    expect(rotated).toMatchObject({
+      mode: 'camera-projected-plane',
+      camera: { kind: 'orthographic' },
+      fill: { top: '#317abc', bottom: '#317abc' },
+    });
+    expect(
+      buildStaticShape3DPlan(
+        parseShape3D(
+          '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+          cameraOnlyShape,
+        ),
+        { ...target, baseFill: '#4F81BD' },
+        ctx,
+      ),
+    ).toEqual({ mode: 'flat', reason: 'paint-value' });
+  });
+
+  it.each([
+    ['visible text', { hasVisibleText: true }, 'visible-text'],
+    ['visible stroke', { hasVisibleStroke: true }, 'visible-stroke'],
+    ['shape rotation', { rotation: 1 }, 'shape-transform'],
+    ['shape flip', { flipH: true }, 'shape-transform'],
+    ['gradient paint', { paintKind: 'gradient' }, 'paint-kind'],
+    ['unverified solid paint', { baseFill: '#70AD47' }, 'paint-value'],
+  ])('keeps a diagnostic fallback for camera projection with %s', (_label, targetPatch, reason) => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveCameraScene, cameraOnlyShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+        hasVisibleStroke: false,
+        hasVisibleText: false,
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        ...targetPatch,
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toEqual({ mode: 'flat', reason });
+  });
+
+  it.each([
+    [
+      '<a:scene3d><a:camera prst="perspectiveRelaxedModerately" fov="6000000"><a:rot lat="18590633" lon="0" rev="0"/></a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+      'camera-field-of-view',
+    ],
+    [
+      '<a:scene3d><a:camera prst="perspectiveRelaxedModerately" fov="7200000" zoom="95000"><a:rot lat="18590633" lon="0" rev="0"/></a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+      'camera-zoom',
+    ],
+    [
+      '<a:scene3d><a:camera prst="perspectiveRelaxedModerately" fov="7200000"><a:rot lat="18000000" lon="0" rev="0"/></a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+      'camera-rotation',
+    ],
+  ])('does not broaden camera support beyond the native matrix', (scene, reason) => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(scene, cameraOnlyShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      createMockRenderContext(),
+    );
+    expect(plan).toEqual({ mode: 'flat', reason });
+  });
+
+  it.each([
+    [
+      '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/><a:backdrop/></a:scene3d>',
+      cameraOnlyShape,
+      'backdrop',
+    ],
+    [supportedScene, '<a:sp3d z="12700" extrusionH="0"/>', 'z-position'],
+    [
+      supportedScene,
+      '<a:sp3d extrusionH="0"><a:extrusionClr><a:srgbClr val="FFFFFF"/></a:extrusionClr></a:sp3d>',
+      'extrusion-paint',
+    ],
+  ])(
+    'retains a diagnostic fallback for unverified scene/shape depth semantics',
+    (scene, shape, reason) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(scene, shape),
+        {
+          nodeType: 'shape',
+          presetGeometry: 'rect',
+          width: 200,
+          height: 100,
+          paintKind: 'solid',
+          baseFill: '#2F75B5',
+        },
+        createMockRenderContext(),
+      );
+      expect(plan).toEqual({ mode: 'flat', reason });
+    },
+  );
+
   it('builds the bounded orthographic circle top-bevel and contour plan', () => {
     const shape3d = parseShape3D(supportedScene, supportedShape);
     const plan = buildStaticShape3DPlan(
@@ -412,6 +608,50 @@ describe('buildStaticShape3DPlan', () => {
 });
 
 describe('appendStaticShape3DEffects', () => {
+  it('replaces the flat path with a projected plane and native-backed material gradient', () => {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const defs = document.createElementNS(ns, 'defs');
+    const basePath = document.createElementNS(ns, 'path');
+    basePath.setAttribute('d', 'M0,0 H403.2 V403.2 H0 Z');
+    basePath.setAttribute('fill', '#2F75B5');
+    svg.append(basePath);
+    const ctx = createMockRenderContext({
+      presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+    });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveCameraScene, cameraOnlyShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      ctx,
+    );
+
+    const result = appendStaticShape3DEffects({
+      svg,
+      defs,
+      basePath,
+      pathD: basePath.getAttribute('d')!,
+      bounds: { width: 403.2, height: 403.2 },
+      plan,
+      ctx,
+    });
+
+    expect(result?.group.dataset.pptxShape3dCamera).toBe('perspectiveRelaxedModerately');
+    expect(basePath.getAttribute('visibility')).toBe('hidden');
+    const projected = svg.querySelector('[data-pptx-shape3d-projected-plane]');
+    expect(projected?.getAttribute('d')).toContain('M62.');
+    expect(projected?.getAttribute('fill')).toMatch(/^url\(#shape3d-camera-gradient-/);
+    expect(svg.querySelectorAll('linearGradient[data-pptx-shape3d-camera-gradient]')).toHaveLength(
+      1,
+    );
+  });
+
   it('keeps vector faces until the contour-aware texture is ready, then swaps only the lighting', async () => {
     const mocks = installShape3DRasterMocks();
     const ns = 'http://www.w3.org/2000/svg';

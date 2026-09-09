@@ -128,7 +128,7 @@ Three-step: `schemeClr` → master `colorMap` remap (e.g. "tx1"→"dk1") → the
 
 ### What's NOT Supported
 
-3D effects, true 3D chart perspective/depth/surface meshes, animations/transitions, equations, full EMF/WMF vector rendering, shadow/reflection/glow, executing/editing embedded OLE objects, and slide notes rendering.
+General DrawingML 3D outside the verified static top-bevel and zero-depth camera-plane tuples, true 3D chart perspective/depth/surface meshes, animations/transitions, equations, full EMF/WMF vector rendering, shadow/reflection/glow, executing/editing embedded OLE objects, and slide notes rendering.
 
 Notes:
 

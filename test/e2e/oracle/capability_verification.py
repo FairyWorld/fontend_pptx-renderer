@@ -14,12 +14,17 @@ from oracle.capability_evidence import compute_implementation_fingerprint
 
 
 DERIVED_GATES = frozenset(
-    {"native-powerpoint", "manual-visual", "regression", "bevel-local"}
+    {"native-powerpoint", "manual-visual", "regression", "bevel-local", "camera-local"}
 )
 SSIM_REGRESSION_BUDGET = 0.02
 BEVEL_SCORE_THRESHOLD = 0.60
 BEVEL_CORNER_SCORE_THRESHOLD = 0.78
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
+CAMERA_CORNER_SCORE_THRESHOLD = 0.98
+CAMERA_COLOR_SCORE_THRESHOLD = 0.97
+CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD = 0.65
+CAMERA_GRADIENT_DIRECTION_THRESHOLD = 0.95
+CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE = 4.0
 
 
 class CapabilityVerificationError(ValueError):
@@ -367,6 +372,187 @@ def _validate_bevel_local(
         raise CapabilityVerificationError("bevel-local report failed")
 
 
+def _validate_camera_local(
+    report: Mapping[str, Any],
+    current: Mapping[str, Mapping[str, Any]],
+    current_revision: str,
+    repo: Path,
+) -> None:
+    if report.get("schemaVersion") != 1:
+        raise CapabilityVerificationError("camera-local report requires schemaVersion=1")
+    renderer = _mapping(report.get("renderer"), "camera-local renderer")
+    if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
+        raise CapabilityVerificationError(
+            "camera-local report must match the clean native-report revision"
+        )
+    expected_thresholds = {
+        "cornerScore": CAMERA_CORNER_SCORE_THRESHOLD,
+        "colorScore": CAMERA_COLOR_SCORE_THRESHOLD,
+        "gradientRangeRatio": CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD,
+        "gradientDirection": CAMERA_GRADIENT_DIRECTION_THRESHOLD,
+        "minimumReferenceGradientRange": CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE,
+    }
+    thresholds = _mapping(report.get("thresholds"), "camera-local thresholds")
+    if thresholds != expected_thresholds:
+        raise CapabilityVerificationError("camera-local report uses unexpected thresholds")
+
+    values = report.get("caseResults")
+    if not isinstance(values, list) or any(not isinstance(value, Mapping) for value in values):
+        raise CapabilityVerificationError("camera-local caseResults must be a list of objects")
+    by_case: dict[str, Mapping[str, Any]] = {}
+    for value in values:
+        case_id = value.get("caseId")
+        if not isinstance(case_id, str) or not case_id or case_id in by_case:
+            raise CapabilityVerificationError("camera-local case IDs must be unique strings")
+        by_case[case_id] = value
+    if set(by_case) != set(current):
+        raise CapabilityVerificationError("camera-local case IDs must match native reports")
+
+    applicable_count = 0
+    all_cases_passed = True
+    for case_id, value in by_case.items():
+        source_hash, ground_truth_hash = _case_hashes(current[case_id], case_id)
+        if value.get("sourceSha256") != source_hash or value.get(
+            "groundTruthSha256"
+        ) != ground_truth_hash:
+            raise CapabilityVerificationError(
+                f"{case_id} camera-local input hashes must match native reports"
+            )
+        slides = value.get("slides")
+        if not isinstance(slides, list) or any(not isinstance(slide, Mapping) for slide in slides):
+            raise CapabilityVerificationError(f"{case_id} camera-local slides must be objects")
+        native_slide_values = current[case_id].get("perSlide")
+        if not isinstance(native_slide_values, list) or any(
+            not isinstance(slide, Mapping) for slide in native_slide_values
+        ):
+            raise CapabilityVerificationError(
+                f"{case_id} native report is missing per-slide artifacts"
+            )
+        native_slides = {
+            slide.get("slideIdx"): slide
+            for slide in native_slide_values
+            if isinstance(slide.get("slideIdx"), int) and slide.get("hidden") is not True
+        }
+        seen_slide_indices: set[int] = set()
+        slide_passes: list[bool] = []
+        for slide_index, slide in enumerate(slides):
+            context = f"{case_id} camera-local slide {slide_index}"
+            source_slide_index = slide.get("slideIdx")
+            if (
+                not isinstance(source_slide_index, int)
+                or source_slide_index < 0
+                or source_slide_index in seen_slide_indices
+            ):
+                raise CapabilityVerificationError(f"{context} index is invalid or duplicated")
+            seen_slide_indices.add(source_slide_index)
+            native_slide = native_slides.get(source_slide_index)
+            if native_slide is None:
+                raise CapabilityVerificationError(f"{context} is absent from the native report")
+            native_artifacts = _mapping(
+                native_slide.get("renderArtifacts"), f"{context} native render artifacts"
+            )
+            for kind in ("reference", "candidate"):
+                path_value = slide.get(f"{kind}Path")
+                expected_hash = _sha256(slide.get(f"{kind}Sha256"), f"{context} {kind}")
+                native_artifact = _mapping(
+                    native_artifacts.get(kind), f"{context} native {kind} artifact"
+                )
+                if (
+                    native_artifact.get("path") != path_value
+                    or native_artifact.get("sha256") != expected_hash
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} does not match native report artifacts"
+                    )
+                if not isinstance(path_value, str) or "\\" in path_value:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                relative = PurePosixPath(path_value)
+                if relative.is_absolute() or ".." in relative.parts or "." in relative.parts:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                artifact = (repo / relative.as_posix()).resolve()
+                try:
+                    artifact.relative_to(repo.resolve())
+                except ValueError as error:
+                    raise CapabilityVerificationError(
+                        f"{context} {kind} path escapes the repository"
+                    ) from error
+                if not artifact.is_file():
+                    raise CapabilityVerificationError(f"{context} {kind} artifact is missing")
+                digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+                if digest != expected_hash:
+                    raise CapabilityVerificationError(f"{context} {kind} artifact hash changed")
+
+            metrics = _mapping(slide.get("metrics"), f"{context} metrics")
+            if metrics.get("evaluable") is not True:
+                raise CapabilityVerificationError(f"{context} must contain evaluable metrics")
+            if _mapping(metrics.get("thresholds"), f"{context} thresholds") != thresholds:
+                raise CapabilityVerificationError(f"{context} uses unexpected thresholds")
+            corner_score = _finite_metric(metrics.get("cornerScore"), f"{context} corner score")
+            mean_corner_error = _finite_metric(
+                metrics.get("meanCornerErrorRatio"), f"{context} corner error"
+            )
+            color_score = _finite_metric(metrics.get("colorScore"), f"{context} color score")
+            reference_range = _finite_metric(
+                metrics.get("referenceGradientRange"), f"{context} reference gradient range"
+            )
+            candidate_range = _finite_metric(
+                metrics.get("candidateGradientRange"), f"{context} candidate gradient range"
+            )
+            range_ratio = _finite_metric(
+                metrics.get("gradientRangeRatio"), f"{context} gradient range ratio"
+            )
+            direction = _finite_metric(
+                metrics.get("gradientDirection"), f"{context} gradient direction"
+            )
+            if (
+                not 0 <= corner_score <= 1
+                or mean_corner_error < 0
+                or not 0 <= color_score <= 1
+                or reference_range < 0
+                or candidate_range < 0
+                or not 0 <= range_ratio <= 1
+                or not -1 <= direction <= 1
+            ):
+                raise CapabilityVerificationError(f"{context} metrics are outside their domains")
+            gradient_required = metrics.get("gradientRequired")
+            if not isinstance(gradient_required, bool) or gradient_required is not (
+                reference_range >= CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE
+            ):
+                raise CapabilityVerificationError(
+                    f"{context} gradient requirement is inconsistent"
+                )
+            expected_pass = (
+                corner_score >= CAMERA_CORNER_SCORE_THRESHOLD
+                and color_score >= CAMERA_COLOR_SCORE_THRESHOLD
+                and (
+                    not gradient_required
+                    or (
+                        range_ratio >= CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD
+                        and direction >= CAMERA_GRADIENT_DIRECTION_THRESHOLD
+                    )
+                )
+            )
+            if metrics.get("passed") is not expected_pass or slide.get("passed") is not expected_pass:
+                raise CapabilityVerificationError(f"{context} metric pass status is inconsistent")
+            slide_passes.append(expected_pass)
+
+        applicable = value.get("applicable")
+        if not isinstance(applicable, bool) or applicable is not bool(slides):
+            raise CapabilityVerificationError(f"{case_id} camera-local applicability is inconsistent")
+        if applicable:
+            applicable_count += 1
+        case_passed = applicable and all(slide_passes)
+        if value.get("passed") is not case_passed:
+            raise CapabilityVerificationError(f"{case_id} camera-local pass status is inconsistent")
+        all_cases_passed = all_cases_passed and case_passed
+        if not case_passed:
+            raise CapabilityVerificationError(f"{case_id} camera-local report failed")
+    if applicable_count < 1 or report.get("applicableCaseCount") != applicable_count:
+        raise CapabilityVerificationError("camera-local report requires applicable case evidence")
+    if report.get("passed") is not all_cases_passed or report.get("passed") is not True:
+        raise CapabilityVerificationError("camera-local report failed")
+
+
 def normalize_native_evaluation_reports(
     capability: CapabilityDefinition,
     reports: Sequence[Mapping[str, Any]],
@@ -377,6 +563,7 @@ def normalize_native_evaluation_reports(
     passed_gates: Iterable[str] = (),
     manual_verdicts: Mapping[str, str] | None = None,
     bevel_report: Mapping[str, Any] | None = None,
+    camera_report: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if oracle not in {"powerpoint-macos", "powerpoint-windows"}:
         raise CapabilityVerificationError(
@@ -422,6 +609,10 @@ def normalize_native_evaluation_reports(
     if bevel_report is not None:
         _validate_bevel_local(bevel_report, current, next(iter(revisions)), repo)
         bevel_local_passed = True
+    camera_local_passed = False
+    if camera_report is not None:
+        _validate_camera_local(camera_report, current, next(iter(revisions)), repo)
+        camera_local_passed = True
     gates = {
         gate: (
             "passed"
@@ -430,6 +621,7 @@ def normalize_native_evaluation_reports(
             or (gate == "manual-visual")
             or (gate == "regression" and baseline_reports)
             or (gate == "bevel-local" and bevel_local_passed)
+            or (gate == "camera-local" and camera_local_passed)
             else "failed"
             if gate == "native-powerpoint"
             else "missing"

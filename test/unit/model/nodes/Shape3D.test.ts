@@ -126,6 +126,82 @@ describe('parseShape3DProperties', () => {
     });
   });
 
+  it('parses camera field of view and zoom in their OOXML units', () => {
+    const result = parseSpPr(`
+      <spPr>
+        <scene3d>
+          <camera prst="perspectiveRelaxedModerately" fov="7200000" zoom="95000">
+            <rot lat="18590633" lon="0" rev="0"/>
+          </camera>
+          <lightRig rig="threePt" dir="t"/>
+        </scene3d>
+        <sp3d extrusionH="0"/>
+      </spPr>
+    `);
+
+    expect(result).toMatchObject({
+      scene: {
+        cameraPreset: 'perspectiveRelaxedModerately',
+        fieldOfView: 120,
+        cameraZoom: 0.95,
+        cameraRotation: {
+          latitude: 18590633 / 60000,
+          longitude: 0,
+          revolution: 0,
+        },
+      },
+      parseIssues: [],
+    });
+  });
+
+  it('retains scene backdrop, shape depth, and extrusion paint as unsupported observations', () => {
+    const result = parseSpPr(`
+      <spPr>
+        <effectDag/>
+        <scene3d>
+          <camera prst="orthographicFront"/>
+          <lightRig rig="threePt" dir="t"/>
+          <backdrop/>
+        </scene3d>
+        <sp3d z="-12700" extrusionH="0">
+          <extrusionClr><srgbClr val="FFFFFF"/></extrusionClr>
+        </sp3d>
+      </spPr>
+    `);
+
+    expect(result).toMatchObject({
+      scene: { hasBackdrop: true },
+      shape: {
+        zPosition: -4 / 3,
+        extrusionColor: { type: 'srgbClr', value: 'FFFFFF' },
+      },
+      effectKinds: ['effectDag'],
+      parseIssues: [],
+    });
+  });
+
+  it('reports malformed camera field of view or zoom without discarding the shape', () => {
+    const result = parseSpPr(`
+      <spPr>
+        <scene3d>
+          <camera prst="perspectiveRelaxedModerately" fov="not-a-number" zoom="-1"/>
+          <lightRig rig="threePt" dir="t"/>
+        </scene3d>
+        <sp3d extrusionH="0"/>
+      </spPr>
+    `);
+
+    expect(result).toMatchObject({
+      scene: {
+        cameraPreset: 'perspectiveRelaxedModerately',
+        fieldOfView: undefined,
+        cameraZoom: undefined,
+      },
+      shape: { extrusionHeight: 0 },
+      parseIssues: ['malformed-numeric'],
+    });
+  });
+
   it('rejects malformed or negative dimensions without throwing away the 2D node', () => {
     const result = parseSpPr(`
       <spPr>
@@ -147,9 +223,10 @@ describe('parseShape3DProperties', () => {
   });
 
   it('preserves incomplete 3D tuples for the renderer planner', () => {
-    expect(
-      parseSpPr('<spPr><sp3d><bevelT w="12700" h="12700"/></sp3d></spPr>'),
-    ).toMatchObject({ scene: undefined, parseIssues: [] });
+    expect(parseSpPr('<spPr><sp3d><bevelT w="12700" h="12700"/></sp3d></spPr>')).toMatchObject({
+      scene: undefined,
+      parseIssues: [],
+    });
     expect(parseSpPr('<spPr><scene3d/></spPr>')).toMatchObject({
       scene: {},
       shape: undefined,

@@ -217,8 +217,8 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, zero-adjustment flowchart, bounded static DrawingML 3D, composite, and
-chart interaction cases, use the python-pptx generator. It currently defines 171 cases: 59 text,
-31 shape-adjustment, 28 flowchart, 12 static 3D, 20 composite, and 21 chart cases. Each flowchart
+chart interaction cases, use the python-pptx generator. It currently defines 172 cases: 59 text,
+31 shape-adjustment, 28 flowchart, 13 static 3D, 20 composite, and 21 chart cases. Each flowchart
 case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
 square explicit paint, wide theme-reference paint, and grouped tall explicit paint. The group uses
 a non-identity child coordinate space, and every source keeps an empty `a:avLst` with no adjustment
@@ -227,8 +227,11 @@ shape containers, `twoPt:t` and `threePt:t` lighting, donut/ellipse/rect/roundRe
 wide/tall aspect ratios, a non-identity group, and the light rotation plus implicit defaults
 observed in the local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
 outline and outer shadow so the 3D effect is not tested in isolation from its actual container.
-The twelve cases are one opt-out control, nine single-slide positive cases, one three-slide ellipse
-matrix, and one five-slide donut matrix. The real-property slice is copied from the ignored local corpus; the last three
+The thirteen cases are one opt-out control, nine single-slide positive bevel cases, one three-slide
+ellipse matrix, one five-slide donut matrix, and one six-slide camera-plane matrix. The
+camera-plane row covers identity and 20°/30° rotated `orthographicFront`, then square, wide, tall,
+theme-fill, and non-identity-group `perspectiveRelaxedModerately` rendering at the exact verified
+120° field of view and camera rotation. The real-property slice is copied from the ignored local corpus; the last three
 picture rows isolate horizontal, vertical, and combined nonnegative `a:srcRect` crops against the
 existing no-crop control. The ellipse row spans square explicit paint, wide theme-reference paint,
 and a tall ellipse under a non-identity group transform. The donut row spans the `0..50000`
@@ -291,10 +294,10 @@ per-slide PNG. The generator refreshes tracked case metadata even when cached lo
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
 The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
-into tracked `oracle/cases-pypptx/` and do not change the 171-case default matrix.
+into tracked `oracle/cases-pypptx/` and do not change the 172-case default matrix.
 
-The 3D capability also has a region-level lighting gate. After the twelve clean native API reports
-have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
+The top-bevel capability also has a region-level lighting gate. After the first twelve clean native
+API reports have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
 
 ```bash
 # Run from the repository root; report paths are repository-relative.
@@ -326,6 +329,23 @@ SSIM/color-histogram gate; it does not replace it. Each native API slide row fin
 reference and HTML rasters. The metric generator rejects a stale or replaced raster before scoring.
 It is also sensitive to material-specific lighting: the tracked picture case must retain the native
 top/right shadow and bottom/left relief instead of passing only because its rectangular bounds match.
+
+The camera-plane capability has a separate local gate. After the clean six-slide case report has
+refreshed the native and HTML rasters, run:
+
+```bash
+test/e2e/.venv/bin/python test/e2e/scripts/shape3d_camera_metrics.py \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0013-camera-projection-matrix.json \
+  --out test/e2e/reports/capability-loop/shape3d-camera-local-<revision>.json
+```
+
+This gate derives the applicable slides from source OOXML, binds both raster hashes to the native
+API report, and extracts the largest saturated four-corner plane independently from renderer DOM
+bounds. Normalized corner score must be at least `0.98` and material-band color score at least
+`0.97`. When native top-to-bottom color range is at least four RGB-vector units, the candidate must
+retain at least `0.65` of the range ratio and a direction cosine of at least `0.95`. A flat native
+orthographic control therefore does not invent a gradient requirement, while flattening a native
+perspective material field fails.
 
 PowerPoint automation on macOS needs an available interactive session. Error `-9074` can mean the
 session is locked, PowerPoint is waiting for a dialog, or the fixed staged input is still open from
@@ -552,11 +572,12 @@ errors, PowerPoint quality status, matching baseline case IDs, and the 0.02 SSIM
 Regression baselines must use one earlier clean revision with identical source, ground-truth, and
 runtime-environment fingerprints.
 It derives `native-powerpoint`, `manual-visual`, and `regression`; callers cannot self-attest those
-gates. A capability that requires `bevel-local` must also supply `--bevel-report`; verification
-derives that gate only when the clean revision, exact case set, source hashes, ground-truth hashes,
-native per-slide raster hashes, on-disk raster hashes, and every local result match. `--passed-gate`
-records separate checks that have already run and does not execute them. A `needsReview` case
-requires `--manual-verdict CASE_ID=passed` (or `accepted`).
+gates. A capability that requires `bevel-local` must also supply `--bevel-report`, while one that
+requires `camera-local` must supply `--camera-report`. Verification derives either local gate only
+when the clean revision, exact case set, source hashes, ground-truth hashes, native per-slide raster
+hashes, on-disk raster hashes, thresholds, and every local result match. `--passed-gate` records
+separate checks that have already run and does not execute them. A `needsReview` case requires
+`--manual-verdict CASE_ID=passed` (or `accepted`).
 
 Promotion uses the `accept` command only after the capability registry says `renderMode=native` and
 the candidate implementation is committed. The command requires a clean tracked tree, matching
@@ -566,18 +587,28 @@ sanitized receipt atomically and never changes GitHub issues or visual baselines
 
 DrawingML shape 3D, chart 3D, Office 2017 embedded models, and PresentationML animation are separate
 capability IDs. A verified flat 2D fallback in one lane cannot promote native behavior in another.
-The static shape/picture 3D cohort promotes only `orthographicFront` circular top bevels on opaque
+The `drawingml.shape.3d.top-bevel-contour` cohort promotes only `orthographicFront` circular top bevels on opaque
 solid `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures, with absent or bounded
-nonnegative `a:srcRect` crops, the documented `twoPt:t`/`threePt:t` lighting tuple, zero extrusion,
-an optional contour with a resolvable color, and an optional outer shadow. The visual gate checks
+nonnegative `a:srcRect` crops, the documented `twoPt:t`/`threePt:t` lighting tuple, zero extrusion
+and `z`, no scene backdrop or extrusion color, an optional contour with a resolvable color, and an
+optional outer shadow. The visual gate checks
 that `bevelT@w` controls the inward edge width,
 `bevelT@h` changes contrast rather than geometry, directional lighting remains distinct, and rounded
 corners follow continuous silhouette normals. The picture row additionally verifies the lower
 relative-overlay response and native `twoPt:t` edge ordering. Verification
-uses all twelve `oracle-pypptx-shape3d-*` case reports, the same twelve earlier-revision baselines,
+uses cases 0001-0012 and the same twelve earlier-revision baselines,
 the derived `bevel-local` report, explicit manual verdicts for review rows, and the `source`,
 `structural`, `unit`, `browser`, `performance`, `package-size`, and `docs` caller-run gates.
-Perspective, arbitrary rotations, nonzero extrusion, materials, bottom bevels, tiled pictures,
+
+The separate `drawingml.shape.3d.camera-projected-plane` cohort uses case 0013 and promotes only
+zero-depth, solid rectangular shapes with no visible text/stroke, local transform, backdrop,
+nonzero `z`, effect, bevel, contour, extrusion color, or material. Its exact orthographic and perspective camera tuples, paint values, aspect
+ratios, and group row are declared in the registry. Verification uses the earlier and current
+six-slide reports plus the derived `camera-local` geometry/material report and the same caller-run
+gate classes. The broad `drawingml.shape.3d.scene` fallback remains in inventory as a conservative
+residual, so observing a verified narrow tuple cannot hide unimplemented scene values.
+
+Other perspective and arbitrary rotations, nonzero extrusion, materials, bottom bevels, tiled pictures,
 negative or degenerate source crops, other paint/effect combinations, and other shape or picture
 presets remain flat fallbacks. Opt-in local probes for these contexts do not promote the public
 support boundary.

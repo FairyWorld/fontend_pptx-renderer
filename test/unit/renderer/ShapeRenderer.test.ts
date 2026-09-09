@@ -6778,6 +6778,76 @@ describe('ShapeRenderer', () => {
     expect(el.querySelector('[data-pptx-shape3d-bevel]')).toBeTruthy();
   });
 
+  it('replaces the flat path with the bounded perspective camera plane', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="84" name="3D camera plane"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d>
+            <a:camera prst="perspectiveRelaxedModerately" fov="7200000">
+              <a:rot lat="18590633" lon="0" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+          <a:sp3d extrusionH="0"/>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+      </p:sp>`;
+
+    const ctx = createMockRenderContext({
+      presentation: {
+        ...createMockRenderContext().presentation,
+        width: 1280,
+        height: 720,
+      },
+    });
+    const el = renderShape(parseShapeNode(parseXml(xml)), ctx);
+    const basePath = el.querySelector('svg > path');
+    const projected = el.querySelector('[data-pptx-shape3d-projected-plane="perspective"]');
+    const gradient = el.querySelector(
+      'linearGradient[data-pptx-shape3d-camera-gradient="perspectiveRelaxedModerately"]',
+    );
+
+    expect(basePath?.getAttribute('visibility')).toBe('hidden');
+    expect(projected?.getAttribute('d')).toMatch(/^M[^Z]+ Z$/);
+    expect(projected?.getAttribute('fill')).toMatch(/^url\(#shape3d-camera-gradient-/);
+    expect(gradient?.getAttribute('gradientUnits')).toBe('userSpaceOnUse');
+    expect(gradient?.getAttribute('color-interpolation')).toBe('linearRGB');
+  });
+
+  it('keeps a camera shape with visible text on the ordinary flat renderer', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="85" name="Camera plane with text"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d>
+            <a:camera prst="perspectiveRelaxedModerately" fov="7200000">
+              <a:rot lat="18590633" lon="0" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+          <a:sp3d extrusionH="0"/>
+        </p:spPr>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>Keep readable</a:t></a:r></a:p></p:txBody>
+      </p:sp>`;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+
+    expect(el.querySelector('[data-pptx-shape3d-projected-plane]')).toBeNull();
+    expect(el.querySelector('svg > path')?.hasAttribute('visibility')).toBe(false);
+    expect(el.textContent).toContain('Keep readable');
+  });
+
   it('keeps unsupported perspective shape 3D as the ordinary flat renderer', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

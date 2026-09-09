@@ -4,7 +4,7 @@
 
 A high-fidelity, browser-native PPTX renderer that parses Office Open XML (`.pptx`) files and renders slides as HTML/SVG DOM.
 
-Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded static DrawingML bevels, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
+Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded static DrawingML 3D, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
 
 ## Rendering Example
 
@@ -608,7 +608,7 @@ retains both outer and inner contours across square, wide, tall, grouped, and pi
 Other presets retain the handwritten implementation until their own layering, adjustment, and
 oracle gates pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
 
-### Static DrawingML 3D — Bounded Top Bevel
+### Static DrawingML 3D — Bounded Top Bevel and Camera Plane
 
 The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
 parsed observations in serialized model output. A native-oracle-backed static subset renders an
@@ -622,8 +622,9 @@ orthographic circular top bevel and optional contour with silhouette-aware light
   crops whose remaining horizontal and vertical extents are both positive;
 - `orthographicFront`, no camera rotation, `twoPt:t` or `threePt:t` lighting, with either no light
   rotation or the observed `twoPt:t` rotation `lat=0`, `lon=0`, `rev=120°`;
-- zero or omitted extrusion, an absent/zero contour or a positive contour with a resolvable color,
-  no bottom bevel or preset material, and no effect-list entry other than a coexisting outer shadow.
+- zero or omitted extrusion and `z`, no scene backdrop or extrusion color, an absent/zero contour or
+  a positive contour with a resolvable color, no bottom bevel or preset material, and no effect-list
+  entry other than a coexisting outer shadow.
 
 The renderer keeps the normal flat shape or picture whenever the complete tuple does not match.
 For a supported tuple it first paints a synchronous four-gradient vector fallback, then rasterizes
@@ -641,8 +642,23 @@ rendering is unavailable, the vector fallback remains visible. Text stays outsid
 overlay, picture outlines remain centered on the source bounds, and group transforms retain the
 existing coordinate mapping.
 
-This support does not include perspective cameras, nonzero extrusion, arbitrary light rotation,
-other bevel presets, tiled pictures, negative or degenerate source crops,
+The separate camera-plane lane projects a zero-depth solid rectangle into an SVG quadrilateral. Its
+verified matrix contains `orthographicFront` with absent rotation, `orthographicFront` with exactly
+`lat=20°`, `lon=30°`, `rev=0°`, and `perspectiveRelaxedModerately` with `fov=120°` and exactly
+`lat=18590633/60000°`, `lon=0°`, `rev=0°`. All rows use an unrotated `threePt:t` light. The six
+native slides cover square, wide, tall, explicit and theme paint, and a non-identity group. The
+shape must be a `rect` with no visible text or stroke, shape rotation/flip, backdrop, nonzero `z`,
+effect, bevel, contour, extrusion color, material, or extrusion. Public paint coverage is limited to
+the explicit `#2F75B5` and theme `#4F81BD` rows in that matrix.
+
+This plane projection uses small independent SVG math rather than a mesh engine: longitude,
+latitude, and revolution rotations are followed by orthographic or perspective division. OOXML
+provides the camera properties; preset viewport scale and material response are pinned to native
+PowerPoint evidence. A dedicated gate compares normalized four-corner geometry, three material
+color bands, gradient range, and gradient direction against the same hashed native rasters.
+
+This support does not include camera values outside that exact plane matrix, nonzero extrusion,
+arbitrary light rotation, other bevel presets, tiled pictures, negative or degenerate source crops,
 gradient/pattern/group/image-filled shapes, or pixel-identical PowerPoint material simulation.
 Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
 claim remains limited to native-verified `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular
@@ -823,10 +839,11 @@ Dev pages at `http://127.0.0.1:5173`:
 
 ## What's Not Yet Supported
 
-DrawingML shape/picture 3D outside the bounded orthographic circular top-bevel tuple above retains
-the flat 2D fallback. This includes perspective or rotated cameras, nonzero extrusion, bottom or
-non-circular bevels, preset materials, unsupported lighting, tiled pictures, and unsupported paint
-or effect combinations. True 3D chart perspective/depth/surface meshes, Office 2017 embedded 3D
+DrawingML shape/picture 3D outside the bounded circular top-bevel and zero-depth camera-plane tuples
+above retains the flat 2D fallback. This includes other perspective or rotated cameras, nonzero
+extrusion, bottom or non-circular bevels, preset materials, unsupported lighting, tiled pictures,
+and unsupported paint, text, stroke, transform, or effect combinations. True 3D chart
+perspective/depth/surface meshes, Office 2017 embedded 3D
 models, animations/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing
 embedded OLE objects, and slide notes rendering are outside the verified native scope. Available OLE
 picture previews can render; they are not an OLE object engine. EMF bitmap and embedded-PDF previews

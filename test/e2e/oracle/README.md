@@ -38,10 +38,11 @@ work packet records the override instead of silently hiding the global ordering.
 `verify` consumes raw `/api/evaluate` JSON reports from one clean committed renderer revision. It
 derives native-PowerPoint, manual-review, and regression status, including a matching baseline case
 set, identical input/runtime fingerprints from an earlier revision, and the 0.02 SSIM budget. The
-bounded shape-3D capability additionally requires a `--bevel-report`; the derived `bevel-local` gate
-binds its exact case set, source/ground-truth hashes, and per-slide raster hashes to the same clean
-revision and current files. Other `--passed-gate` values only record checks already executed by the
-caller; they are not run by the command. Review rows require an explicit case verdict.
+bounded top-bevel capability additionally requires a `--bevel-report`; the camera-plane capability
+requires a `--camera-report`. Their derived `bevel-local` and `camera-local` gates bind the exact
+case set, source/ground-truth hashes, and per-slide raster hashes to the same clean revision and
+current files. Other `--passed-gate` values only record checks already executed by the caller; they
+are not run by the command. Review rows require an explicit case verdict.
 
 ## Current Implemented Pieces
 
@@ -63,6 +64,8 @@ caller; they are not run by the command. Review rows require an explicit case ve
 - `metrics.py`: visual metrics (`ssim`, `fg_iou`, `fg_iou_tolerant`, `chamfer_score`, `color_hist_corr`, `mae`) and quality gate. Pass/fail uses only `ssim ≥ 0.95` and `color_hist_corr ≥ 0.80`; the foreground color metric tolerates one HSV histogram bin and negligible visually blank PDF residue. Other metrics are diagnostic.
 - `../scripts/shape3d_bevel_metrics.py`: source-OOXML-derived bevel-ring and round-corner lighting
   gate for the bounded static 3D cohort.
+- `../scripts/shape3d_camera_metrics.py`: source-OOXML-derived four-corner projection and material
+  field gate for the bounded zero-depth camera-plane cohort.
 - `shape` nodes support `shapeTypeId` (numeric `MsoAutoShapeType`) for forward-compatible shape coverage.
 
 4. VBA probe module
@@ -181,7 +184,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 171 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 172 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -191,13 +194,15 @@ ground-truth export. It defines 171 cases under `oracle/cases-pypptx/` with the
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Zero-adjustment flowcharts** (28 cases, 84 slides): presets in shape IDs 61-88, each with
   square explicit paint, wide theme-reference paint, and grouped-tall rendering
-- **Static DrawingML 3D** (12 cases, 18 slides): flat picture opt-out plus a bounded
+- **Static DrawingML 3D** (13 cases, 24 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
   `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
   shadow, cases 8-10 isolate horizontal, vertical, and combined `a:srcRect` crops, case 11
   covers square explicit, wide theme-reference, and grouped-tall ellipse rendering, and case 12
-  covers donut adjustment bounds/default plus wide-theme and grouped-tall variants
+  covers donut adjustment bounds/default plus wide-theme and grouped-tall variants; case 13 adds
+  identity and rotated orthographic camera controls plus square/wide/tall, explicit/theme, and
+  grouped perspective zero-depth planes
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -233,12 +238,13 @@ fingerprints.
 The opt-in `oracle-local-shape3d-*` matrix explores ellipse, adjusted donut/star, concave freeform,
 shape rotation, nested group scaling, and glow interaction. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
-ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 171-case matrix.
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 172-case matrix.
 The original one-slide ellipse and donut probes remain useful for preflight comparisons, while the
 tracked three-slide ellipse and five-slide donut matrices bound the public
-`drawingml.shape.3d.top-bevel-contour` claim.
+`drawingml.shape.3d.top-bevel-contour` claim. That tuple also requires an absent scene backdrop,
+zero or omitted shape `z`, and no extrusion color.
 
-After evaluating the twelve tracked shape-3D cases, run `../scripts/shape3d_bevel_metrics.py` with one
+After evaluating top-bevel cases 0001-0012, run `../scripts/shape3d_bevel_metrics.py` with one
 `--case-report` per case. It reads the source OOXML to locate supported regions and builds independent
 rect, roundRect, ellipse, and donut masks before comparing the native and HTML luminance fields only
 inside the bevel ring. Unknown silhouettes and rotations fail as unevaluable instead of borrowing a
@@ -247,6 +253,13 @@ to `roundRect`. Zero-thickness donuts remain covered by the full-slide gate; ban
 resolution-limited and remain subject to full-slide and manual checks. Pass the resulting JSON to
 `run_capability_loop.py verify --bevel-report ...`; both commands verify the API and on-disk raster
 hashes, and callers cannot self-attest `bevel-local`.
+
+After evaluating case 0013, run `../scripts/shape3d_camera_metrics.py` with its clean native report.
+It binds the exact source, ground truth, revision, and per-slide raster hashes, extracts a normalized
+four-corner polygon from each applicable slide, and compares three material color bands. The gate
+requires corner score `0.98`, color score `0.97`, and, where native output has a measurable material
+gradient, range ratio `0.65` and direction cosine `0.95`. Pass its report to
+`run_capability_loop.py verify --camera-report ...`; callers cannot self-attest `camera-local`.
 
 On macOS the PowerPoint interactive session must remain available. Error `-9074` can come from a
 locked session, a pending dialog, or a staged `_pptx-input.pptx` left open by an interrupted run.

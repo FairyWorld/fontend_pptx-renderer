@@ -154,6 +154,82 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
     }
 
 
+def camera_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
+    case_id = case["testFile"]
+    reports_dir = repo / "test/e2e/reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    reference_path = reports_dir / f"{case_id}_pdf.png"
+    candidate_path = reports_dir / f"{case_id}_html.png"
+    reference_path.write_bytes(b"native-camera-reference")
+    candidate_path.write_bytes(b"renderer-camera-candidate")
+    reference_hash = hashlib.sha256(reference_path.read_bytes()).hexdigest()
+    candidate_hash = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
+    artifacts = {
+        "reference": {
+            "path": reference_path.relative_to(repo).as_posix(),
+            "sizeBytes": reference_path.stat().st_size,
+            "sha256": reference_hash,
+        },
+        "candidate": {
+            "path": candidate_path.relative_to(repo).as_posix(),
+            "sizeBytes": candidate_path.stat().st_size,
+            "sha256": candidate_hash,
+        },
+    }
+    case["perSlide"] = [{"slideIdx": 0, "hidden": False, "renderArtifacts": artifacts}]
+    thresholds = {
+        "cornerScore": 0.98,
+        "colorScore": 0.97,
+        "gradientRangeRatio": 0.65,
+        "gradientDirection": 0.95,
+        "minimumReferenceGradientRange": 4.0,
+    }
+    metrics = {
+        "evaluable": True,
+        "cornerScore": 0.995 if passed else 0.9,
+        "meanCornerErrorRatio": 0.005 if passed else 0.1,
+        "colorScore": 0.99,
+        "gradientRequired": True,
+        "referenceGradientRange": 20.0,
+        "candidateGradientRange": 18.0,
+        "gradientRangeRatio": 0.9,
+        "gradientDirection": 1.0,
+        "referenceBands": [[1, 2, 3]] * 3,
+        "candidateBands": [[1, 2, 3]] * 3,
+        "thresholds": thresholds,
+        "passed": passed,
+    }
+    return {
+        "schemaVersion": 1,
+        "renderer": dict(case["provenance"]["renderer"]),
+        "thresholds": thresholds,
+        "applicableCaseCount": 1,
+        "passed": passed,
+        "caseResults": [
+            {
+                "caseId": case_id,
+                "sourceSha256": case["provenance"]["inputs"]["sourcePptx"]["sha256"],
+                "groundTruthSha256": case["provenance"]["inputs"]["groundTruth"][
+                    "combinedSha256"
+                ],
+                "applicable": True,
+                "passed": passed,
+                "slides": [
+                    {
+                        "slideIdx": 0,
+                        "referencePath": artifacts["reference"]["path"],
+                        "candidatePath": artifacts["candidate"]["path"],
+                        "referenceSha256": reference_hash,
+                        "candidateSha256": candidate_hash,
+                        "metrics": metrics,
+                        "passed": passed,
+                    }
+                ],
+            }
+        ],
+    }
+
+
 def test_normalizes_native_reports_into_promotion_evidence(tmp_path: Path):
     repo, capability = capability_fixture(tmp_path)
     current = [native_report("donut-thin"), native_report("donut-thick")]
@@ -331,6 +407,71 @@ def test_derives_bevel_local_gate_from_matching_artifact_evidence(tmp_path: Path
         bevel_report=bevel_report(current, repo),
     )
     assert verified["gates"]["bevel-local"] == "passed"
+
+
+def test_derives_camera_local_gate_from_matching_artifact_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-plane")
+    baseline = native_report("camera-plane", revision="b" * 40)
+
+    missing = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+    )
+    assert missing["gates"]["camera-local"] == "missing"
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        camera_report=camera_report(current, repo),
+    )
+    assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_rejects_failed_or_tampered_camera_local_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-plane")
+    baseline = native_report("camera-plane", revision="b" * 40)
+    failed = camera_report(current, repo, passed=False)
+    with pytest.raises(CapabilityVerificationError, match="camera-local report failed"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=failed,
+        )
+
+    tampered = camera_report(current, repo)
+    (repo / tampered["caseResults"][0]["slides"][0]["candidatePath"]).write_bytes(b"changed")
+    with pytest.raises(CapabilityVerificationError, match="artifact hash"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=tampered,
+        )
 
 
 def test_rejects_bevel_local_evidence_for_different_inputs_or_failed_metrics(tmp_path: Path):

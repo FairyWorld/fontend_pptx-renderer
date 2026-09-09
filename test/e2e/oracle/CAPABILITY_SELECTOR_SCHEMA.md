@@ -29,4 +29,30 @@ The inventory scanner enforces direct-parent matching while streaming XML with a
 stack. Contract and scanner behavior are covered by `test_capability_contract.py` and
 `test_capability_inventory.py`.
 
+Selectors identify candidate packages; they do not replace the capability's full accepted scope.
+Some renderer decisions depend on siblings or descendants that this streaming element selector does
+not express. For example, the bounded camera-plane capability selects zero-depth `a:sp3d` directly
+under `p:spPr` while its registry scope additionally constrains the sibling geometry, scene camera,
+light, fill, text, stroke, transform, bevel, contour, material, and effects:
+
+```json
+{
+  "localName": "sp3d",
+  "parent": {
+    "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+    "localNames": ["spPr"]
+  },
+  "attributes": {
+    "contourW": ["$absent", "0"],
+    "extrusionH": ["$absent", "0"],
+    "prstMaterial": ["$absent"]
+  }
+}
+```
+
+The broad `drawingml.shape.3d.scene` row deliberately overlaps bounded native rows and remains a
+fallback residual. As a result, inventory still exposes unverified camera, light, or backdrop values
+even when the same package also contains a verified top-bevel or camera-plane candidate. Only a
+fresh receipt for the exact registry scope supports a public native claim.
+
 See `CORPUS_CLASSIFICATION.md` for the separate representative-versus-validation ranking signal.

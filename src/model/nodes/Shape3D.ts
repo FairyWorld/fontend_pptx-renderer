@@ -6,7 +6,7 @@
  */
 
 import { SafeXmlNode } from '../../parser/XmlParser';
-import { angleToDeg, emuToPx } from '../../parser/units';
+import { angleToDeg, emuToPx, pctToDecimal } from '../../parser/units';
 
 /** Problems with the source data itself, independent of renderer capability. */
 export type Shape3DParseIssue = 'malformed-numeric';
@@ -19,10 +19,33 @@ export interface Shape3DRotation {
 
 export interface Scene3DProperties {
   cameraPreset?: string;
+  /** Camera field of view in degrees (`a:camera@fov` uses 60000ths of a degree). */
+  fieldOfView?: number;
+  /** Camera zoom as a decimal fraction (`a:camera@zoom` uses 100000ths). */
+  cameraZoom?: number;
   cameraRotation?: Shape3DRotation;
   lightRig?: string;
   lightDirection?: string;
   lightRotation?: Shape3DRotation;
+  /** Backdrop geometry is retained so unsupported camera semantics cannot be mistaken for support. */
+  hasBackdrop?: true;
+}
+
+function parseCameraNumber(
+  node: SafeXmlNode,
+  attr: 'fov' | 'zoom',
+  issues: Shape3DParseIssue[],
+): number | undefined {
+  const raw = node.attr(attr);
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  const valid =
+    Number.isFinite(value) && (attr === 'fov' ? value > 0 && value <= 180 * 60000 : value > 0);
+  if (!valid) {
+    addIssue(issues, 'malformed-numeric');
+    return undefined;
+  }
+  return attr === 'fov' ? angleToDeg(value) : pctToDecimal(value);
 }
 
 export interface Shape3DBevelProperties {
@@ -38,11 +61,14 @@ export interface Shape3DColorObservation {
 }
 
 export interface Shape3DFormatProperties {
+  /** Shape depth coordinate in pixels (`a:sp3d@z`); absent means zero. */
+  zPosition?: number;
   extrusionHeight?: number;
   contourWidth?: number;
   presetMaterial?: string;
   bevelTop?: Shape3DBevelProperties;
   bevelBottom?: Shape3DBevelProperties;
+  extrusionColor?: Shape3DColorObservation;
   contourColor?: Shape3DColorObservation;
   /** @internal Wrapper color node consumed by the normal theme/color resolver. */
   contourColorSource?: SafeXmlNode;
@@ -95,6 +121,21 @@ function parseLength(
   return emuToPx(value);
 }
 
+function parseCoordinate(
+  node: SafeXmlNode,
+  attr: string,
+  issues: Shape3DParseIssue[],
+): number | undefined {
+  const raw = node.attr(attr);
+  if (raw === undefined) return undefined;
+  const value = Number(raw);
+  if (!Number.isFinite(value)) {
+    addIssue(issues, 'malformed-numeric');
+    return undefined;
+  }
+  return emuToPx(value);
+}
+
 function parseBevel(
   node: SafeXmlNode,
   issues: Shape3DParseIssue[],
@@ -136,6 +177,8 @@ export function parseShape3DProperties(spPr: SafeXmlNode): Shape3DProperties | u
 
     if (camera.exists()) {
       scene.cameraPreset = camera.attr('prst');
+      scene.fieldOfView = parseCameraNumber(camera, 'fov', parseIssues);
+      scene.cameraZoom = parseCameraNumber(camera, 'zoom', parseIssues);
       const cameraRotationNode = camera.child('rot');
       scene.cameraRotation = parseRotation(cameraRotationNode, parseIssues);
     }
@@ -146,34 +189,42 @@ export function parseShape3DProperties(spPr: SafeXmlNode): Shape3DProperties | u
       const lightRotationNode = light.child('rot');
       scene.lightRotation = parseRotation(lightRotationNode, parseIssues);
     }
+    if (scene3d.child('backdrop').exists()) scene.hasBackdrop = true;
   }
 
   if (sp3d.exists()) {
     const bevelTop = parseBevel(sp3d.child('bevelT'), parseIssues);
     const bevelBottom = parseBevel(sp3d.child('bevelB'), parseIssues);
     const contourColorSource = sp3d.child('contourClr');
+    const extrusionColorSource = sp3d.child('extrusionClr');
+    const zPosition = parseCoordinate(sp3d, 'z', parseIssues);
     const extrusionHeight = parseLength(sp3d, 'extrusionH', 0, parseIssues);
     const contourWidth = parseLength(sp3d, 'contourW', 0, parseIssues);
     const presetMaterial = sp3d.attr('prstMaterial');
 
     shape = {
+      zPosition,
       extrusionHeight,
       contourWidth,
       presetMaterial,
       bevelTop,
       bevelBottom,
+      extrusionColor: parseColorObservation(extrusionColorSource),
       contourColor: parseColorObservation(contourColorSource),
       contourColorSource: contourColorSource.exists() ? contourColorSource : undefined,
     };
   }
 
   const effectList = spPr.child('effectLst');
+  const effectDag = spPr.child('effectDag');
   return {
     scene,
     shape,
     effectKinds: effectList.exists()
       ? effectList.allChildren().map((effect) => effect.localName)
-      : [],
+      : effectDag.exists()
+        ? ['effectDag']
+        : [],
     parseIssues,
   };
 }
