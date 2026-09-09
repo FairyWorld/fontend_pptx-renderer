@@ -837,6 +837,50 @@
         "19d220fde4155e42d8fb9cde939176baeff18ca79a00502f954348e6bf3d0557"
       ],
       "implementationFingerprint": "a8fe97f4fe645e6eb1663e6852fc42ee98da1dad1ac29cb28eda49755787b4b3"
+    },
+    {
+      "acceptedAt": "2026-09-09T15:47:06.173200Z",
+      "acceptedRevision": "84bf986063e60c63494ffb0854b6479d713f998a",
+      "capabilityId": "drawingml.text.run.defrpr-color-precedence",
+      "caseIds": [
+        "oracle-pypptx-text-0056-defrpr-srgb-over-fontref-square",
+        "oracle-pypptx-text-0057-defrpr-scheme-over-fontref-wide",
+        "oracle-pypptx-text-0058-run-color-over-defrpr-tall",
+        "oracle-pypptx-text-0059-fontref-fallback-no-defrpr"
+      ],
+      "caseInputFingerprints": [
+        "c2cea67566a4d65db4d52b5ee3f4e89fd2f35628ac83855dd6fa1672c5bb5d29",
+        "b6a8a0067c552bd5e94b7c9f351daeade7af2fcfbbee738b3d8c5bd1db82f054",
+        "20cd883efc019e054dea8b6810f533e0b99f6a019759de80e70cf96a769f187e",
+        "d1760a39298a56409f8f9ecf8062a67fc143b81d4bd4827606b112294b95a326"
+      ],
+      "definitionFingerprint": "4435b4fd0b342d54b138a01fdbbad45109b29668481d2a90fe2ddac3bf49c779",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "2fd13216f3e0e156887f685accc1ffd5b9f20b4709e7dd0b653d835c37bb7b78",
+        "ac61bea0351cf618514575607f97de01f9e2fb1729e59a251c8a04a3c53033ba",
+        "8dbd857e5b23e3796b5a5f12cda4074de0e6b729e5e6ee0091f504ef47b02550",
+        "19d220fde4155e42d8fb9cde939176baeff18ca79a00502f954348e6bf3d0557"
+      ],
+      "implementationFingerprint": "ed7a8e7a3c0f1b23564fd6fba93b0b091d6b669aace0eb84b02b896ff194fef6"
     }
   ],
   "schemaVersion": 1
