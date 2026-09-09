@@ -35,10 +35,7 @@ const supportedShape = `
     <a:contourClr><a:srgbClr val="FFFFFF"/></a:contourClr>
   </a:sp3d>`;
 
-const originalImageDecode = Object.getOwnPropertyDescriptor(
-  HTMLImageElement.prototype,
-  'decode',
-);
+const originalImageDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -83,11 +80,9 @@ function installShape3DRasterMocks() {
     return (contextCount === 1 ? maskContext : outputContext) as never;
   });
   let completeBlob: BlobCallback | undefined;
-  const toBlob = vi
-    .spyOn(HTMLCanvasElement.prototype, 'toBlob')
-    .mockImplementation((callback) => {
-      completeBlob = callback;
-    });
+  const toBlob = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((callback) => {
+    completeBlob = callback;
+  });
   Object.defineProperty(HTMLImageElement.prototype, 'decode', {
     configurable: true,
     value: vi.fn().mockResolvedValue(undefined),
@@ -322,6 +317,28 @@ describe('buildStaticShape3DPlan', () => {
     });
   });
 
+  it('accepts an adjusted donut whose resolved path carries the OOXML hole geometry', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'donut',
+        width: 240,
+        height: 160,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'orthographic-top-bevel',
+      surface: 'shape',
+      geometry: 'donut',
+      bounds: { width: 240, height: 160 },
+    });
+  });
+
   it('keeps rounded pictures outside the bounded geometry cohort', () => {
     const plan = buildStaticShape3DPlan(
       parseShape3D(supportedScene, supportedShape),
@@ -511,9 +528,7 @@ describe('appendStaticShape3DEffects', () => {
     mocks.complete(new Blob([new Uint8Array([1])], { type: 'image/png' }));
     await Promise.all(ctx.asyncTasks!);
 
-    const firstHref = first.svg
-      .querySelector('[data-pptx-shape3d-lighting]')
-      ?.getAttribute('href');
+    const firstHref = first.svg.querySelector('[data-pptx-shape3d-lighting]')?.getAttribute('href');
     const second = makeSvg();
     appendStaticShape3DEffects({
       ...second,

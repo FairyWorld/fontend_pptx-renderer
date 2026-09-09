@@ -190,6 +190,19 @@ describe('OOXML preset geometry runtime subset', () => {
     ).toThrow(/adjustment adj.*finite/i);
   });
 
+  it('normalizes floating-point residue at the donut upper adjustment bound', () => {
+    const [path] =
+      getOoxmlPresetShapePaths(
+        'donut',
+        403.20000000000005,
+        403.20000000000005,
+        new Map([['adj', 50000]]),
+      ) ?? [];
+
+    expect(path?.d).toBeTruthy();
+    expect(path?.d).not.toMatch(/NaN|Infinity/);
+  });
+
   it('rejects invalid dimensions and ignores unrelated legacy adjustment entries', () => {
     expect(() => getOoxmlPresetShapePaths('flowChartTerminator', 0, 280)).toThrow(
       /width.*greater than zero/i,

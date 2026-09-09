@@ -208,6 +208,22 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
       host.append(shape);
     }
 
+    const donut = renderShape(
+      parseShapeNode(
+        parseXml(
+          shapeXml('donut', 180, 120, '2F75B5').replace(
+            '<a:avLst/>',
+            '<a:avLst><a:gd name="adj" fmla="val 32000"/></a:avLst>',
+          ),
+        ),
+      ),
+      createMockRenderContext({ asyncTasks: shape3dTasks }),
+    );
+    donut.style.position = 'relative';
+    donut.style.left = '0';
+    donut.style.top = '0';
+    host.append(donut);
+
     const flat = renderShape(
       parseShapeNode(
         parseXml(
@@ -302,11 +318,13 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     const ellipseLighting = host.children[3].querySelector(
       '[data-pptx-shape3d-lighting="distance-field"]',
     ) as SVGGraphicsElement;
+    const donutLighting = donut.querySelector(
+      '[data-pptx-shape3d-lighting="distance-field"]',
+    ) as SVGGraphicsElement;
+    const donutClipPath = donut.querySelector('clipPath path');
     return {
       bevelCount: host.querySelectorAll('[data-pptx-shape3d-bevel]').length,
-      lightingCount: host.querySelectorAll(
-        '[data-pptx-shape3d-lighting="distance-field"]',
-      ).length,
+      lightingCount: host.querySelectorAll('[data-pptx-shape3d-lighting="distance-field"]').length,
       flatHasBevel: !!flat.querySelector('[data-pptx-shape3d-bevel]'),
       uniqueIds: new Set(ids).size === ids.length,
       noHorizontalGrowth: host.scrollWidth === host.clientWidth,
@@ -324,6 +342,12 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
         width: ellipseLighting.getBoundingClientRect().width,
         height: ellipseLighting.getBoundingClientRect().height,
       },
+      donutLightingBounds: {
+        width: donutLighting.getBoundingClientRect().width,
+        height: donutLighting.getBoundingClientRect().height,
+      },
+      donutClipSubpaths: donutClipPath?.getAttribute('d')?.match(/M/g)?.length ?? 0,
+      donutClipFillRule: donutClipPath?.getAttribute('fill-rule'),
       groupLightingBounds: {
         width: groupLighting.getBoundingClientRect().width,
         height: groupLighting.getBoundingClientRect().height,
@@ -337,8 +361,8 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
 
   expect(result).toEqual(
     expect.objectContaining({
-      bevelCount: 6,
-      lightingCount: 6,
+      bevelCount: 7,
+      lightingCount: 7,
       flatHasBevel: false,
       uniqueIds: true,
       noHorizontalGrowth: true,
@@ -350,6 +374,9 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   expect(result.groupBounds).toEqual({ width: 200, height: 100, childWidth: 100, childHeight: 50 });
   expect(result.roundRectLightingBounds).toEqual({ width: 220, height: 100 });
   expect(result.ellipseLightingBounds).toEqual({ width: 180, height: 120 });
+  expect(result.donutLightingBounds).toEqual({ width: 180, height: 120 });
+  expect(result.donutClipSubpaths).toBe(2);
+  expect(result.donutClipFillRule).toBe('evenodd');
   expect(result.groupLightingBounds).toEqual({ width: 100, height: 50 });
   expect(result.croppedPictureBounds).toEqual({
     x: expect.closeTo(-62.857, 2),
@@ -366,6 +393,62 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   );
   const second = await host.screenshot();
   expect(first.equals(second)).toBe(true);
+});
+
+test('static 3D donut composes with its upper adjustment bound and a solid theme fill', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const scene =
+      '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>';
+    const bevel = '<a:sp3d><a:bevelT w="127000" h="127000" prst="circle"/></a:sp3d>';
+    const xml = (adjustment: number, themeFill: boolean) => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="3D donut"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:prstGeom prst="donut"><a:avLst><a:gd name="adj" fmla="val ${adjustment}"/></a:avLst></a:prstGeom>
+          ${themeFill ? '' : '<a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>'}
+          ${scene}${bevel}
+        </p:spPr>
+        ${
+          themeFill
+            ? '<p:style><a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef><a:fillRef idx="1"><a:schemeClr val="accent1"/></a:fillRef><a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></p:style>'
+            : ''
+        }
+      </p:sp>`;
+
+    const tasks: Promise<void>[] = [];
+    const upper = renderShape(
+      parseShapeNode(parseXml(xml(50000, false))),
+      createMockRenderContext({ asyncTasks: tasks }),
+    );
+    const themed = renderShape(
+      parseShapeNode(parseXml(xml(32000, true))),
+      createMockRenderContext({ asyncTasks: tasks }),
+    );
+    document.body.append(upper, themed);
+    await Promise.all(tasks);
+
+    return {
+      upperPath: upper.querySelector('svg > path')?.getAttribute('d'),
+      upperLighting: !!upper.querySelector('[data-pptx-shape3d-lighting="distance-field"]'),
+      themedFill: themed.querySelector('svg > path')?.getAttribute('fill'),
+      themedLighting: !!themed.querySelector('[data-pptx-shape3d-lighting="distance-field"]'),
+    };
+  });
+
+  expect(result.upperPath).toBeTruthy();
+  expect(result.upperPath).not.toMatch(/NaN|Infinity/);
+  expect(result.upperLighting).toBe(true);
+  expect(result.themedFill).toBe('#4472C4');
+  expect(result.themedLighting).toBe(true);
 });
 
 test('orthographic circle bevel uses PowerPoint-like face lighting instead of a flat border', async ({

@@ -17,10 +17,11 @@ function positiveNumber(value, context) {
   return finite;
 }
 
-function nonNegativeNumber(value, context) {
+function nonNegativeRadius(value, scale, context) {
   const finite = finiteNumber(value, context);
-  if (finite < 0) throw new Error(`${context} must be non-negative`);
-  return finite;
+  const tolerance = Number.EPSILON * Math.max(1, scale, Math.abs(finite)) * 64;
+  if (finite < -tolerance) throw new Error(`${context} must be non-negative`);
+  return finite < 0 ? 0 : finite;
 }
 
 function outputPrecision(value) {
@@ -73,10 +74,14 @@ function visualAnglePoint(center, widthRadius, heightRadius, angle) {
   };
 }
 
-function emitArc({ command, context, cursor, scaleX, scaleY, precision }) {
+function emitArc({ command, context, cursor, scaleX, scaleY, radiusScale, precision }) {
   const current = requireCursor(cursor, context);
-  const widthRadius = nonNegativeNumber(command.widthRadius, `${context} widthRadius`);
-  const heightRadius = nonNegativeNumber(command.heightRadius, `${context} heightRadius`);
+  const widthRadius = nonNegativeRadius(command.widthRadius, radiusScale, `${context} widthRadius`);
+  const heightRadius = nonNegativeRadius(
+    command.heightRadius,
+    radiusScale,
+    `${context} heightRadius`,
+  );
   const startAngle = finiteNumber(command.startAngle, `${context} startAngle`);
   const sweepAngle = finiteNumber(command.sweepAngle, `${context} sweepAngle`);
 
@@ -194,6 +199,7 @@ function emitPath(path, shape, pathIndex, precision) {
           cursor,
           scaleX,
           scaleY,
+          radiusScale: Math.max(pathWidth, pathHeight),
           precision,
         });
         cursor = emitted.cursor;

@@ -492,11 +492,17 @@ function emitPath(
         break;
       case 'arcTo': {
         if (!cursor) throw new Error(`${commandContext}: command requires a current point`);
-        const widthRadius = finiteNumber(command.widthRadius, `${commandContext} widthRadius`);
-        const heightRadius = finiteNumber(command.heightRadius, `${commandContext} heightRadius`);
-        if (widthRadius < 0 || heightRadius < 0) {
+        let widthRadius = finiteNumber(command.widthRadius, `${commandContext} widthRadius`);
+        let heightRadius = finiteNumber(command.heightRadius, `${commandContext} heightRadius`);
+        const radiusTolerance =
+          Number.EPSILON *
+          Math.max(1, path.width, path.height, Math.abs(widthRadius), Math.abs(heightRadius)) *
+          64;
+        if (widthRadius < -radiusTolerance || heightRadius < -radiusTolerance) {
           throw new Error(`${commandContext}: arc radii must be non-negative`);
         }
+        if (widthRadius < 0) widthRadius = 0;
+        if (heightRadius < 0) heightRadius = 0;
         if (widthRadius === 0 || heightRadius === 0 || command.sweepAngle === 0) break;
         const startOffset = visualAnglePoint(
           { x: 0, y: 0 },

@@ -64,6 +64,60 @@ def _bevel_specimen(height: int = 200, width: int = 300):
     return reference, flat, region
 
 
+def _elliptical_bevel_specimen(preset: str):
+    height, width = 200, 300
+    bounds = (60, 40, 180, 120)
+    x, y, shape_width, shape_height = bounds
+    yy, xx = np.mgrid[:height, :width]
+    center_x = x + (shape_width - 1) / 2
+    center_y = y + (shape_height - 1) / 2
+    outer = (
+        ((xx - center_x) / (shape_width / 2)) ** 2
+        + ((yy - center_y) / (shape_height / 2)) ** 2
+        <= 1
+    )
+    adjustment = 0.32 if preset == "donut" else 0.0
+    mask = outer
+    if preset == "donut":
+        inset = min(shape_width, shape_height) * adjustment
+        inner = (
+            ((xx - center_x) / (shape_width / 2 - inset)) ** 2
+            + ((yy - center_y) / (shape_height / 2 - inset)) ** 2
+            < 1
+        )
+        mask = outer & ~inner
+
+    padded = np.pad(mask.astype(np.uint8), 1)
+    distance = cv2.distanceTransform(padded, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)[1:-1, 1:-1]
+    grad_x = cv2.Sobel(distance, cv2.CV_32F, 1, 0, ksize=3)
+    grad_y = cv2.Sobel(distance, cv2.CV_32F, 0, 1, ksize=3)
+    grad_length = np.maximum(np.hypot(grad_x, grad_y), 1e-6)
+    outward_x = -grad_x / grad_length
+    outward_y = -grad_y / grad_length
+    profile = np.clip(1 - distance / 12, 0, 1)
+    delta = (outward_x * -0.12 + outward_y * -0.82 - 0.16) * profile * 72
+
+    reference = np.full((height, width, 3), 255, dtype=np.uint8)
+    flat = reference.copy()
+    base = np.array([50, 126, 196], dtype=np.float32)
+    reference[mask] = np.clip(base + delta[mask, None], 0, 255).astype(np.uint8)
+    flat[mask] = base.astype(np.uint8)
+    region = BevelRegion(
+        slide_index=0,
+        x=x / width,
+        y=y / height,
+        width=shape_width / width,
+        height=shape_height / height,
+        bevel_width_x=12 / width,
+        bevel_width_y=12 / height,
+        preset=preset,
+        geometry_adjustment=adjustment,
+        geometry_inset_x_ratio=(min(shape_width, shape_height) * adjustment / shape_width),
+        geometry_inset_y_ratio=(min(shape_width, shape_height) * adjustment / shape_height),
+    )
+    return reference, flat, region
+
+
 def test_bevel_ring_metrics_reject_a_flat_edge_and_accept_directional_curvature():
     reference, flat, region = _bevel_specimen()
 
@@ -77,6 +131,19 @@ def test_bevel_ring_metrics_reject_a_flat_edge_and_accept_directional_curvature(
     assert flattened["score"] < 0.55
     assert flattened["cornerScore"] < 0.55
     assert flattened["ringPixelCount"] < reference.shape[0] * reference.shape[1] * 0.2
+
+
+@pytest.mark.parametrize("preset", ["ellipse", "donut"])
+def test_bevel_ring_metrics_follow_elliptical_silhouettes_and_holes(preset: str):
+    reference, flat, region = _elliptical_bevel_specimen(preset)
+
+    matched = compute_bevel_ring_metrics(reference, reference, region)
+    flattened = compute_bevel_ring_metrics(reference, flat, region)
+
+    assert matched["passed"] is True
+    assert matched["score"] > 0.99
+    assert flattened["passed"] is False
+    assert flattened["score"] < 0.55
 
 
 def test_bevel_ring_score_is_not_diluted_by_more_background_pixels():
@@ -129,6 +196,34 @@ def test_bevel_ring_reports_resolution_limited_instead_of_guessing():
             "cornerScore": 0.78,
         },
     }
+
+
+@pytest.mark.parametrize(
+    ("preset", "rotation", "reason"),
+    [
+        ("star5", 0.0, "geometry-mask-unsupported"),
+        ("roundRect", 30.0, "shape-rotation-unsupported"),
+    ],
+)
+def test_bevel_ring_refuses_geometry_it_cannot_mask_independently(
+    preset: str,
+    rotation: float,
+    reason: str,
+):
+    reference, _flat, base_region = _bevel_specimen()
+    region = BevelRegion(
+        **{
+            **base_region.__dict__,
+            "preset": preset,
+            "rotation_degrees": rotation,
+        }
+    )
+
+    result = compute_bevel_ring_metrics(reference, reference, region)
+
+    assert result["evaluable"] is False
+    assert result["passed"] is False
+    assert result["reason"] == reason
 
 
 def test_corner_gate_applies_only_to_roundrect_geometry():
@@ -202,6 +297,57 @@ def test_extracts_group_scaled_bounds_and_bevel_width_from_ooxml(tmp_path):
             corner_radius_ratio=0.25,
         )
     ]
+
+
+def test_extracts_donut_adjustment_for_the_bevel_mask(tmp_path):
+    source = tmp_path / "donut.pptx"
+    presentation = """
+      <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:sldSz cx="1000" cy="500"/>
+      </p:presentation>"""
+    slide = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:spPr>
+          <a:xfrm><a:off x="100" y="50"/><a:ext cx="400" cy="300"/></a:xfrm>
+          <a:prstGeom prst="donut"><a:avLst><a:gd name="adj" fmla="val 32000"/></a:avLst></a:prstGeom>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT w="10" h="8" prst="circle"/></a:sp3d>
+        </p:spPr></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/presentation.xml", presentation)
+        archive.writestr("ppt/slides/slide1.xml", slide)
+
+    [region] = extract_shape3d_regions(source)
+
+    assert region.preset == "donut"
+    assert region.geometry_adjustment == pytest.approx(0.32)
+    assert region.geometry_inset_x_ratio == pytest.approx(0.24)
+    assert region.geometry_inset_y_ratio == pytest.approx(0.32)
+
+
+def test_skips_a_zero_thickness_donut_from_local_bevel_scoring(tmp_path):
+    source = tmp_path / "zero-donut.pptx"
+    presentation = """
+      <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:sldSz cx="1000" cy="500"/>
+      </p:presentation>"""
+    slide = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:spPr>
+          <a:xfrm><a:off x="100" y="50"/><a:ext cx="400" cy="300"/></a:xfrm>
+          <a:prstGeom prst="donut"><a:avLst><a:gd name="adj" fmla="val 0"/></a:avLst></a:prstGeom>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT w="10" h="8" prst="circle"/></a:sp3d>
+        </p:spPr></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/presentation.xml", presentation)
+        archive.writestr("ppt/slides/slide1.xml", slide)
+
+    assert extract_shape3d_regions(source) == []
 
 
 def test_bevel_report_binds_the_exact_native_report_rasters(tmp_path):

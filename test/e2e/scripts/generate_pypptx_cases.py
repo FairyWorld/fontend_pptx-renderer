@@ -1731,6 +1731,89 @@ def _build_shape3d_cases() -> list[CaseDef]:
         ],
     )
 
+    def _style_donut(shape, adjustment: float | None = None) -> None:
+        if adjustment is not None:
+            shape.adjustments[0] = adjustment
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
+        shape.line.fill.background()
+        _apply_bounded_shape3d(shape)
+
+    def _build_donut_matrix(prs):
+        for name, adjustment in (
+            ("Static 3D donut default", None),
+            ("Static 3D donut lower bound", 0.0),
+            ("Static 3D donut upper bound", 0.5),
+        ):
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            donut = slide.shapes.add_shape(
+                MSO_SHAPE.DONUT,
+                _emu(4.5665),
+                _emu(1.65),
+                _emu(4.2),
+                _emu(4.2),
+            )
+            donut.name = name
+            _style_donut(donut, adjustment)
+
+        wide_slide = prs.slides.add_slide(prs.slide_layouts[6])
+        wide = wide_slide.shapes.add_shape(
+            MSO_SHAPE.DONUT,
+            _emu(2.6665),
+            _emu(2.15),
+            _emu(8.0),
+            _emu(3.2),
+        )
+        wide.name = "Static 3D donut wide adjusted theme"
+        wide.adjustments[0] = 0.32
+        style = wide._element.find(qn("p:style"))
+        if style is None:
+            raise RuntimeError("donut shape has no p:style")
+        fill_ref = style.find(qn("a:fillRef"))
+        if fill_ref is None:
+            raise RuntimeError("donut shape style has no a:fillRef")
+        fill_ref.set("idx", "1")
+        scheme_color = fill_ref.find(qn("a:schemeClr"))
+        if scheme_color is None:
+            raise RuntimeError("donut shape fillRef has no a:schemeClr")
+        scheme_color.set("val", "accent1")
+        wide.line.fill.background()
+        _apply_bounded_shape3d(wide)
+
+        tall_slide = prs.slides.add_slide(prs.slide_layouts[6])
+        group = tall_slide.shapes.add_group_shape()
+        tall = group.shapes.add_shape(
+            MSO_SHAPE.DONUT,
+            _emu(1.0),
+            _emu(1.0),
+            _emu(4.0),
+            _emu(4.0),
+        )
+        tall.name = "Static 3D donut grouped tall adjusted"
+        _style_donut(tall, 0.10)
+        tall.fill.fore_color.rgb = RGBColor(0x70, 0xAD, 0x47)
+        group.left = _emu(5.0665)
+        group.top = _emu(0.95)
+        group.width = _emu(3.2)
+        group.height = _emu(5.6)
+
+    _add(
+        "donut-circle-bevel-adjustment-matrix",
+        _build_donut_matrix,
+        slide_count=5,
+        features=[
+            "p:sp.prstGeom=donut",
+            "geometry.adjustment=0|10000|default25000|32000|50000",
+            "geometry.aspect=square|wide|tall",
+            "container=standalone|nonIdentityGroup",
+            "paint=explicitSolid|themeStyleReference",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
     return cases
 
 

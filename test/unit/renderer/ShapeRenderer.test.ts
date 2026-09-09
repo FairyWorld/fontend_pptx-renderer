@@ -6753,6 +6753,31 @@ describe('ShapeRenderer', () => {
     );
   });
 
+  it('treats a solid theme fill reference as eligible static 3D paint', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="83" name="3D theme donut"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+          <a:prstGeom prst="donut"><a:avLst><a:gd name="adj" fmla="val 32000"/></a:avLst></a:prstGeom>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT w="127000" h="127000" prst="circle"/></a:sp3d>
+        </p:spPr>
+        <p:style>
+          <a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef>
+          <a:fillRef idx="1"><a:schemeClr val="accent1"/></a:fillRef>
+          <a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef>
+          <a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef>
+        </p:style>
+      </p:sp>`;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+
+    expect(el.querySelector('svg > path')?.getAttribute('fill')).toBe('#4472C4');
+    expect(el.querySelector('[data-pptx-shape3d-bevel]')).toBeTruthy();
+  });
+
   it('keeps unsupported perspective shape 3D as the ordinary flat renderer', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

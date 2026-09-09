@@ -2521,9 +2521,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         }
       }
 
+      const hasResolvedSolidShapeFill = !gradientFillData && /^#[0-9a-f]{6}$/i.test(fillCss);
       const shape3dPaintKind = blipFill.exists()
         ? 'picture'
-        : spPr.child('gradFill').exists()
+        : spPr.child('gradFill').exists() || gradientFillData
           ? 'gradient'
           : spPr.child('pattFill').exists()
             ? 'pattern'
@@ -2531,7 +2532,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
               ? 'group'
               : spPr.child('noFill').exists()
                 ? 'none'
-                : spPr.child('solidFill').exists() || node.fill?.localName === 'solidFill'
+                : spPr.child('solidFill').exists() ||
+                    node.fill?.localName === 'solidFill' ||
+                    hasResolvedSolidShapeFill
                   ? 'solid'
                   : 'unknown';
       const shape3dPlan = buildStaticShape3DPlan(

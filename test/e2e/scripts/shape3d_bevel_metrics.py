@@ -39,6 +39,10 @@ class BevelRegion:
     bevel_width_y: float
     preset: str
     corner_radius_ratio: float = 0.0
+    geometry_adjustment: float = 0.0
+    geometry_inset_x_ratio: float = 0.0
+    geometry_inset_y_ratio: float = 0.0
+    rotation_degrees: float = 0.0
 
 
 def _float_attr(node: etree._Element | None, name: str, default: float = 0.0) -> float:
@@ -103,6 +107,17 @@ def _roundrect_adjustment(shape_properties: etree._Element) -> float:
     return max(0.0, min(0.5, value / 100000.0))
 
 
+def _donut_adjustment(shape_properties: etree._Element) -> float:
+    guide = shape_properties.find(
+        "a:prstGeom/a:avLst/a:gd[@name='adj']",
+        NS,
+    )
+    formula = guide.get("fmla", "") if guide is not None else ""
+    match = re.fullmatch(r"\s*val\s+(-?\d+(?:\.\d+)?)\s*", formula)
+    value = float(match.group(1)) if match else 25000.0
+    return max(0.0, min(0.5, value / 100000.0))
+
+
 def _shape_regions(
     container: etree._Element,
     slide_index: int,
@@ -148,8 +163,19 @@ def _shape_regions(
         absolute_width = abs(scale_x * width)
         absolute_height = abs(scale_y * height)
         preset_node = shape_properties.find("a:prstGeom", NS)
-        preset = preset_node.get("prst", "rect") if preset_node is not None else "rect"
+        if preset_node is not None:
+            preset = preset_node.get("prst", "rect")
+        elif shape_properties.find("a:custGeom", NS) is not None:
+            preset = "custom"
+        else:
+            preset = "rect"
         corner_radius = _roundrect_adjustment(shape_properties) if preset == "roundRect" else 0.0
+        geometry_adjustment = _donut_adjustment(shape_properties) if preset == "donut" else 0.0
+        # adj=0 collapses the inner and outer donut paths to a zero-area surface. The full-page
+        # native gate still checks that degenerate result; there is no interior bevel band to score.
+        if preset == "donut" and geometry_adjustment <= 0:
+            continue
+        geometry_inset = min(width, height) * geometry_adjustment
         regions.append(
             BevelRegion(
                 slide_index=slide_index,
@@ -161,6 +187,10 @@ def _shape_regions(
                 bevel_width_y=abs(scale_y * bevel_width) / slide_height,
                 preset=preset,
                 corner_radius_ratio=corner_radius,
+                geometry_adjustment=geometry_adjustment,
+                geometry_inset_x_ratio=geometry_inset / width,
+                geometry_inset_y_ratio=geometry_inset / height,
+                rotation_degrees=_float_attr(xfrm, "rot") / 60000.0,
             )
         )
     return regions
@@ -217,11 +247,33 @@ def _common_images(reference: np.ndarray, candidate: np.ndarray) -> tuple[np.nda
     return resized[0], resized[1]
 
 
-def _geometry_mask(width: int, height: int, region: BevelRegion) -> np.ndarray:
-    if region.preset != "roundRect" or region.corner_radius_ratio <= 0:
+def _geometry_mask(width: int, height: int, region: BevelRegion) -> np.ndarray | None:
+    if region.preset == "rect":
         return np.ones((height, width), dtype=bool)
-    radius = max(1.0, min(width, height) * region.corner_radius_ratio)
     yy, xx = np.mgrid[:height, :width]
+    if region.preset in {"ellipse", "donut"}:
+        center_x = (width - 1) / 2
+        center_y = (height - 1) / 2
+        outer = (
+            ((xx - center_x) / max(width / 2, 1.0)) ** 2
+            + ((yy - center_y) / max(height / 2, 1.0)) ** 2
+            <= 1
+        )
+        if region.preset == "ellipse":
+            return outer
+        inner_radius_x = width / 2 - width * region.geometry_inset_x_ratio
+        inner_radius_y = height / 2 - height * region.geometry_inset_y_ratio
+        if inner_radius_x <= 0 or inner_radius_y <= 0:
+            return outer
+        inner = (
+            ((xx - center_x) / inner_radius_x) ** 2
+            + ((yy - center_y) / inner_radius_y) ** 2
+            < 1
+        )
+        return outer & ~inner
+    if region.preset != "roundRect" or region.corner_radius_ratio <= 0:
+        return None
+    radius = max(1.0, min(width, height) * region.corner_radius_ratio)
     nearest_x = np.clip(xx, radius, width - radius - 1)
     nearest_y = np.clip(yy, radius, height - radius - 1)
     return (xx - nearest_x) ** 2 + (yy - nearest_y) ** 2 <= radius**2
@@ -304,9 +356,6 @@ def compute_bevel_ring_metrics(
     reference_crop = reference[top:bottom, left:right]
     candidate_crop = candidate[top:bottom, left:right]
     crop_height, crop_width = reference_crop.shape[:2]
-    geometry = _geometry_mask(crop_width, crop_height, region)
-    padded = np.pad(geometry.astype(np.uint8), 1)
-    distance = cv2.distanceTransform(padded, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)[1:-1, 1:-1]
     band_width = math.sqrt(
         max(region.bevel_width_x * image_width, 0.0)
         * max(region.bevel_width_y * image_height, 0.0)
@@ -324,6 +373,26 @@ def compute_bevel_ring_metrics(
                 "cornerScore": corner_score_threshold,
             },
         }
+    unsupported_reason = None
+    if not math.isclose(region.rotation_degrees % 360.0, 0.0, abs_tol=1e-6):
+        unsupported_reason = "shape-rotation-unsupported"
+    geometry = _geometry_mask(crop_width, crop_height, region)
+    if geometry is None:
+        unsupported_reason = unsupported_reason or "geometry-mask-unsupported"
+    if unsupported_reason is not None:
+        return {
+            "evaluable": False,
+            "passed": False,
+            "reason": unsupported_reason,
+            "boundsPx": [left, top, right - left, bottom - top],
+            "bandWidthPx": float(band_width),
+            "thresholds": {
+                "score": score_threshold,
+                "cornerScore": corner_score_threshold,
+            },
+        }
+    padded = np.pad(geometry.astype(np.uint8), 1)
+    distance = cv2.distanceTransform(padded, cv2.DIST_L2, cv2.DIST_MASK_PRECISE)[1:-1, 1:-1]
     ring = geometry & (distance > max(1.0, band_width * 0.10)) & (distance <= band_width * 1.35)
     core = geometry & (distance >= band_width * 1.75)
     if np.count_nonzero(core) < 20:

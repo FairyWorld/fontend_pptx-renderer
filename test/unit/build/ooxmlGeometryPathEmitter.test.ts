@@ -225,6 +225,23 @@ describe('OOXML evaluated-path SVG emitter', () => {
     });
   });
 
+  it('normalizes a sub-pixel negative arc radius caused by floating-point residue', () => {
+    const emitted = emitPresetShapePaths(
+      evaluatedShape([
+        { type: 'moveTo', x: 0, y: 0 },
+        {
+          type: 'arcTo',
+          widthRadius: -Number.EPSILON * 16,
+          heightRadius: 5,
+          startAngle: 0,
+          sweepAngle: 90 * 60000,
+        },
+      ]),
+    );
+
+    expect(emitted.paths[0].d).toBe('M0,0');
+  });
+
   it.each([
     [
       'an arc before a current point',

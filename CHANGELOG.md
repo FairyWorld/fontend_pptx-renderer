@@ -18,9 +18,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus an eleven-case, thirteen-slide
+  shapes and pictures, with stable renderer fallback reasons, plus a twelve-case, eighteen-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
-  ellipse aspect/container/paint interactions, and horizontal, vertical, and combined source crops.
+  ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
+  vertical, and combined source crops.
 - Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored eight-case
   3D discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
@@ -47,7 +48,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Promote finite nonnegative `a:srcRect` picture crops into the bounded static 3D top-bevel lane;
   negative or degenerate crops keep the ordinary flat picture path with a stable fallback reason.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
-  `ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures with a
+  `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures with a
   silhouette-aware interior
   distance field, continuous perimeter normals, and a circular cross-section. Bevel width controls
   edge extent while height controls lighting contrast; a bounded cached texture replaces a
@@ -57,6 +58,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Validate ellipse bevels across square explicit paint, wide theme-reference paint, and a tall
   ellipse under a non-identity group transform; all three use the same source-silhouette distance
   field instead of a geometry-specific lighting approximation.
+- Validate donut bevels across the `0..50000` adjustment bounds, the `25000` default, square/wide/tall
+  extents, a theme fill, and a non-identity group. Multi-contour lighting now preserves the hole
+  with explicit even-odd clipping, normalizes floating-point residue at a clamped zero arc radius,
+  and recognizes resolved solid theme fills without admitting theme gradients.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
   renderer, browser, picture-clip, and native PowerPoint comparison gates. A reproducible 28-case,
