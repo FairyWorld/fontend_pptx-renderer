@@ -269,6 +269,35 @@ def _apply_bounded_shape3d(
     _insert_before_ext_lst(sp_pr, sp3d)
 
 
+def _apply_flat_shape3d_scene(
+    shape,
+    *,
+    camera_preset: str,
+    camera_rotation: tuple[int, int, int] | None = None,
+    field_of_view: int | None = None,
+) -> None:
+    """Insert a camera-only scene around one zero-depth shape face."""
+    sp_pr = shape._element.spPr
+    camera_attrs = {"prst": camera_preset}
+    if field_of_view is not None:
+        camera_attrs["fov"] = str(field_of_view)
+    scene3d = etree.Element(qn("a:scene3d"))
+    camera = etree.SubElement(scene3d, qn("a:camera"), **camera_attrs)
+    if camera_rotation is not None:
+        lat, lon, rev = camera_rotation
+        etree.SubElement(
+            camera,
+            qn("a:rot"),
+            lat=str(lat),
+            lon=str(lon),
+            rev=str(rev),
+        )
+    etree.SubElement(scene3d, qn("a:lightRig"), rig="threePt", dir="t")
+    sp3d = etree.Element(qn("a:sp3d"), extrusionH="0")
+    _insert_before_ext_lst(sp_pr, scene3d)
+    _insert_before_ext_lst(sp_pr, sp3d)
+
+
 def _add_cjk_textbox(
     prs: Presentation,
     *,
@@ -1811,6 +1840,112 @@ def _build_shape3d_cases() -> list[CaseDef]:
             "a:scene3d.lightRig=threePt:t",
             "a:sp3d.extrusionH=0",
             "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _style_camera_probe(shape, *, theme_fill: bool = False) -> None:
+        if theme_fill:
+            style = shape._element.find(qn("p:style"))
+            if style is None:
+                raise RuntimeError("camera probe shape has no p:style")
+            fill_ref = style.find(qn("a:fillRef"))
+            if fill_ref is None:
+                raise RuntimeError("camera probe shape style has no a:fillRef")
+            fill_ref.set("idx", "1")
+            scheme_color = fill_ref.find(qn("a:schemeClr"))
+            if scheme_color is None:
+                raise RuntimeError("camera probe shape fillRef has no a:schemeClr")
+            scheme_color.set("val", "accent1")
+        else:
+            shape.fill.solid()
+            shape.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
+        shape.line.fill.background()
+
+    def _add_camera_probe(
+        prs,
+        *,
+        camera_preset: str,
+        camera_rotation: tuple[int, int, int] | None,
+        field_of_view: int | None = None,
+        width: float = 4.2,
+        height: float = 4.2,
+        theme_fill: bool = False,
+        grouped: bool = False,
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        if grouped:
+            group = slide.shapes.add_group_shape()
+            shape = group.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                _emu(1.0),
+                _emu(1.0),
+                _emu(4.0),
+                _emu(4.0),
+            )
+            group.left = _emu(3.8665)
+            group.top = _emu(2.15)
+            group.width = _emu(5.6)
+            group.height = _emu(3.2)
+        else:
+            shape = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                _emu((13.333 - width) / 2),
+                _emu((7.5 - height) / 2),
+                _emu(width),
+                _emu(height),
+            )
+        shape.name = "Flat shape 3D camera projection probe"
+        _style_camera_probe(shape, theme_fill=theme_fill)
+        _apply_flat_shape3d_scene(
+            shape,
+            camera_preset=camera_preset,
+            camera_rotation=camera_rotation,
+            field_of_view=field_of_view,
+        )
+
+    def _build_camera_projection_matrix(prs) -> None:
+        _add_camera_probe(
+            prs,
+            camera_preset="orthographicFront",
+            camera_rotation=None,
+        )
+        _add_camera_probe(
+            prs,
+            camera_preset="orthographicFront",
+            camera_rotation=(1200000, 1800000, 0),
+        )
+        for width, height, theme_fill, grouped in (
+            (4.2, 4.2, False, False),
+            (8.0, 3.2, True, False),
+            (3.2, 5.4, False, False),
+            (4.0, 4.0, False, True),
+        ):
+            _add_camera_probe(
+                prs,
+                camera_preset="perspectiveRelaxedModerately",
+                camera_rotation=(18590633, 0, 0),
+                field_of_view=7200000,
+                width=width,
+                height=height,
+                theme_fill=theme_fill,
+                grouped=grouped,
+            )
+
+    _add(
+        "camera-projection-matrix",
+        _build_camera_projection_matrix,
+        slide_count=6,
+        features=[
+            "p:sp.prstGeom=rect",
+            "geometry.aspect=square|wide|tall",
+            "container=standalone|nonIdentityGroup",
+            "paint=explicitSolid|themeStyleReference",
+            "a:scene3d.camera=orthographicFront|perspectiveRelaxedModerately",
+            "a:scene3d.camera.rot=absent|20deg,30deg,0deg|18590633,0,0",
+            "a:scene3d.camera.fov=absent|7200000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevel=absent",
         ],
     )
 

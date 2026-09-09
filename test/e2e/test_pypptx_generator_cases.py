@@ -553,6 +553,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0010-picture-asymmetric-crop-bevel",
         "oracle-pypptx-shape3d-0011-ellipse-circle-bevel-matrix",
         "oracle-pypptx-shape3d-0012-donut-circle-bevel-adjustment-matrix",
+        "oracle-pypptx-shape3d-0013-camera-projection-matrix",
     }
 
 
@@ -578,7 +579,10 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
     optout = roots["oracle-pypptx-shape3d-0001-flat-optout"]
     assert not optout.xpath(".//a:scene3d | .//a:sp3d", namespaces=ns)
 
-    positive_names = set(cases) - {"oracle-pypptx-shape3d-0001-flat-optout"}
+    positive_names = set(cases) - {
+        "oracle-pypptx-shape3d-0001-flat-optout",
+        "oracle-pypptx-shape3d-0013-camera-projection-matrix",
+    }
     for name in positive_names:
         root = roots[name]
         targets = root.xpath(
@@ -869,6 +873,119 @@ def test_static_shape3d_donut_case_json_records_all_five_slides(tmp_path: Path):
             "a:scene3d.lightRig=threePt:t",
             "a:sp3d.extrusionH=0",
             "a:sp3d.bevelT=circle",
+        ],
+    }
+
+
+def test_static_shape3d_camera_matrix_serializes_bounded_flat_plane_scenes(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-shape3d-0013-camera-projection-matrix"
+    )
+    assert case["slide_count"] == 6
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        roots = [
+            etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 7)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    for root in roots:
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:prstGeom[@prst='rect'])",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'])",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:sp3d[@extrusionH='0'])",
+            namespaces=ns,
+        )
+        assert not root.xpath(
+            ".//p:sp/p:spPr/a:sp3d/* | .//p:sp/p:spPr/a:sp3d/@contourW"
+            " | .//p:sp/p:spPr/a:sp3d/@prstMaterial | .//p:sp/p:spPr/a:effectLst"
+            " | .//p:sp/p:txBody//a:t[string-length(.) > 0]",
+            namespaces=ns,
+        )
+
+    assert roots[0].xpath(
+        "boolean(.//a:camera[@prst='orthographicFront'][not(a:rot)][not(@fov)])",
+        namespaces=ns,
+    )
+    assert roots[1].xpath(
+        "boolean(.//a:camera[@prst='orthographicFront']/a:rot"
+        "[@lat='1200000'][@lon='1800000'][@rev='0'])",
+        namespaces=ns,
+    )
+    for root in roots[2:]:
+        assert root.xpath(
+            "boolean(.//a:camera[@prst='perspectiveRelaxedModerately'][@fov='7200000']"
+            "/a:rot[@lat='18590633'][@lon='0'][@rev='0'])",
+            namespaces=ns,
+        )
+
+    square_ext = [
+        int(value)
+        for value in roots[2].xpath(".//p:sp/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)
+    ]
+    wide_ext = [
+        int(value)
+        for value in roots[3].xpath(".//p:sp/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)
+    ]
+    tall_ext = [
+        int(value)
+        for value in roots[4].xpath(".//p:sp/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)
+    ]
+    assert square_ext[0] == square_ext[1]
+    assert wide_ext[0] > wide_ext[1]
+    assert tall_ext[1] > tall_ext[0]
+    assert roots[3].xpath(
+        "boolean(.//p:sp/p:style/a:fillRef[@idx='1']/a:schemeClr[@val='accent1'])",
+        namespaces=ns,
+    )
+    assert roots[5].xpath("boolean(.//p:grpSp/p:sp[p:spPr/a:scene3d])", namespaces=ns)
+    group_xfrm = roots[5].xpath(".//p:grpSp/p:grpSpPr/a:xfrm", namespaces=ns)[0]
+    assert group_xfrm.xpath("a:ext/@cx", namespaces=ns) != group_xfrm.xpath(
+        "a:chExt/@cx",
+        namespaces=ns,
+    )
+
+
+def test_static_shape3d_camera_case_json_records_all_six_slides(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-shape3d-0013-camera-projection-matrix"
+    )
+
+    path = generator._write_case_json(case, tmp_path)
+    payload = __import__("json").loads(path.read_text(encoding="utf-8"))
+
+    assert len(payload["slides"]) == 6
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "features": [
+            "p:sp.prstGeom=rect",
+            "geometry.aspect=square|wide|tall",
+            "container=standalone|nonIdentityGroup",
+            "paint=explicitSolid|themeStyleReference",
+            "a:scene3d.camera=orthographicFront|perspectiveRelaxedModerately",
+            "a:scene3d.camera.rot=absent|20deg,30deg,0deg|18590633,0,0",
+            "a:scene3d.camera.fov=absent|7200000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevel=absent",
         ],
     }
 
