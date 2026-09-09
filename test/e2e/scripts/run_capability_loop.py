@@ -138,7 +138,10 @@ def command_inventory(args: argparse.Namespace) -> int:
     corpus_values = args.corpus or ["test/e2e/testdata/cases"]
     roots = [Path(value) if Path(value).is_absolute() else repo / value for value in corpus_values]
     report = scan_corpus(roots, registry)
-    payload = inventory_to_dict(report)
+    payload = inventory_to_dict(
+        report,
+        representative_alias_globs=tuple(args.representative_alias),
+    )
     revision, dirty = detect_renderer_git_state(repo)
     payload["renderer"] = {"revision": revision, "dirty": dirty}
     if args.issues:
@@ -430,6 +433,15 @@ def build_parser() -> argparse.ArgumentParser:
     inventory = subparsers.add_parser("inventory", help="scan bounded PPTX corpora")
     _add_common_contract_arguments(inventory)
     inventory.add_argument("--corpus", action="append")
+    inventory.add_argument(
+        "--representative-alias",
+        action="append",
+        default=[],
+        help=(
+            "alias glob for representative documents; repeat as needed. "
+            "When present, unmatched packages are validation fixtures"
+        ),
+    )
     inventory.add_argument("--issues")
     inventory.add_argument("--out")
     inventory.add_argument("--fail-on-rejected", action="store_true")

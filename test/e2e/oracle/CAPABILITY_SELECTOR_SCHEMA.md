@@ -28,3 +28,5 @@ tracked separately. Inventory observation does not imply renderer support; the c
 The inventory scanner enforces direct-parent matching while streaming XML with a bounded ancestor
 stack. Contract and scanner behavior are covered by `test_capability_contract.py` and
 `test_capability_inventory.py`.
+
+See `CORPUS_CLASSIFICATION.md` for the separate representative-versus-validation ranking signal.

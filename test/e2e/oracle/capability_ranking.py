@@ -38,6 +38,7 @@ class LedgerRow:
     impact: str
     current_issue_count: int
     observed_unique_packages: int
+    observed_representative_packages: int
     failure_kind: str
     oracle_ready: bool
     dependency_depth: int
@@ -50,7 +51,7 @@ class LedgerRow:
 @dataclass(frozen=True)
 class RankedCapability:
     row: LedgerRow
-    priority_key: tuple[int, int, int, int, int, int, str]
+    priority_key: tuple[int, int, int, int, int, int, int, str]
     priority_labels: tuple[tuple[str, str], ...]
 
     @property
@@ -63,8 +64,14 @@ def _validate_row(row: LedgerRow) -> None:
         raise ValueError("ledger capability id must not be empty")
     if row.impact not in IMPACTS or row.impact not in IMPACT_ORDER:
         raise ValueError(f"unsupported impact: {row.impact}")
-    if row.current_issue_count < 0 or row.observed_unique_packages < 0:
+    if (
+        row.current_issue_count < 0
+        or row.observed_unique_packages < 0
+        or row.observed_representative_packages < 0
+    ):
         raise ValueError("ledger counts must be non-negative")
+    if row.observed_representative_packages > row.observed_unique_packages:
+        raise ValueError("representative package count must not exceed total observed packages")
     if row.failure_kind not in FAILURE_ORDER:
         raise ValueError(f"unsupported failure kind: {row.failure_kind}")
     if row.dependency_depth < 0:
@@ -81,6 +88,7 @@ def _ranked(row: LedgerRow) -> RankedCapability:
     priority_key = (
         IMPACT_ORDER[row.impact],
         -row.current_issue_count,
+        -row.observed_representative_packages,
         -row.observed_unique_packages,
         FAILURE_ORDER[row.failure_kind],
         0 if row.oracle_ready else 1,
@@ -90,6 +98,7 @@ def _ranked(row: LedgerRow) -> RankedCapability:
     priority_labels = (
         ("impact", row.impact),
         ("currentIssueCount", str(row.current_issue_count)),
+        ("observedRepresentativePackages", str(row.observed_representative_packages)),
         ("observedUniquePackages", str(row.observed_unique_packages)),
         ("failureKind", row.failure_kind),
         ("oracleReady", str(row.oracle_ready).lower()),
@@ -140,6 +149,7 @@ def ledger_row_to_dict(row: LedgerRow) -> dict[str, Any]:
         "capabilityId": row.capability_id,
         "impact": row.impact,
         "currentIssueCount": row.current_issue_count,
+        "observedRepresentativePackages": row.observed_representative_packages,
         "observedUniquePackages": row.observed_unique_packages,
         "failureKind": row.failure_kind,
         "oracleReady": row.oracle_ready,
@@ -153,11 +163,15 @@ def ledger_row_to_dict(row: LedgerRow) -> dict[str, Any]:
 
 def ledger_row_from_dict(value: Mapping[str, Any]) -> LedgerRow:
     try:
+        observed_unique_packages = int(value["observedUniquePackages"])
         row = LedgerRow(
             capability_id=str(value["capabilityId"]),
             impact=str(value["impact"]),
             current_issue_count=int(value["currentIssueCount"]),
-            observed_unique_packages=int(value["observedUniquePackages"]),
+            observed_unique_packages=observed_unique_packages,
+            observed_representative_packages=int(
+                value.get("observedRepresentativePackages", observed_unique_packages)
+            ),
             failure_kind=str(value["failureKind"]),
             oracle_ready=value["oracleReady"] is True,
             dependency_depth=int(value["dependencyDepth"]),
@@ -282,6 +296,15 @@ def build_ledger_rows(
         if isinstance(package, Mapping) and _is_sha256(package.get("sha256"))
     }
     accepted_states = accepted_states or {}
+    package_roles: dict[str, str] = {}
+    for package in packages:
+        if not isinstance(package, Mapping):
+            continue
+        package_id = package.get("packageId") or package.get("sha256")
+        role = package.get("corpusRole", "representative")
+        if role not in {"representative", "validation"}:
+            raise ValueError(f"unsupported corpus role: {role}")
+        package_roles[str(package_id)] = role
     rows: list[LedgerRow] = []
     for capability in registry.capabilities:
         observed = sum(
@@ -290,6 +313,18 @@ def build_ledger_rows(
             if isinstance(package, Mapping)
             and isinstance(package.get("capabilityIds"), list)
             and capability.id in package["capabilityIds"]
+        )
+        observed_representative = sum(
+            1
+            for package in packages
+            if isinstance(package, Mapping)
+            and isinstance(package.get("capabilityIds"), list)
+            and capability.id in package["capabilityIds"]
+            and package_roles.get(
+                str(package.get("packageId") or package.get("sha256")),
+                "representative",
+            )
+            == "representative"
         )
         oracle_rows = _oracle_rows_for(capability.id, oracle_report)
         fresh_rows = tuple(
@@ -328,6 +363,7 @@ def build_ledger_rows(
                 impact=capability.impact,
                 current_issue_count=_issue_current_reproduction_count(capability, issues),
                 observed_unique_packages=observed,
+                observed_representative_packages=observed_representative,
                 failure_kind=failure_kind,
                 oracle_ready=oracle_ready,
                 dependency_depth=0,
@@ -413,6 +449,7 @@ def build_work_packet(
         "fallback": capability.fallback,
         "observations": {
             "currentIssueCount": row.current_issue_count,
+            "observedRepresentativePackages": row.observed_representative_packages,
             "observedUniquePackages": row.observed_unique_packages,
             "failureKind": row.failure_kind,
             "oracleReady": row.oracle_ready,

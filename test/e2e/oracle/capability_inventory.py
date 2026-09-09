@@ -8,7 +8,7 @@ import math
 import re
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
-from typing import Iterable
+from typing import Iterable, Sequence
 from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
@@ -366,7 +366,58 @@ def scan_corpus(
     )
 
 
-def inventory_to_dict(report: InventoryReport) -> dict:
+def _corpus_role(
+    aliases: tuple[str, ...],
+    representative_alias_globs: tuple[str, ...],
+) -> str:
+    if not representative_alias_globs:
+        return "representative"
+    return (
+        "representative"
+        if any(
+            fnmatch.fnmatchcase(alias, pattern)
+            for alias in aliases
+            for pattern in representative_alias_globs
+        )
+        else "validation"
+    )
+
+
+def _representative_alias_globs(
+    values: Sequence[str],
+    report: InventoryReport,
+) -> tuple[str, ...]:
+    patterns = tuple(values)
+    if any(not isinstance(pattern, str) or not pattern.strip() for pattern in patterns):
+        raise ValueError("representative alias globs must be non-empty strings")
+    patterns = tuple(pattern.strip() for pattern in patterns)
+    if len(patterns) != len(set(patterns)):
+        raise ValueError("representative alias globs contain duplicates")
+    all_aliases = tuple(
+        alias
+        for package in (*report.packages, *report.rejected_packages)
+        for alias in package.aliases
+    )
+    unmatched = [
+        pattern
+        for pattern in patterns
+        if not any(fnmatch.fnmatchcase(alias, pattern) for alias in all_aliases)
+    ]
+    if unmatched:
+        raise ValueError(f"representative alias globs matched no packages: {', '.join(unmatched)}")
+    return patterns
+
+
+def inventory_to_dict(
+    report: InventoryReport,
+    *,
+    representative_alias_globs: Sequence[str] = (),
+) -> dict:
+    patterns = _representative_alias_globs(representative_alias_globs, report)
+    package_roles = {
+        package.package_id: _corpus_role(package.aliases, patterns) for package in report.packages
+    }
+    representative_count = sum(role == "representative" for role in package_roles.values())
     return {
         "schemaVersion": report.schema_version,
         "registryFingerprint": report.registry_fingerprint,
@@ -374,11 +425,20 @@ def inventory_to_dict(report: InventoryReport) -> dict:
         "uniquePackageCount": report.unique_package_count,
         "rejectedPackageCount": report.rejected_package_count,
         "uniqueRejectedPackageCount": len(report.rejected_packages),
+        "corpusClassification": {
+            "mode": (
+                "explicit-representative-alias-globs" if patterns else "all-representative"
+            ),
+            "representativeAliasGlobs": list(patterns),
+            "representativeUniquePackageCount": representative_count,
+            "validationUniquePackageCount": len(report.packages) - representative_count,
+        },
         "packages": [
             {
                 "packageId": package.package_id,
                 "sha256": package.sha256,
                 "aliases": list(package.aliases),
+                "corpusRole": package_roles[package.package_id],
                 "capabilityIds": list(package.capability_ids),
                 "matchingParts": {
                     capability_id: list(parts)
@@ -392,6 +452,7 @@ def inventory_to_dict(report: InventoryReport) -> dict:
                 "packageId": package.package_id,
                 "sha256": package.sha256,
                 "aliases": list(package.aliases),
+                "corpusRole": _corpus_role(package.aliases, patterns),
                 "reasonCode": package.reason_code,
                 "reason": package.reason,
             }
@@ -400,11 +461,19 @@ def inventory_to_dict(report: InventoryReport) -> dict:
     }
 
 
-def write_inventory(report: InventoryReport, path: Path) -> Path:
+def write_inventory(
+    report: InventoryReport,
+    path: Path,
+    *,
+    representative_alias_globs: Sequence[str] = (),
+) -> Path:
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     encoded = json.dumps(
-        inventory_to_dict(report),
+        inventory_to_dict(
+            report,
+            representative_alias_globs=representative_alias_globs,
+        ),
         ensure_ascii=False,
         indent=2,
         sort_keys=True,

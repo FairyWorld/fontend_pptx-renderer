@@ -8,6 +8,7 @@ from oracle.capability_contract import load_capability_registry
 from oracle.capability_inventory import (
     CapabilityInventoryError,
     ScanLimits,
+    inventory_to_dict,
     scan_corpus,
     scan_pptx,
     write_inventory,
@@ -228,6 +229,53 @@ def test_scan_corpus_deduplicates_identical_packages_and_serializes_deterministi
     assert first_output == second_output
     payload = json.loads(first_output)
     assert payload["packages"][0]["sha256"] == report.packages[0].sha256
+    explicitly_classified = inventory_to_dict(
+        report,
+        representative_alias_globs=("corpus-0/first.pptx",),
+    )
+    assert explicitly_classified["packages"][0]["corpusRole"] == "representative"
+    assert explicitly_classified["corpusClassification"]["representativeUniquePackageCount"] == 1
+
+
+def test_inventory_classifies_explicit_representative_aliases_without_rescanning(
+    tmp_path: Path,
+    registry,
+):
+    corpus = tmp_path / "corpus"
+    representative = corpus / "representative"
+    validation = corpus / "validation"
+    representative.mkdir(parents=True)
+    validation.mkdir(parents=True)
+    write_test_pptx(representative / "source.pptx")
+    write_test_pptx(
+        validation / "source.pptx",
+        slide_xml=SLIDE_WITH_SCENE_AND_SP3D.replace('contourW="12700"', 'contourW="25400"'),
+    )
+
+    payload = inventory_to_dict(
+        scan_corpus([corpus], registry),
+        representative_alias_globs=("corpus-0/representative/*",),
+    )
+
+    roles_by_alias = {
+        package["aliases"][0]: package["corpusRole"] for package in payload["packages"]
+    }
+    assert roles_by_alias == {
+        "corpus-0/representative/source.pptx": "representative",
+        "corpus-0/validation/source.pptx": "validation",
+    }
+    assert payload["corpusClassification"] == {
+        "mode": "explicit-representative-alias-globs",
+        "representativeAliasGlobs": ["corpus-0/representative/*"],
+        "representativeUniquePackageCount": 1,
+        "validationUniquePackageCount": 1,
+    }
+
+    with pytest.raises(ValueError, match="matched no packages"):
+        inventory_to_dict(
+            scan_corpus([corpus], registry),
+            representative_alias_globs=("corpus-0/misspelled/*",),
+        )
 
 
 def test_scan_corpus_records_one_rejected_package_and_continues(tmp_path: Path, registry):

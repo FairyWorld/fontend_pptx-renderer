@@ -7,6 +7,8 @@ from oracle.capability_ranking import (
     LedgerRow,
     build_ledger_rows,
     build_work_packet,
+    ledger_row_from_dict,
+    ledger_row_to_dict,
     rank_capabilities,
     select_ranked_capability,
 )
@@ -18,6 +20,7 @@ def row(
     impact: str = "fidelity",
     current_issues: int = 0,
     observed: int = 0,
+    representative: int | None = None,
     failure: str = "none",
     oracle_ready: bool = False,
     dependency_depth: int = 0,
@@ -30,6 +33,9 @@ def row(
         impact=impact,
         current_issue_count=current_issues,
         observed_unique_packages=observed,
+        observed_representative_packages=(
+            observed if representative is None else representative
+        ),
         failure_kind=failure,
         oracle_ready=oracle_ready,
         dependency_depth=dependency_depth,
@@ -74,11 +80,87 @@ def test_ranking_uses_documented_lexicographic_order():
         "cap.e",
         "cap.f",
     ]
-    assert ranked[1].priority_labels[:3] == (
+    assert ranked[1].priority_labels[:4] == (
         ("impact", "fidelity"),
         ("currentIssueCount", "2"),
+        ("observedRepresentativePackages", "0"),
         ("observedUniquePackages", "0"),
     )
+
+
+def test_representative_corpus_precedes_generated_validation_volume():
+    common = {
+        "impact": "fidelity",
+        "current_issue_count": 0,
+        "failure_kind": "none",
+        "oracle_ready": False,
+        "dependency_depth": 0,
+        "evidence_state": "observed",
+        "render_mode": "fallback",
+        "blockers": (),
+        "issue_urls": (),
+    }
+    ranked = rank_capabilities(
+        [
+            LedgerRow(
+                capability_id="cap.generated-heavy",
+                observed_unique_packages=20,
+                observed_representative_packages=0,
+                **common,
+            ),
+            LedgerRow(
+                capability_id="cap.representative",
+                observed_unique_packages=2,
+                observed_representative_packages=2,
+                **common,
+            ),
+        ]
+    )
+
+    assert [item.capability_id for item in ranked] == [
+        "cap.representative",
+        "cap.generated-heavy",
+    ]
+    assert ranked[0].priority_labels[2:4] == (
+        ("observedRepresentativePackages", "2"),
+        ("observedUniquePackages", "2"),
+    )
+
+
+def test_legacy_ledger_rows_treat_all_observations_as_representative():
+    payload = ledger_row_to_dict(row("cap.legacy", observed=3))
+    del payload["observedRepresentativePackages"]
+
+    restored = ledger_row_from_dict(payload)
+
+    assert restored.observed_representative_packages == 3
+
+
+def test_ledger_counts_representative_and_validation_observations_separately():
+    registry = load_capability_registry(Path("oracle/capabilities.json"))
+    capability_id = "drawingml.shape.3d.scene"
+    inventory = {
+        "packages": [
+            {
+                "packageId": "sha256:" + "a" * 64,
+                "sha256": "a" * 64,
+                "corpusRole": "representative",
+                "capabilityIds": [capability_id],
+            },
+            {
+                "packageId": "sha256:" + "b" * 64,
+                "sha256": "b" * 64,
+                "corpusRole": "validation",
+                "capabilityIds": [capability_id],
+            },
+        ]
+    }
+
+    rows = build_ledger_rows(registry, inventory)
+    scene = {item.capability_id: item for item in rows}[capability_id]
+
+    assert scene.observed_unique_packages == 2
+    assert scene.observed_representative_packages == 1
 
 
 def test_oracle_readiness_then_dependency_depth_then_id_break_ties():
@@ -112,6 +194,8 @@ def test_ranking_rejects_invalid_or_duplicate_rows():
         rank_capabilities([row("cap.a"), row("cap.a")])
     with pytest.raises(ValueError, match="non-negative"):
         rank_capabilities([row("cap.a", observed=-1)])
+    with pytest.raises(ValueError, match="must not exceed"):
+        rank_capabilities([row("cap.a", observed=1, representative=2)])
     with pytest.raises(ValueError, match="failure kind"):
         rank_capabilities([row("cap.a", failure="mystery")])
 
@@ -161,6 +245,7 @@ def test_work_packet_contains_one_bounded_donut_matrix():
         "grouped",
         "picture-clip-sentinel",
     ]
+    assert packet["observations"]["observedRepresentativePackages"] == 2
     assert packet["blockers"] == ["refresh-current-native-report"]
     assert packet["rollbackConditions"]
     assert packet["requiredGates"] == list(

@@ -171,11 +171,16 @@ def test_inventory_is_deterministic_and_rejects_unsafe_zip(tmp_path: Path):
             registry,
             "--corpus",
             corpus,
+            "--representative-alias",
+            "corpus-0/donut.pptx",
             "--out",
             output,
         )
         assert result.returncode == 0, result.stderr
     assert first.read_bytes() == second.read_bytes()
+    classified = json.loads(first.read_text(encoding="utf-8"))
+    assert classified["packages"][0]["corpusRole"] == "representative"
+    assert classified["corpusClassification"]["representativeUniquePackageCount"] == 1
 
     with ZipFile(corpus / "unsafe.pptx", "w") as archive:
         archive.writestr("../escape.xml", "<x/>")
