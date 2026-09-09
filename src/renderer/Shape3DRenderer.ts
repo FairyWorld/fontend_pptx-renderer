@@ -2,9 +2,9 @@
  * Bounded DrawingML static 3D renderer.
  *
  * This module deliberately supports one small, native-oracle-backed tuple: orthographic-front
- * circle top bevels on solid rect/roundRect shapes and rectangular pictures with bounded source
- * crops. Everything else returns an explicit flat plan so detection cannot be confused with
- * rendering support.
+ * circle top bevels on solid ellipse/rect/roundRect shapes and rectangular pictures with bounded
+ * source crops. Everything else returns an explicit flat plan so detection cannot be confused
+ * with rendering support.
  */
 
 import type { Shape3DProperties, Shape3DRotation } from '../model/nodes/Shape3D';
@@ -14,7 +14,7 @@ import { applyLumMod, applyLumOff, applySatMod, hexToRgb } from '../utils/color'
 import { fitShape3DRasterScale, renderCircleBevelOverlay } from './shape3d/BevelLighting';
 
 type StaticShape3DSurface = 'shape' | 'picture';
-type StaticShape3DGeometry = 'rect' | 'roundrect';
+type StaticShape3DGeometry = 'ellipse' | 'rect' | 'roundrect';
 type BevelFace = 'top' | 'right' | 'bottom' | 'left';
 
 type StaticShape3DFallbackReason =
@@ -115,7 +115,7 @@ interface AppendedStaticShape3DEffects {
   clipId: string;
 }
 
-const SUPPORTED_SHAPE_PRESETS = new Set(['rect', 'roundrect']);
+const SUPPORTED_SHAPE_PRESETS = new Set(['ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SHAPE3D_LIGHTING_VERSION = 'distance-field-v1';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;

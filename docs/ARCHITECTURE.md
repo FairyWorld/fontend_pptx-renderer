@@ -218,7 +218,9 @@ supported plan requires all of the following:
 - a positive circular top bevel, zero or omitted extrusion, an absent/zero contour or a positive
   contour with a resolvable color, no bottom bevel or preset material, and only an optional outer
   shadow in `effectLst`;
-- an opaque resolved solid-fill `rect`/`roundRect` shape, or a rectangular stretch-filled picture;
+- an opaque resolved solid-fill `ellipse`/`rect`/`roundRect` shape, or a rectangular stretch-filled
+  picture; the ellipse lane is pinned across square, wide, and tall silhouettes, explicit and theme
+  paint sources, and standalone or non-identity-group containers;
 - for pictures, no `a:srcRect`, or finite nonnegative crop fractions whose left/right and
   top/bottom sums each leave more than the renderer's `0.001` visible-fraction tolerance.
 

@@ -1386,17 +1386,20 @@ def _build_shape3d_cases() -> list[CaseDef]:
     cases: list[CaseDef] = []
     seq = 0
 
-    def _add(slug: str, build_fn, *, features: list[str]):
+    def _add(slug: str, build_fn, *, features: list[str], slide_count: int = 1):
         nonlocal seq
         seq += 1
-        cases.append({
+        case = {
             "name": f"oracle-pypptx-shape3d-{seq:04d}-{slug}",
             "build_fn": build_fn,
             "coverage": {
                 "oracle": "native-powerpoint",
                 "features": features,
             },
-        })
+        }
+        if slide_count != 1:
+            case["slide_count"] = slide_count
+        cases.append(case)
 
     def _add_picture(prs, *, apply_3d: bool):
         slide = prs.slides.add_slide(prs.slide_layouts[6])
@@ -1651,6 +1654,79 @@ def _build_shape3d_cases() -> list[CaseDef]:
             "a:srcRect=12%,8%,18%,10%",
             "crop.axis=combined",
             "a:scene3d.lightRig=twoPt:t",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _build_ellipse_matrix(prs):
+        square_slide = prs.slides.add_slide(prs.slide_layouts[6])
+        square = square_slide.shapes.add_shape(
+            MSO_SHAPE.OVAL,
+            _emu(4.5665),
+            _emu(1.65),
+            _emu(4.2),
+            _emu(4.2),
+        )
+        square.name = "Static 3D ellipse square explicit"
+        square.fill.solid()
+        square.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
+        square.line.fill.background()
+        _apply_bounded_shape3d(square)
+
+        wide_slide = prs.slides.add_slide(prs.slide_layouts[6])
+        wide = wide_slide.shapes.add_shape(
+            MSO_SHAPE.OVAL,
+            _emu(2.6665),
+            _emu(2.15),
+            _emu(8.0),
+            _emu(3.2),
+        )
+        wide.name = "Static 3D ellipse wide theme"
+        style = wide._element.find(qn("p:style"))
+        if style is None:
+            raise RuntimeError("ellipse shape has no p:style")
+        fill_ref = style.find(qn("a:fillRef"))
+        if fill_ref is None:
+            raise RuntimeError("ellipse shape style has no a:fillRef")
+        fill_ref.set("idx", "1")
+        scheme_color = fill_ref.find(qn("a:schemeClr"))
+        if scheme_color is None:
+            raise RuntimeError("ellipse shape fillRef has no a:schemeClr")
+        scheme_color.set("val", "accent1")
+        wide.line.fill.background()
+        _apply_bounded_shape3d(wide)
+
+        tall_slide = prs.slides.add_slide(prs.slide_layouts[6])
+        group = tall_slide.shapes.add_group_shape()
+        tall = group.shapes.add_shape(
+            MSO_SHAPE.OVAL,
+            _emu(1.0),
+            _emu(1.0),
+            _emu(4.0),
+            _emu(4.0),
+        )
+        tall.name = "Static 3D ellipse grouped tall explicit"
+        tall.fill.solid()
+        tall.fill.fore_color.rgb = RGBColor(0x70, 0xAD, 0x47)
+        tall.line.fill.background()
+        _apply_bounded_shape3d(tall)
+        group.left = _emu(5.0665)
+        group.top = _emu(0.95)
+        group.width = _emu(3.2)
+        group.height = _emu(5.6)
+
+    _add(
+        "ellipse-circle-bevel-matrix",
+        _build_ellipse_matrix,
+        slide_count=3,
+        features=[
+            "p:sp.prstGeom=ellipse",
+            "geometry.aspect=square|wide|tall",
+            "container=standalone|nonIdentityGroup",
+            "paint=explicitSolid|themeStyleReference",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
             "a:sp3d.bevelT=circle",
         ],
     )

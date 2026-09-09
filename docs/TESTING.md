@@ -217,26 +217,29 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, zero-adjustment flowchart, bounded static DrawingML 3D, composite, and
-chart interaction cases, use the python-pptx generator. It currently defines 169 cases: 59 text,
-31 shape-adjustment, 28 flowchart, 10 static 3D, 20 composite, and 21 chart cases. Each flowchart
+chart interaction cases, use the python-pptx generator. It currently defines 170 cases: 59 text,
+31 shape-adjustment, 28 flowchart, 11 static 3D, 20 composite, and 21 chart cases. Each flowchart
 case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
 square explicit paint, wide theme-reference paint, and grouped tall explicit paint. The group uses
 a non-identity child coordinate space, and every source keeps an empty `a:avLst` with no adjustment
 guides. The static 3D matrix covers flat opt-out, picture and
-shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white contour, wide/tall
-aspect ratios, a non-identity group, and the light rotation plus implicit defaults observed in the
-local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
+shape containers, `twoPt:t` and `threePt:t` lighting, ellipse/rect/roundRect, white contour,
+wide/tall aspect ratios, a non-identity group, and the light rotation plus implicit defaults
+observed in the local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
 outline and outer shadow so the 3D effect is not tested in isolation from its actual container.
-The ten cases are one opt-out control, eight synthetic interaction cases, and one property-level
-slice copied from the ignored local corpus. The last three synthetic rows isolate horizontal,
-vertical, and combined nonnegative `a:srcRect` crops against the existing no-crop control. Together
+The eleven cases are one opt-out control, nine single-slide positive cases, and one three-slide
+ellipse matrix. The real-property slice is copied from the ignored local corpus; the last three
+picture rows isolate horizontal, vertical, and combined nonnegative `a:srcRect` crops against the
+existing no-crop control. The ellipse row spans square explicit paint, wide theme-reference paint,
+and a tall ellipse under a non-identity group transform. Together
 they pin picture versus shape rendering, wide/tall extents, a non-identity parent group, contour
 layering, stable repeated frames, unique SVG
 effect IDs, distance-field texture readiness, no horizontal growth, picture-URL disposal, abort-safe
 cleanup, and the flat fallback for an unsupported camera. The accepted support claim is limited to
 the exact tuple in
 `drawingml.shape.3d.top-bevel-contour`; a high aggregate score cannot broaden that registry scope.
-An opt-in seven-case local matrix adds ellipse, adjusted donut, adjusted star, concave freeform,
+An opt-in eight-case local matrix retains the original ellipse discovery probe and adds adjusted
+donut, adjusted star, concave freeform,
 rotation, nested non-identity groups, and glow interaction. Those cases use the
 `oracle-local-shape3d-*` prefix, write metadata only below the ignored `oracle-runtime` directory,
 and remain discovery evidence until a separately bounded capability and native gate promote them.
@@ -286,9 +289,9 @@ per-slide PNG. The generator refreshes tracked case metadata even when cached lo
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
 The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
-into tracked `oracle/cases-pypptx/` and do not change the 169-case default matrix.
+into tracked `oracle/cases-pypptx/` and do not change the 170-case default matrix.
 
-The 3D capability also has a region-level lighting gate. After the ten clean native API reports
+The 3D capability also has a region-level lighting gate. After the eleven clean native API reports
 have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
 
 ```bash
@@ -304,6 +307,7 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_bevel_metrics.py \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0008-picture-horizontal-crop-bevel.json \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0009-picture-vertical-crop-bevel.json \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0010-picture-asymmetric-crop-bevel.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0011-ellipse-circle-bevel-matrix.json \
   --out test/e2e/reports/capability-loop/shape3d-bevel-local-<revision>.json
 ```
 
@@ -548,14 +552,14 @@ sanitized receipt atomically and never changes GitHub issues or visual baselines
 DrawingML shape 3D, chart 3D, Office 2017 embedded models, and PresentationML animation are separate
 capability IDs. A verified flat 2D fallback in one lane cannot promote native behavior in another.
 The static shape/picture 3D cohort promotes only `orthographicFront` circular top bevels on opaque
-solid `rect`/`roundRect` shapes and rectangular stretch-filled pictures, with absent or bounded
+solid `ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures, with absent or bounded
 nonnegative `a:srcRect` crops, the documented `twoPt:t`/`threePt:t` lighting tuple, zero extrusion,
 an optional contour with a resolvable color, and an optional outer shadow. The visual gate checks
 that `bevelT@w` controls the inward edge width,
 `bevelT@h` changes contrast rather than geometry, directional lighting remains distinct, and rounded
 corners follow continuous silhouette normals. The picture row additionally verifies the lower
 relative-overlay response and native `twoPt:t` edge ordering. Verification
-uses all ten `oracle-pypptx-shape3d-*` case reports, the same ten earlier-revision baselines,
+uses all eleven `oracle-pypptx-shape3d-*` case reports, the same eleven earlier-revision baselines,
 the derived `bevel-local` report, explicit manual verdicts for review rows, and the `source`,
 `structural`, `unit`, `browser`, `performance`, `package-size`, and `docs` caller-run gates.
 Perspective, arbitrary rotations, nonzero extrusion, materials, bottom bevels, tiled pictures,

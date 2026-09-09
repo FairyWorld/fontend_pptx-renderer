@@ -551,6 +551,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0008-picture-horizontal-crop-bevel",
         "oracle-pypptx-shape3d-0009-picture-vertical-crop-bevel",
         "oracle-pypptx-shape3d-0010-picture-asymmetric-crop-bevel",
+        "oracle-pypptx-shape3d-0011-ellipse-circle-bevel-matrix",
     }
 
 
@@ -679,6 +680,102 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         "[@l='12000'][@t='8000'][@r='18000'][@b='10000'])",
         namespaces=ns,
     )
+
+
+def test_static_shape3d_ellipse_matrix_serializes_aspects_paints_and_group(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-shape3d-0011-ellipse-circle-bevel-matrix"
+    )
+    assert case["slide_count"] == 3
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        roots = [
+            etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 4)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    for root in roots:
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:prstGeom[@prst='ellipse'])",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:scene3d/a:camera[@prst='orthographicFront'])",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'])",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:sp3d[@extrusionH='0']/a:bevelT"
+            "[@w='127000'][@h='127000'][@prst='circle'])",
+            namespaces=ns,
+        )
+
+    square_ext = [
+        int(value)
+        for value in roots[0].xpath(".//p:sp/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)
+    ]
+    assert square_ext[0] == square_ext[1]
+    assert roots[0].xpath(
+        "boolean(.//p:sp/p:spPr/a:solidFill/a:srgbClr[@val='2F75B5'])",
+        namespaces=ns,
+    )
+
+    wide_ext = [
+        int(value)
+        for value in roots[1].xpath(".//p:sp/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)
+    ]
+    assert wide_ext[0] > wide_ext[1]
+    assert not roots[1].xpath(".//p:sp/p:spPr/a:solidFill", namespaces=ns)
+    assert roots[1].xpath(
+        "boolean(.//p:sp/p:style/a:fillRef[@idx='1']/a:schemeClr[@val='accent1'])",
+        namespaces=ns,
+    )
+
+    assert roots[2].xpath("boolean(.//p:grpSp/p:sp)", namespaces=ns)
+    group_xfrm = roots[2].xpath(".//p:grpSp/p:grpSpPr/a:xfrm", namespaces=ns)[0]
+    group_ext = [int(value) for value in group_xfrm.xpath("a:ext/@*", namespaces=ns)]
+    group_child_ext = [int(value) for value in group_xfrm.xpath("a:chExt/@*", namespaces=ns)]
+    assert group_ext[1] > group_ext[0]
+    assert group_ext != group_child_ext
+
+
+def test_static_shape3d_ellipse_case_json_records_all_three_slides(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-shape3d-0011-ellipse-circle-bevel-matrix"
+    )
+
+    path = generator._write_case_json(case, tmp_path)
+    payload = __import__("json").loads(path.read_text(encoding="utf-8"))
+
+    assert len(payload["slides"]) == 3
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "features": [
+            "p:sp.prstGeom=ellipse",
+            "geometry.aspect=square|wide|tall",
+            "container=standalone|nonIdentityGroup",
+            "paint=explicitSolid|themeStyleReference",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT=circle",
+        ],
+    }
 
 
 def test_static_shape3d_case_json_records_exact_scope(tmp_path: Path):

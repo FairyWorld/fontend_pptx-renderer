@@ -297,18 +297,40 @@ describe('buildStaticShape3DPlan', () => {
   });
 
   it.each([
-    ['shape', 'ellipse'],
-    ['picture', 'roundRect'],
-  ] as const)('does not widen the %s geometry cohort to %s', (nodeType, presetGeometry) => {
+    [200, 200],
+    [320, 120],
+    [120, 320],
+  ])('builds the bounded ellipse plan at %sx%s', (width, height) => {
     const plan = buildStaticShape3DPlan(
       parseShape3D(supportedScene, supportedShape),
       {
-        nodeType,
-        presetGeometry,
+        nodeType: 'shape',
+        presetGeometry: 'ellipse',
+        width,
+        height,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'orthographic-top-bevel',
+      surface: 'shape',
+      geometry: 'ellipse',
+      bounds: { width, height },
+    });
+  });
+
+  it('keeps rounded pictures outside the bounded geometry cohort', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'picture',
+        presetGeometry: 'roundRect',
         width: 200,
         height: 100,
-        paintKind: nodeType === 'shape' ? 'solid' : 'picture',
-        baseFill: nodeType === 'shape' ? '#2F75B5' : undefined,
+        paintKind: 'picture',
       },
       createMockRenderContext(),
     );

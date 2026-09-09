@@ -195,6 +195,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
       ['rect', 260, 80, '2F75B5'],
       ['rect', 80, 220, '2F75B5'],
       ['roundRect', 220, 100, '2F75B5'],
+      ['ellipse', 180, 120, '2F75B5'],
       ['rect', 240, 100, '70AD47'],
     ] as const) {
       const shape = renderShape(
@@ -298,6 +299,9 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     const groupLighting = group.querySelector(
       '[data-pptx-shape3d-lighting="distance-field"]',
     ) as SVGGraphicsElement;
+    const ellipseLighting = host.children[3].querySelector(
+      '[data-pptx-shape3d-lighting="distance-field"]',
+    ) as SVGGraphicsElement;
     return {
       bevelCount: host.querySelectorAll('[data-pptx-shape3d-bevel]').length,
       lightingCount: host.querySelectorAll(
@@ -316,6 +320,10 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
         width: roundRectLighting.getBoundingClientRect().width,
         height: roundRectLighting.getBoundingClientRect().height,
       },
+      ellipseLightingBounds: {
+        width: ellipseLighting.getBoundingClientRect().width,
+        height: ellipseLighting.getBoundingClientRect().height,
+      },
       groupLightingBounds: {
         width: groupLighting.getBoundingClientRect().width,
         height: groupLighting.getBoundingClientRect().height,
@@ -329,8 +337,8 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
 
   expect(result).toEqual(
     expect.objectContaining({
-      bevelCount: 5,
-      lightingCount: 5,
+      bevelCount: 6,
+      lightingCount: 6,
       flatHasBevel: false,
       uniqueIds: true,
       noHorizontalGrowth: true,
@@ -341,6 +349,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   );
   expect(result.groupBounds).toEqual({ width: 200, height: 100, childWidth: 100, childHeight: 50 });
   expect(result.roundRectLightingBounds).toEqual({ width: 220, height: 100 });
+  expect(result.ellipseLightingBounds).toEqual({ width: 180, height: 120 });
   expect(result.groupLightingBounds).toEqual({ width: 100, height: 50 });
   expect(result.croppedPictureBounds).toEqual({
     x: expect.closeTo(-62.857, 2),

@@ -614,7 +614,9 @@ The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures
 parsed observations in serialized model output. A native-oracle-backed static subset renders an
 orthographic circular top bevel and optional contour with silhouette-aware lighting:
 
-- shape lane: opaque resolved solid-fill `rect` and `roundRect`;
+- shape lane: opaque resolved solid-fill `ellipse`, `rect`, and `roundRect`; ellipse coverage spans
+  square explicit paint, wide theme-reference paint, and tall rendering through a non-identity
+  group transform;
 - picture lane: rectangular, stretch-filled pictures with no `a:srcRect`, or nonnegative source
   crops whose remaining horizontal and vertical extents are both positive;
 - `orthographicFront`, no camera rotation, `twoPt:t` or `threePt:t` lighting, with either no light
@@ -642,9 +644,10 @@ This support does not include perspective cameras, nonzero extrusion, arbitrary 
 other bevel presets, tiled pictures, negative or degenerate source crops,
 gradient/pattern/group/image-filled shapes, or pixel-identical PowerPoint material simulation.
 Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
-claim remains limited to native-verified `rect`/`roundRect` shapes and rectangular pictures.
-Ellipse, donut, star, freeform, rotation, nested-group, and glow probes stay in an opt-in ignored
-discovery matrix until their own native gates pass.
+claim remains limited to native-verified `ellipse`/`rect`/`roundRect` shapes and rectangular
+pictures. Donut, star, freeform, rotation, nested-group, and glow probes stay in an opt-in ignored
+discovery matrix until their own native gates pass; the original ellipse probe remains only as a
+preflight neighbor to the tracked three-slide matrix.
 
 ### Text — 7-Level Style Inheritance
 

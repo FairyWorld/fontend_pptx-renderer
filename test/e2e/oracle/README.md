@@ -181,7 +181,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 141 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 170 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -189,11 +189,14 @@ ground-truth export. It defines 141 cases under `oracle/cases-pypptx/` with the
   final four cases cover square/wide/tall `spAutoFit` growth and explicit-overflow opt-out, and a
   four-case `defRPr`/`fontRef` color-precedence matrix with explicit-run and inverse controls
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
-- **Static DrawingML 3D** (10 cases): flat picture opt-out plus a bounded
+- **Zero-adjustment flowcharts** (28 cases, 84 slides): presets in shape IDs 61-88, each with
+  square explicit paint, wide theme-reference paint, and grouped-tall rendering
+- **Static DrawingML 3D** (11 cases, 13 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
-  roundRect, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
+  roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
   `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
-  shadow, while the final three isolate horizontal, vertical, and combined `a:srcRect` crops
+  shadow, cases 8-10 isolate horizontal, vertical, and combined `a:srcRect` crops, and case 11
+  covers square explicit, wide theme-reference, and grouped-tall ellipse rendering
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -211,7 +214,7 @@ cd test/e2e
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-shape3d-*'
 
-# Generate seven ignored discovery probes without widening the supported cohort.
+# Generate eight ignored discovery probes without widening the supported cohort.
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --include-local-shape3d-matrix \
   --case 'oracle-local-shape3d-*'
@@ -229,10 +232,11 @@ fingerprints.
 The opt-in `oracle-local-shape3d-*` matrix explores ellipse, adjusted donut/star, concave freeform,
 shape rotation, nested group scaling, and glow interaction. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
-ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 141-case matrix
-or the `drawingml.shape.3d.top-bevel-contour` support claim.
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 170-case matrix.
+The original one-slide ellipse probe remains useful for preflight comparisons, while the tracked
+three-slide ellipse matrix now bounds the public `drawingml.shape.3d.top-bevel-contour` claim.
 
-After evaluating the ten tracked shape-3D cases, run `../scripts/shape3d_bevel_metrics.py` with one
+After evaluating the eleven tracked shape-3D cases, run `../scripts/shape3d_bevel_metrics.py` with one
 `--case-report` per case. It reads the source OOXML to locate supported regions, compares the native
 and HTML luminance fields only inside the bevel ring, requires a general score of `0.60`, and applies
 an additional `0.78` corner score to `roundRect`. Bands below four pixels are reported as
