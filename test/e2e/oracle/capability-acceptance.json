@@ -1,6 +1,44 @@
 {
   "receipts": [
     {
+      "acceptedAt": "2026-09-09T23:14:22.003351Z",
+      "acceptedRevision": "972382885758ac355cf21d9cbe40932d78a008bd",
+      "capabilityId": "drawingml.shape.3d.camera-projected-plane",
+      "caseIds": [
+        "oracle-pypptx-shape3d-0013-camera-projection-matrix"
+      ],
+      "caseInputFingerprints": [
+        "23a154711dd9beb2d78c9033a5a6c77e31b826770cf32d851a232d7aa426778c"
+      ],
+      "definitionFingerprint": "3a82c1cfa283b9793853fae4dbd15b16ea882df6cb42837d6a62da231c06cc22",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "camera-local",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "performance",
+        "package-size",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "1bc3df21cabf2bf9c8bd044c055f47a552c4c6a2cd91875b60d17e53893d64fa"
+      ],
+      "implementationFingerprint": "a001f822871d6764647ba04534014971630952b3dff830286ad32d83683532c0"
+    },
+    {
       "acceptedAt": "2026-09-08T21:07:47.622348Z",
       "acceptedRevision": "452641ee7da127c27f36df1c541e6ed307877380",
       "capabilityId": "drawingml.shape.3d.top-bevel-contour",
