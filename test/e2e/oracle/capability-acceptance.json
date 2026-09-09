@@ -166,6 +166,62 @@
       "implementationFingerprint": "9f05b9394f7baf9762a0ce624712f4289df7973cd281b68d66d45a8adc8416ab"
     },
     {
+      "acceptedAt": "2026-09-09T13:59:24.878221Z",
+      "acceptedRevision": "9b9af7c93070d8e5976c53a1a7d1adfd6f6f01ab",
+      "capabilityId": "drawingml.shape.3d.top-bevel-contour",
+      "caseIds": [
+        "oracle-pypptx-shape3d-0001-flat-optout",
+        "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel",
+        "oracle-pypptx-shape3d-0003-roundrect-bevel-contour",
+        "oracle-pypptx-shape3d-0004-wide-bevel",
+        "oracle-pypptx-shape3d-0005-tall-bevel",
+        "oracle-pypptx-shape3d-0006-grouped-bevel",
+        "oracle-pypptx-shape3d-0007-real-picture-bevel-slice"
+      ],
+      "caseInputFingerprints": [
+        "74c293774148224d54e34c80472c7280e09c686636453b360f2714240825ee30",
+        "29bec7b160ce0bbf9c34db115a8eadb8e966a86d314f33e0af51684437f2519d",
+        "8c5f0ede21ee648bd5fb55596184d74e0835d9aaada4d60a2d6f97bfd21473de",
+        "7da11976af2dea3d49c23da51fd4f8fb50ffd904519a62712dd6dc951972afdf",
+        "7815571167b8b6d20f7eb4dcfd88c4bdb9c7906da5de2326a5fb06183b547c50",
+        "2166baf4afae4a734db5fbad8ae09f003fd97cda92fec910414add8ab34d400d",
+        "20c39f252ad36ebf82ee66f8c74898ef233bbaf1390b88465d7ee2356eb02a5e"
+      ],
+      "definitionFingerprint": "e3aa38566e2095947558e7955fa42aed6d1ed9e5ba5d09c826af72da5fcc830c",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "bevel-local",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "performance",
+        "package-size",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "80539ecfd1d62ec467e58f99a97014d0c03c35c49cb89a4c44409caebae20ddc",
+        "d07478481195114c6e63234721acb67f86f1420a7afc9586420e62c7d8d794df",
+        "46188dcd382fb59092ecbb553817f51e7bee4af3512b663fe194d7d1f76a9be3",
+        "32a747512f24c52ffeb6046e78d0480232e1305abe533ca6d1c15c426aff6b55",
+        "6322d925c54679d16e75bfcefc57fa233f2570be8ca084702f1d9f40468a378e",
+        "e915fa15ff5dec8af0f8ed9f6573e0928f6606d38476dee5a31fdc0fd39907ba",
+        "3a4860cd5aa591c9ba078a1ebdaa0e643acf9c8781b3373a5c333a26e2a06eca"
+      ],
+      "implementationFingerprint": "8c55810f97d4aa4a2ca33c2b31af76bfbdedc70e9015c930c157a102876e9ee1"
+    },
+    {
       "acceptedAt": "2026-09-08T18:56:55.317403Z",
       "acceptedRevision": "0d144fcce9716200c9af0a9dbdb90cffacfae3ff",
       "capabilityId": "drawingml.shape.geometry.adjustment.donut",
