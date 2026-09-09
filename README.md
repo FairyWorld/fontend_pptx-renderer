@@ -31,10 +31,10 @@ Visual regression suites compare selected shape, SmartArt, fill/stroke, text, ta
 
 > Ground truth binaries (PPTX/PDF/PNG) stay in the ignored `test/e2e/testdata/` tree. Tracked case definitions and coverage metadata keep that local corpus reproducible. Generate shape/SmartArt corpora with `scripts/one_shot_full_ground_truth.py` or focused text/chart/composite cases with `scripts/generate_pypptx_cases.py`; both macOS and Windows PowerPoint are supported. See [`docs/TESTING.md`](docs/TESTING.md).
 
-On macOS, native exports use one fixed ignored `oracle-runtime` directory, target the requested
-presentation by its exact full path, and require an unlocked interactive PowerPoint session. This
-lets local oracle runs coexist with other open presentations without treating the active window as
-the export target.
+On macOS, native exports use one fixed ignored `oracle-runtime` directory and target the requested
+presentation by its exact full path. Keep the interactive PowerPoint session available and inspect
+pending dialogs when automation fails. This lets local oracle runs coexist with other open
+presentations without treating the active window as the export target.
 
 ### Evidence-Driven Capability Loop
 

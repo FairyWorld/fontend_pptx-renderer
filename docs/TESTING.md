@@ -327,17 +327,20 @@ reference and HTML rasters. The metric generator rejects a stale or replaced ras
 It is also sensitive to material-specific lighting: the tracked picture case must retain the native
 top/right shadow and bottom/left relief instead of passing only because its rectangular bounds match.
 
-PowerPoint automation on macOS requires an unlocked interactive session. Error `-9074` while the
-same known-good deck exports normally in an unlocked session is an environment failure, not a
-renderer result. Ordinary exports stage `_pptx-input.pptx` and `_pptx-output.pdf` in the ignored
-`testdata/oracle-runtime` directory; grant PowerPoint access to that directory once. Each script
-normalizes macOS's `/private/tmp` firmlink to the `/tmp` spelling returned by PowerPoint, matches
-the opened file by exact `full name`, never exports or closes `active presentation`, and closes
-only the matched object on success or failure. Macro names are qualified with their loaded
-`.pptm` filename because an unqualified name can return PowerPoint error `-18` when another deck is
-open. The 120-second export and macro timeouts stop without retry and tell the operator to check
-the unlock state and any pending **Grant File Access** or macro-security dialog. Stale output PDFs
-are removed before each attempt. AppleScript stderr remains in the reported error.
+PowerPoint automation on macOS needs an available interactive session. Error `-9074` can mean the
+session is locked, PowerPoint is waiting for a dialog, or the fixed staged input is still open from
+an interrupted run; it is an environment failure, not a renderer result. Ordinary exports stage
+`_pptx-input.pptx` and `_pptx-output.pdf` in the ignored `testdata/oracle-runtime` directory; grant
+PowerPoint access to that directory once. Each script normalizes macOS's `/private/tmp` firmlink to
+the `/tmp` spelling returned by PowerPoint, matches the opened file by exact `full name`, never
+exports or closes `active presentation`, and closes only the matched object on success or failure.
+If PowerPoint cannot compile the file-backed export script (`-2741`), the exporter retries the same
+exact-path lifecycle as inline AppleScript within the same attempt. Macro names are qualified with
+their loaded `.pptm` filename because an unqualified name can return PowerPoint error `-18` when
+another deck is open. The 120-second export and macro timeouts stop without retry and tell the
+operator to check the unlock state and any pending **Grant File Access** or macro-security dialog.
+Stale output PDFs are removed before each attempt. AppleScript stderr remains in the reported
+error.
 
 The native macro smoke uses `ExportSmartArtLayouts_ToFile` with a fixed runtime output and verifies
 that the resulting catalog is non-empty. Run it only on a host where the repository macro host is

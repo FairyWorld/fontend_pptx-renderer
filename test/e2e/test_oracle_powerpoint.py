@@ -193,6 +193,44 @@ def test_export_error_includes_osascript_stderr(tmp_path: Path):
         )
 
 
+def test_export_falls_back_to_inline_osascript_on_parse_error(tmp_path: Path):
+    calls = []
+    pptx = tmp_path / "sample.pptx"
+    pptx.write_bytes(b"pptx")
+    pdf = tmp_path / "sample.pdf"
+
+    def flaky_runner(cmd, **kwargs):
+        calls.append((cmd, kwargs))
+        if len(calls) == 1:
+            raise subprocess.CalledProcessError(
+                returncode=1,
+                cmd=cmd,
+                stderr='script error: Expected "," but found property. (-2741)',
+            )
+        pdf.write_bytes(b"%PDF-1.4\n")
+
+    result = export_pptx_to_pdf_mac(
+        pptx_path=pptx,
+        pdf_path=pdf,
+        runner=flaky_runner,
+        retries=0,
+    )
+
+    assert result.attempts == 1
+    assert result.output_pdf == pdf.resolve()
+    assert len(calls) == 2
+    first_cmd, _ = calls[0]
+    second_cmd, _ = calls[1]
+    assert first_cmd[1].endswith("export_pptx_to_pdf.applescript")
+    assert second_cmd[0] == "osascript"
+    assert "-e" in second_cmd
+    tell_index = second_cmd.index('tell application "Microsoft PowerPoint"')
+    assert second_cmd.index("set inPptx to POSIX file inPptxPath") < tell_index
+    assert second_cmd.index("set outPdf to POSIX file outPdfPath") < tell_index
+    assert any("save openedPresentation in outPdf as save as PDF" in arg for arg in second_cmd)
+    assert not any("active presentation" in arg for arg in second_cmd)
+
+
 def test_export_applescript_targets_only_the_requested_presentation_by_full_name():
     script_path = (
         Path(__file__).resolve().parent

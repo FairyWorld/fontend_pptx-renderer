@@ -248,9 +248,11 @@ resolution-limited and remain subject to full-slide and manual checks. Pass the 
 `run_capability_loop.py verify --bevel-report ...`; both commands verify the API and on-disk raster
 hashes, and callers cannot self-attest `bevel-local`.
 
-On macOS the PowerPoint session must be unlocked. A locked session can return `-9074` even for a
-known-good PPTX. Export and macro timeouts stop immediately and point to the unlock state or a
-pending **Grant File Access** or macro-security dialog. VBA calls are qualified as
+On macOS the PowerPoint interactive session must remain available. Error `-9074` can come from a
+locked session, a pending dialog, or a staged `_pptx-input.pptx` left open by an interrupted run.
+Export and macro timeouts stop immediately and point to the unlock state or a pending **Grant File
+Access** or macro-security dialog. A file-backed export-script compile error (`-2741`) switches to
+an equivalent inline exact-path script within the same attempt. VBA calls are qualified as
 `<macro-host-filename>!<macro-name>` because an unqualified procedure can return `-18` when another
 presentation is open. The exporter removes stale output before every attempt and preserves the
 original AppleScript stderr.

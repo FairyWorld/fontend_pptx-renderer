@@ -47,6 +47,44 @@ def _qualify_macro_name(macro_host_pptm: Path, macro_name: str) -> str:
     return f"{macro_host_pptm.name}!{macro_name}"
 
 
+def _build_export_inline_cmd(*, pptx_path: Path, output_pdf: Path) -> list[str]:
+    lines = [
+        f"set inPptxPath to {_as_osascript_literal(_powerpoint_mac_path(pptx_path))}",
+        f"set outPdfPath to {_as_osascript_literal(_powerpoint_mac_path(output_pdf))}",
+        "set inPptx to POSIX file inPptxPath",
+        "set outPdf to POSIX file outPdfPath",
+        "set openedPresentation to missing value",
+        'tell application "Microsoft PowerPoint"',
+        "try",
+        "open inPptx",
+        "set presentationPaths to (get full name of every presentation)",
+        "repeat with presentationIndex from 1 to count of presentationPaths",
+        "set candidatePath to item presentationIndex of presentationPaths",
+        "if (candidatePath as text) is inPptxPath then",
+        "set openedPresentation to presentation presentationIndex",
+        "exit repeat",
+        "end if",
+        "end repeat",
+        'if openedPresentation is missing value then error "PowerPoint opened the input but no presentation matched: " & inPptxPath',
+        "save openedPresentation in outPdf as save as PDF",
+        "close openedPresentation saving no",
+        "on error errorMessage number errorNumber",
+        "if openedPresentation is not missing value then",
+        "try",
+        "close openedPresentation saving no",
+        "end try",
+        "end if",
+        "error errorMessage number errorNumber",
+        "end try",
+        "end tell",
+    ]
+
+    cmd = ["osascript"]
+    for line in lines:
+        cmd.extend(["-e", line])
+    return cmd
+
+
 def _build_macro_inline_cmd(
     *,
     macro_host_pptm: Path,
@@ -161,6 +199,7 @@ def _run_with_parse_fallback(
     primary_cmd: list[str],
     fallback_cmd: list[str],
     timeout_sec: float,
+    action: str = "macro automation",
 ):
     try:
         runner(
@@ -171,7 +210,7 @@ def _run_with_parse_fallback(
             timeout=timeout_sec,
         )
     except subprocess.TimeoutExpired as exc:
-        _raise_interactive_timeout(exc, "macro automation")
+        _raise_interactive_timeout(exc, action)
     except subprocess.CalledProcessError as exc:
         if _is_applescript_parse_error(exc):
             try:
@@ -184,7 +223,7 @@ def _run_with_parse_fallback(
                 )
                 return
             except subprocess.TimeoutExpired as fallback_exc:
-                _raise_interactive_timeout(fallback_exc, "macro automation")
+                _raise_interactive_timeout(fallback_exc, action)
             except subprocess.CalledProcessError as fallback_exc:
                 if _is_automation_auth_error(fallback_exc):
                     _raise_automation_auth_error(fallback_exc)
@@ -229,6 +268,7 @@ def export_pptx_to_pdf_mac(
         _powerpoint_mac_path(run_src),
         _powerpoint_mac_path(run_out),
     ]
+    fallback_cmd = _build_export_inline_cmd(pptx_path=run_src, output_pdf=run_out)
 
     last_error: Exception | None = None
     attempts_made = 0
@@ -236,13 +276,17 @@ def export_pptx_to_pdf_mac(
         attempts_made = attempt
         try:
             run_out.unlink(missing_ok=True)
-            runner(
-                cmd,
-                check=True,
-                capture_output=True,
-                text=True,
-                timeout=timeout_sec,
-            )
+            try:
+                _run_with_parse_fallback(
+                    runner=runner,
+                    primary_cmd=cmd,
+                    fallback_cmd=fallback_cmd,
+                    timeout_sec=timeout_sec,
+                    action="export",
+                )
+            except PowerPointExportError as exc:
+                last_error = exc
+                break
             if not run_out.exists() or run_out.stat().st_size == 0:
                 raise PowerPointExportError(
                     f"PowerPoint reported success but PDF missing/empty: {run_out}"
