@@ -602,10 +602,11 @@ compiler evaluates the complete preset-shape formula corpus into renderer-indepe
 paths. A generated production subset now renders 29 definitions: all 28 zero-adjustment flowchart
 presets in shape IDs 61-88, plus `donut` with its OOXML `adj=25000` default and `0..50000` polar
 handle bounds. The flowcharts comprise 20 single-path and eight ordered three-path definitions;
-the donut retains both outer and inner contours across square, wide, tall, grouped, and picture-clip
-rendering. Other presets retain the handwritten implementation until their own layering,
-adjustment, and oracle gates pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content
-remain unsupported.
+each flowchart is also covered by a three-slide native PowerPoint matrix spanning square explicit
+paint, wide theme-reference paint, and tall rendering through a non-identity group. The donut
+retains both outer and inner contours across square, wide, tall, grouped, and picture-clip rendering.
+Other presets retain the handwritten implementation until their own layering, adjustment, and
+oracle gates pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
 
 ### Static DrawingML 3D — Bounded Top Bevel
 

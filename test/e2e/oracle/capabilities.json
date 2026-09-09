@@ -208,10 +208,13 @@
       ],
       "scope": {
         "adjustmentGuideCount": [0],
+        "aspectRatios": ["square", "wide", "tall"],
+        "containers": ["standalone", "non-identity-group"],
+        "paint": ["explicit-solid", "theme-style-reference"],
         "presetCount": [28]
       },
       "fallback": "Use the handwritten preset implementation when generated runtime evaluation rejects invalid dimensions.",
-      "implementationPaths": ["scripts/ooxml-geometry/generate.mjs", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
+      "implementationPaths": ["CHANGELOG.md", "README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "scripts/ooxml-geometry/README.md", "scripts/ooxml-geometry/generate.mjs", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-flowchart-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },

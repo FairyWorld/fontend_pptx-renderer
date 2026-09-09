@@ -10,6 +10,37 @@ from lxml import etree
 
 GENERATOR_PATH = Path(__file__).resolve().parent / "scripts" / "generate_pypptx_cases.py"
 
+FLOWCHART_ZERO_ADJUSTMENT_CASES = {
+    "oracle-pypptx-flowchart-0061-process": "flowChartProcess",
+    "oracle-pypptx-flowchart-0062-alternate-process": "flowChartAlternateProcess",
+    "oracle-pypptx-flowchart-0063-decision": "flowChartDecision",
+    "oracle-pypptx-flowchart-0064-input-output": "flowChartInputOutput",
+    "oracle-pypptx-flowchart-0065-predefined-process": "flowChartPredefinedProcess",
+    "oracle-pypptx-flowchart-0066-internal-storage": "flowChartInternalStorage",
+    "oracle-pypptx-flowchart-0067-document": "flowChartDocument",
+    "oracle-pypptx-flowchart-0068-multidocument": "flowChartMultidocument",
+    "oracle-pypptx-flowchart-0069-terminator": "flowChartTerminator",
+    "oracle-pypptx-flowchart-0070-preparation": "flowChartPreparation",
+    "oracle-pypptx-flowchart-0071-manual-input": "flowChartManualInput",
+    "oracle-pypptx-flowchart-0072-manual-operation": "flowChartManualOperation",
+    "oracle-pypptx-flowchart-0073-connector": "flowChartConnector",
+    "oracle-pypptx-flowchart-0074-offpage-connector": "flowChartOffpageConnector",
+    "oracle-pypptx-flowchart-0075-punched-card": "flowChartPunchedCard",
+    "oracle-pypptx-flowchart-0076-punched-tape": "flowChartPunchedTape",
+    "oracle-pypptx-flowchart-0077-summing-junction": "flowChartSummingJunction",
+    "oracle-pypptx-flowchart-0078-or": "flowChartOr",
+    "oracle-pypptx-flowchart-0079-collate": "flowChartCollate",
+    "oracle-pypptx-flowchart-0080-sort": "flowChartSort",
+    "oracle-pypptx-flowchart-0081-extract": "flowChartExtract",
+    "oracle-pypptx-flowchart-0082-merge": "flowChartMerge",
+    "oracle-pypptx-flowchart-0083-online-storage": "flowChartOnlineStorage",
+    "oracle-pypptx-flowchart-0084-delay": "flowChartDelay",
+    "oracle-pypptx-flowchart-0085-magnetic-tape": "flowChartMagneticTape",
+    "oracle-pypptx-flowchart-0086-magnetic-disk": "flowChartMagneticDisk",
+    "oracle-pypptx-flowchart-0087-magnetic-drum": "flowChartMagneticDrum",
+    "oracle-pypptx-flowchart-0088-display": "flowChartDisplay",
+}
+
 
 def _load_generator_module():
     spec = importlib.util.spec_from_file_location("generate_pypptx_cases", GENERATOR_PATH)
@@ -402,6 +433,103 @@ def test_scaled_group_composite_case_generates_non_identity_group_space(tmp_path
         "a:chExt/@cy",
         namespaces=ns,
     )
+
+
+def test_flowchart_zero_adjustment_matrix_is_registered():
+    generator = _load_generator_module()
+    cases = {
+        case["name"]: case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-flowchart-")
+    }
+
+    assert set(cases) == set(FLOWCHART_ZERO_ADJUSTMENT_CASES)
+    assert all(case["slide_count"] == 3 for case in cases.values())
+    assert all(case["coverage"]["oracle"] == "native-powerpoint" for case in cases.values())
+
+
+def test_flowchart_zero_adjustment_matrix_serializes_three_aspects_and_paints(tmp_path: Path):
+    generator = _load_generator_module()
+    cases = {
+        case["name"]: case
+        for case in generator._build_all_case_defs()
+        if case["name"] in FLOWCHART_ZERO_ADJUSTMENT_CASES
+    }
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+
+    for name, preset in FLOWCHART_ZERO_ADJUSTMENT_CASES.items():
+        pptx_path = tmp_path / name / "source.pptx"
+        generator._generate_pptx(cases[name], pptx_path)
+        with ZipFile(pptx_path) as zf:
+            roots = [
+                etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+                for index in range(1, 4)
+            ]
+
+        for root in roots:
+            preset_nodes = root.xpath(".//a:prstGeom", namespaces=ns)
+            assert len(preset_nodes) == 1, name
+            assert preset_nodes[0].get("prst") == preset, name
+            assert not preset_nodes[0].xpath("a:avLst/a:gd", namespaces=ns), name
+
+        square_ext = [
+            int(value)
+            for value in roots[0].xpath(".//p:sp/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)
+        ]
+        assert square_ext[0] == square_ext[1], name
+        assert roots[0].xpath(
+            "boolean(.//p:sp/p:spPr/a:solidFill/a:srgbClr[@val='5B9BD5'])",
+            namespaces=ns,
+        ), name
+        assert roots[0].xpath(
+            "boolean(.//p:sp/p:spPr/a:ln/a:solidFill/a:srgbClr[@val='203864'])",
+            namespaces=ns,
+        ), name
+
+        wide_ext = [
+            int(value)
+            for value in roots[1].xpath(".//p:sp/p:spPr/a:xfrm/a:ext/@*", namespaces=ns)
+        ]
+        assert wide_ext[0] > wide_ext[1], name
+        assert not roots[1].xpath(".//p:sp/p:spPr/a:solidFill", namespaces=ns), name
+        assert roots[1].xpath(
+            "boolean(.//p:sp/p:style/a:fillRef[@idx='1']/a:schemeClr[@val='accent1'])",
+            namespaces=ns,
+        ), name
+
+        assert roots[2].xpath("boolean(.//p:grpSp/p:sp)", namespaces=ns), name
+        group_xfrm = roots[2].xpath(".//p:grpSp/p:grpSpPr/a:xfrm", namespaces=ns)[0]
+        group_ext = [int(value) for value in group_xfrm.xpath("a:ext/@*", namespaces=ns)]
+        group_child_ext = [int(value) for value in group_xfrm.xpath("a:chExt/@*", namespaces=ns)]
+        assert group_ext[1] > group_ext[0], name
+        assert group_ext != group_child_ext, name
+
+
+def test_flowchart_zero_adjustment_case_json_records_all_three_slides(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-flowchart-0061-process"
+    )
+
+    path = generator._write_case_json(case, tmp_path)
+    payload = __import__("json").loads(path.read_text(encoding="utf-8"))
+
+    assert len(payload["slides"]) == 3
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "features": [
+            "p:sp.prstGeom=flowChartProcess",
+            "a:avLst.adjustmentGuideCount=0",
+            "geometry.aspect=square|wide|tall",
+            "container=standalone|nonIdentityGroup",
+            "paint=explicitSolid|themeStyleReference",
+        ],
+    }
 
 
 def test_static_shape3d_matrix_is_registered():

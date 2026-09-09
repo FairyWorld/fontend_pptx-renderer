@@ -138,7 +138,9 @@ The M3 subset contains native-validated shape IDs 61-64, 67, 69-76, 79, 81-85, a
 to 20 ECMA definitions with one path and no adjustment guides. M4 adds IDs 65, 66, 68, 77, 78,
 80, 86, and 87. Each added definition has no adjustment guides and exactly three ordered paths:
 the first carries the normal fill without a stroke, and later paths carry no fill while retaining
-their declared detail/outline stroke flags.
+their declared detail/outline stroke flags. A 28-case native PowerPoint matrix checks every M3 and
+M4 definition at square and wide standalone extents plus a tall extent produced by a non-identity
+group; explicit solid paint and theme style references are both represented.
 
 M5 adds `donut` as the first adjustment-bearing production definition. Its candidate contract pins
 the single `adj` guide to the literal default `25000` and requires one polar radius handle with

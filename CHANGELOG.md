@@ -55,7 +55,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   and material intensity independently from solid-shape lighting. Unmatched 3D tuples stay flat.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
-  renderer, browser, picture-clip, and native PowerPoint comparison gates.
+  renderer, browser, picture-clip, and native PowerPoint comparison gates. A reproducible 28-case,
+  84-slide native matrix now covers square explicit paint, wide theme-reference paint, and grouped
+  tall rendering for every preset.
 - Report per-slide oracle runtime failures separately from visual metrics, retry transient batch
   failures, and serialize browser startup and cancellation cleanup.
 - The python-pptx corpus generator now supports native PDF export on macOS, repeatable exact/glob

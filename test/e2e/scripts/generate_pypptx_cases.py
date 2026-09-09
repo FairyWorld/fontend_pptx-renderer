@@ -4,6 +4,7 @@
 Produces oracle-pypptx-* cases covering:
   - Rich text: fonts, sizes, bold/italic, alignment, vertical text, bullets
   - Shape adjustment variants: same shape with different adj values
+  - Zero-adjustment flowchart geometry: 28 presets across square, wide, and grouped tall views
   - Static DrawingML 3D: bounded orthographic top-bevel and opt-out matrix
   - Chart data variants: 2D chart types with custom data/series
   - Composite: multiple components on a single slide
@@ -1204,6 +1205,174 @@ def _build_shape_adj_cases() -> list[CaseDef]:
                 except (IndexError, ValueError) as exc:
                     print(f"    WARN: adj[{idx}]={val} failed on {_st}: {exc}", flush=True)
         _add(slug, _build)
+
+    return cases
+
+
+# ---------------------------------------------------------------------------
+# P1a: Zero-adjustment flowchart geometry
+# ---------------------------------------------------------------------------
+
+def _build_flowchart_zero_adjustment_cases() -> list[CaseDef]:
+    """Build native-oracle coverage for the 28 generated flowchart presets."""
+    cases: list[CaseDef] = []
+    configs = [
+        (61, MSO_SHAPE.FLOWCHART_PROCESS, "process", "flowChartProcess"),
+        (
+            62,
+            MSO_SHAPE.FLOWCHART_ALTERNATE_PROCESS,
+            "alternate-process",
+            "flowChartAlternateProcess",
+        ),
+        (63, MSO_SHAPE.FLOWCHART_DECISION, "decision", "flowChartDecision"),
+        (64, MSO_SHAPE.FLOWCHART_DATA, "input-output", "flowChartInputOutput"),
+        (
+            65,
+            MSO_SHAPE.FLOWCHART_PREDEFINED_PROCESS,
+            "predefined-process",
+            "flowChartPredefinedProcess",
+        ),
+        (
+            66,
+            MSO_SHAPE.FLOWCHART_INTERNAL_STORAGE,
+            "internal-storage",
+            "flowChartInternalStorage",
+        ),
+        (67, MSO_SHAPE.FLOWCHART_DOCUMENT, "document", "flowChartDocument"),
+        (
+            68,
+            MSO_SHAPE.FLOWCHART_MULTIDOCUMENT,
+            "multidocument",
+            "flowChartMultidocument",
+        ),
+        (69, MSO_SHAPE.FLOWCHART_TERMINATOR, "terminator", "flowChartTerminator"),
+        (70, MSO_SHAPE.FLOWCHART_PREPARATION, "preparation", "flowChartPreparation"),
+        (71, MSO_SHAPE.FLOWCHART_MANUAL_INPUT, "manual-input", "flowChartManualInput"),
+        (
+            72,
+            MSO_SHAPE.FLOWCHART_MANUAL_OPERATION,
+            "manual-operation",
+            "flowChartManualOperation",
+        ),
+        (73, MSO_SHAPE.FLOWCHART_CONNECTOR, "connector", "flowChartConnector"),
+        (
+            74,
+            MSO_SHAPE.FLOWCHART_OFFPAGE_CONNECTOR,
+            "offpage-connector",
+            "flowChartOffpageConnector",
+        ),
+        (75, MSO_SHAPE.FLOWCHART_CARD, "punched-card", "flowChartPunchedCard"),
+        (76, MSO_SHAPE.FLOWCHART_PUNCHED_TAPE, "punched-tape", "flowChartPunchedTape"),
+        (
+            77,
+            MSO_SHAPE.FLOWCHART_SUMMING_JUNCTION,
+            "summing-junction",
+            "flowChartSummingJunction",
+        ),
+        (78, MSO_SHAPE.FLOWCHART_OR, "or", "flowChartOr"),
+        (79, MSO_SHAPE.FLOWCHART_COLLATE, "collate", "flowChartCollate"),
+        (80, MSO_SHAPE.FLOWCHART_SORT, "sort", "flowChartSort"),
+        (81, MSO_SHAPE.FLOWCHART_EXTRACT, "extract", "flowChartExtract"),
+        (82, MSO_SHAPE.FLOWCHART_MERGE, "merge", "flowChartMerge"),
+        (83, MSO_SHAPE.FLOWCHART_STORED_DATA, "online-storage", "flowChartOnlineStorage"),
+        (84, MSO_SHAPE.FLOWCHART_DELAY, "delay", "flowChartDelay"),
+        (
+            85,
+            MSO_SHAPE.FLOWCHART_SEQUENTIAL_ACCESS_STORAGE,
+            "magnetic-tape",
+            "flowChartMagneticTape",
+        ),
+        (
+            86,
+            MSO_SHAPE.FLOWCHART_MAGNETIC_DISK,
+            "magnetic-disk",
+            "flowChartMagneticDisk",
+        ),
+        (
+            87,
+            MSO_SHAPE.FLOWCHART_DIRECT_ACCESS_STORAGE,
+            "magnetic-drum",
+            "flowChartMagneticDrum",
+        ),
+        (88, MSO_SHAPE.FLOWCHART_DISPLAY, "display", "flowChartDisplay"),
+    ]
+
+    def _style_explicit(shape) -> None:
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0x5B, 0x9B, 0xD5)
+        shape.line.color.rgb = RGBColor(0x20, 0x38, 0x64)
+        shape.line.width = Pt(2)
+
+    def _use_solid_theme_reference(shape) -> None:
+        style = shape._element.find(qn("p:style"))
+        if style is None:
+            raise RuntimeError("flowchart shape has no p:style")
+        fill_ref = style.find(qn("a:fillRef"))
+        if fill_ref is None:
+            raise RuntimeError("flowchart shape style has no a:fillRef")
+        fill_ref.set("idx", "1")
+        scheme_color = fill_ref.find(qn("a:schemeClr"))
+        if scheme_color is None:
+            raise RuntimeError("flowchart shape fillRef has no a:schemeClr")
+        scheme_color.set("val", "accent1")
+
+    for shape_id, shape_type, slug, preset in configs:
+        def _build(prs, _shape_type=shape_type, _preset=preset):
+            square_slide = prs.slides.add_slide(prs.slide_layouts[6])
+            square = square_slide.shapes.add_shape(
+                _shape_type,
+                _emu(4.5665),
+                _emu(1.65),
+                _emu(4.2),
+                _emu(4.2),
+            )
+            square.name = f"{_preset} square explicit"
+            _style_explicit(square)
+
+            wide_slide = prs.slides.add_slide(prs.slide_layouts[6])
+            wide = wide_slide.shapes.add_shape(
+                _shape_type,
+                _emu(2.6665),
+                _emu(2.15),
+                _emu(8.0),
+                _emu(3.2),
+            )
+            wide.name = f"{_preset} wide theme"
+            _use_solid_theme_reference(wide)
+
+            tall_slide = prs.slides.add_slide(prs.slide_layouts[6])
+            group = tall_slide.shapes.add_group_shape()
+            tall = group.shapes.add_shape(
+                _shape_type,
+                _emu(1.0),
+                _emu(1.0),
+                _emu(4.0),
+                _emu(4.0),
+            )
+            tall.name = f"{_preset} grouped tall explicit"
+            _style_explicit(tall)
+            group.left = _emu(5.0665)
+            group.top = _emu(0.95)
+            group.width = _emu(3.2)
+            group.height = _emu(5.6)
+
+        cases.append(
+            {
+                "name": f"oracle-pypptx-flowchart-{shape_id:04d}-{slug}",
+                "build_fn": _build,
+                "slide_count": 3,
+                "coverage": {
+                    "oracle": "native-powerpoint",
+                    "features": [
+                        f"p:sp.prstGeom={preset}",
+                        "a:avLst.adjustmentGuideCount=0",
+                        "geometry.aspect=square|wide|tall",
+                        "container=standalone|nonIdentityGroup",
+                        "paint=explicitSolid|themeStyleReference",
+                    ],
+                },
+            }
+        )
 
     return cases
 
@@ -2440,6 +2609,7 @@ def _build_all_case_defs(*, include_local_shape3d: bool = False) -> list[CaseDef
     all_cases: list[CaseDef] = []
     all_cases.extend(_build_text_cases())
     all_cases.extend(_build_shape_adj_cases())
+    all_cases.extend(_build_flowchart_zero_adjustment_cases())
     all_cases.extend(_build_shape3d_cases())
     if include_local_shape3d:
         all_cases.extend(_build_local_shape3d_cases())
@@ -2506,10 +2676,14 @@ def _generate_pptx(case_def: CaseDef, output_path: str | Path) -> None:
 def _write_case_json(case_def: CaseDef, cases_dir: Path) -> Path:
     """Write a minimal case JSON for eval script discovery."""
     name = case_def["name"]
+    slide_count = int(case_def.get("slide_count", 1))
     payload = {
         "name": name,
         "generator": "python-pptx",
-        "slides": [{"nodes": [{"kind": "pypptx-generated"}]}],
+        "slides": [
+            {"nodes": [{"kind": "pypptx-generated"}]}
+            for _ in range(slide_count)
+        ],
     }
     if coverage := case_def.get("coverage"):
         payload["coverage"] = coverage

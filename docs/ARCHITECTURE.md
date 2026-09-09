@@ -127,7 +127,10 @@ tree-shakeable production subset to `src/shapes/generated/ooxmlPresetGeometrySub
 The subset contains 29 definitions: all 28 zero-adjustment flowcharts in shape IDs 61-88 (20
 single-path definitions and eight ordered three-path definitions), plus `donut`. Donut generation
 pins the source default (`adj=25000`) and its polar-handle bounds (`0..50000`) before admitting the
-definition. Other shapes continue through the handwritten registry.
+definition. The 28 flowcharts have one native PowerPoint case each; every case exercises a square
+standalone shape with explicit paint, a wide standalone shape using a theme style reference, and a
+tall shape under a non-identity group transform. Other shapes continue through the handwritten
+registry.
 
 The compiled IR retains ordered adjustment/calculated guides, adjustment handles, connection
 sites, text rectangles, path coordinate systems, path styling metadata, and the six DrawingML

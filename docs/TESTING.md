@@ -90,9 +90,10 @@ generated production-subset module byte-for-byte. These checks establish determi
 and path serialization. Browser and native PowerPoint equivalence remain separate per-shape gates.
 The browser gate renders all 29 production definitions, checks the eight multi-path flowcharts as
 three ordered SVG paths, and exercises donut bounds in standalone, non-uniform group, and adjusted
-picture-clip contexts. The native gate compares the multi-path flowchart and bounded donut cases
-against PowerPoint output and records per-case provenance, runtime errors, review status, and
-metric deltas from a fresh clean baseline.
+picture-clip contexts. The native flowchart gate compares all 28 presets against PowerPoint in 28
+cases and 84 slides: square explicit paint, wide theme-reference paint, and tall rendering through a
+non-identity group. The bounded donut gate remains separate. Both record per-case provenance,
+runtime errors, review status, and metric deltas from a fresh clean baseline.
 
 Report native comparisons with the exact source revision, case IDs, environment, errors,
 pre-existing metric failures, new regressions, and visual-review status. A sampled run is not a
@@ -215,9 +216,13 @@ cd test/e2e
 
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
-For text, shape-adjustment, bounded static DrawingML 3D, composite, and chart interaction cases,
-use the python-pptx generator. It currently defines 141 cases: 59 text, 31 shape-adjustment, 10
-static 3D, 20 composite, and 21 chart cases. The static 3D matrix covers flat opt-out, picture and
+For text, shape-adjustment, zero-adjustment flowchart, bounded static DrawingML 3D, composite, and
+chart interaction cases, use the python-pptx generator. It currently defines 169 cases: 59 text,
+31 shape-adjustment, 28 flowchart, 10 static 3D, 20 composite, and 21 chart cases. Each flowchart
+case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
+square explicit paint, wide theme-reference paint, and grouped tall explicit paint. The group uses
+a non-identity child coordinate space, and every source keeps an empty `a:avLst` with no adjustment
+guides. The static 3D matrix covers flat opt-out, picture and
 shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white contour, wide/tall
 aspect ratios, a non-identity group, and the light rotation plus implicit defaults observed in the
 local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
@@ -261,6 +266,10 @@ cd test/e2e
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-shape3d-*'
 
+# Generate the 28-case, 84-slide zero-adjustment flowchart matrix.
+.venv/bin/python scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-flowchart-*'
+
 # Generate the ignored local 3D discovery matrix. Add --pptx-only without PowerPoint.
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --include-local-shape3d-matrix \
@@ -277,7 +286,7 @@ per-slide PNG. The generator refreshes tracked case metadata even when cached lo
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
 The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
-into tracked `oracle/cases-pypptx/` and do not change the 141-case default matrix.
+into tracked `oracle/cases-pypptx/` and do not change the 169-case default matrix.
 
 The 3D capability also has a region-level lighting gate. After the ten clean native API reports
 have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:

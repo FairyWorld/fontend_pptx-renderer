@@ -79,6 +79,8 @@ caller; they are not run by the command. Review rows require an explicit case ve
 - `test_oracle_metrics.py`: validates visual metrics + quality gate logic.
 - `test_oracle_auto_pipeline.py`: end-to-end local pipeline (`case -> macro -> pptx/pdf -> renderer compare`).
 - `test_oracle_attention_ranking.py`: verifies ranked `attention_cases` output.
+- `../test_pypptx_generator_cases.py`: locks the 28 zero-adjustment flowchart mappings and their
+  84-slide square/wide/grouped-tall native matrix before PowerPoint export.
 
 6. Reproducible evaluation provenance
 - Every `/api/evaluate/{case}` result fingerprints the source PPTX and PDF/PNG ground truth.
@@ -126,6 +128,16 @@ This makes the auto-generated file pair visible in `/test/pages/e2e-compare.html
 for manual visual alignment.
 
 ## Batch-generate Oracle Cases
+
+The python-pptx corpus includes `oracle-pypptx-flowchart-0061-*` through
+`oracle-pypptx-flowchart-0088-*`. Each file has three slides covering explicit solid paint, a theme
+style reference, and a non-identity group transform. Generate only that cohort with:
+
+```bash
+cd test/e2e
+.venv/bin/python scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-flowchart-*'
+```
 
 Run this to generate all JSON cases under `oracle/cases/` into `test/e2e/testdata/cases/`:
 
