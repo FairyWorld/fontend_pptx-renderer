@@ -611,7 +611,7 @@ remain unsupported.
 
 The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
 parsed observations in serialized model output. A native-oracle-backed static subset renders an
-orthographic circular top bevel and optional contour with SVG lighting:
+orthographic circular top bevel and optional contour with clipped SVG face gradients:
 
 - shape lane: opaque resolved solid-fill `rect` and `roundRect`;
 - picture lane: rectangular, stretch-filled pictures;
@@ -623,12 +623,20 @@ orthographic circular top bevel and optional contour with SVG lighting:
 The renderer keeps the normal flat shape or picture whenever the complete tuple does not match.
 This support does not include perspective cameras, nonzero extrusion, arbitrary light rotation,
 other bevel presets, tiled pictures, gradient/pattern/group/image-filled shapes, or pixel-identical
-PowerPoint material simulation. Text stays outside the SVG lighting filter, picture outlines remain
-centered on the source bounds, and group transforms retain the existing coordinate mapping.
+PowerPoint material simulation. The bevel width controls its inward extent, while bevel height
+changes face-lighting contrast without widening the edge. Top, right, bottom, and left faces are
+shaded independently so wide, tall, rounded, grouped, and picture surfaces retain directional depth.
+Text stays outside the SVG lighting overlay, picture outlines remain centered on the source bounds,
+and group transforms retain the existing coordinate mapping.
 
 ### Text — 7-Level Style Inheritance
 
 Full OOXML text cascade: master → layout → shape → paragraph → run. Supports theme fonts, numbered/symbol/picture bullets, multi-level indent, vertical text, superscript/subscript, hyperlinks, and per-shape text insets.
+
+Local text color follows DrawingML precedence: an explicit run fill overrides paragraph
+`defRPr`; paragraph `defRPr` overrides the shape `fontRef`; `fontRef` supplies the fallback only
+when neither local level declares a fill. Native PowerPoint cases cover `srgbClr`, `schemeClr`, the
+inverse fallback, and square, wide, and tall text boxes.
 
 ### Charts via ECharts
 

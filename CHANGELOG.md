@@ -31,6 +31,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added a 16-case CJK native-oracle matrix for wrap, autofit, line/paragraph spacing, adjacent
   run spacing, parent-shape layout, and square/wide/tall `spAutoFit` growth, with tracked
   coverage/font metadata and ignored binaries.
+- Added a four-case native PowerPoint matrix for run/paragraph/shape text-color precedence,
+  covering `srgbClr`, `schemeClr`, explicit run overrides, `fontRef` fallback, and square/wide/tall
+  containers.
 - Added optional local font profiles and per-evaluation provenance for PPTX/ground-truth/font
   hashes, renderer Git state, and the actual browser version.
 
@@ -39,8 +42,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
   polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
-  `rect`/`roundRect` shapes and rectangular stretch-filled pictures, including bounded lighting,
-  contour, group, outline, and outer-shadow interactions; unmatched 3D tuples remain flat.
+  `rect`/`roundRect` shapes and rectangular stretch-filled pictures with separate inward top,
+  right, bottom, and left faces. Bevel width now controls edge extent while height controls
+  lighting contrast; contour, group, outline, and outer-shadow interactions remain bounded, and
+  unmatched 3D tuples stay flat.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
   renderer, browser, picture-clip, and native PowerPoint comparison gates.

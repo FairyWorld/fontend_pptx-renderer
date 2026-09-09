@@ -216,7 +216,7 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, bounded static DrawingML 3D, composite, and chart interaction cases,
-use the python-pptx generator. It currently defines 134 cases: 55 text, 31 shape-adjustment, 7
+use the python-pptx generator. It currently defines 138 cases: 59 text, 31 shape-adjustment, 7
 static 3D, 20 composite, and 21 chart cases. The static 3D matrix covers flat opt-out, picture and
 shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white contour, wide/tall
 aspect ratios, a non-identity group, and the light rotation plus implicit defaults observed in the
@@ -235,6 +235,10 @@ PowerPoint and the renderer to retain the explicit 30 pt CJK run while growing t
 box; ID 0055 is the inverse control where explicit horizontal and vertical overflow remain visible
 and suppress shape growth. Browser coverage also checks that host `white-space` values cannot
 change the result and that absolutely positioned siblings do not reflow.
+Text IDs 0056-0059 cover color precedence independently from layout behavior: paragraph `defRPr`
+`srgbClr` and `schemeClr` over a conflicting shape `fontRef`, an explicit run color over both, and
+the inverse fallback to `fontRef` when local fills are absent. The cases span square, wide, and tall
+containers and retain exact color values in their tracked OOXML metadata.
 
 ```bash
 cd test/e2e
@@ -242,7 +246,7 @@ cd test/e2e
 # Generate all definitions and native ground truth.
 .venv/bin/python scripts/generate_pypptx_cases.py
 
-# Generate only the CJK matrix. --case is repeatable and accepts exact names or globs.
+# Generate the focused text matrices. --case is repeatable and accepts exact names or globs.
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-text-00[45]*'
 
@@ -491,7 +495,9 @@ capability IDs. A verified flat 2D fallback in one lane cannot promote native be
 The static shape/picture 3D cohort promotes only `orthographicFront` circular top bevels on opaque
 solid `rect`/`roundRect` shapes and rectangular stretch-filled pictures, with the documented
 `twoPt:t`/`threePt:t` lighting tuple, zero extrusion, an optional contour with a resolvable color,
-and an optional outer shadow. Verification
+and an optional outer shadow. The visual gate checks that `bevelT@w` controls the inward edge width,
+`bevelT@h` changes contrast rather than geometry, and the four directional faces remain distinct.
+Verification
 uses all seven `oracle-pypptx-shape3d-*` case reports, the same seven earlier-revision baselines,
 explicit manual verdicts for review rows, and the `source`, `structural`, `unit`, `browser`,
 `performance`, `package-size`, and `docs` caller-run gates. Perspective, arbitrary rotations,

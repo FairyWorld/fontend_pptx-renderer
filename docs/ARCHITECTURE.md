@@ -182,6 +182,19 @@ whose size comes only from inheritance remain on the bounded fit path. The nativ
 therefore a finite text-box cohort, not a claim of editor-level parity for every PowerPoint autofit
 context.
 
+### Text color precedence
+
+`TextRenderer` resolves run styles through the existing master/layout/shape/paragraph/run cascade,
+then applies container color options with an explicit local-precedence check. A color declared on
+the run wins first; otherwise a `solidFill` on paragraph `defRPr` wins over the shape's resolved
+`fontRef`. The shape `fontRef` is used only when both local levels omit a text fill. The same path
+handles direct `srgbClr` and theme-backed `schemeClr`, so theme lookup remains in `StyleResolver`
+instead of being duplicated by the precedence layer.
+
+The native matrix includes positive paragraph defaults, an explicit run override, the no-local-color
+inverse fallback, and square, wide, and tall containers. This boundary verifies color selection; it
+does not claim pixel-identical font metrics across every host font installation.
+
 ### Bounded static DrawingML 3D
 
 `src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,
@@ -202,12 +215,14 @@ supported plan requires all of the following:
   shadow in `effectLst`;
 - an opaque resolved solid-fill `rect`/`roundRect` shape, or a rectangular stretch-filled picture.
 
-The renderer builds one clipped SVG bevel overlay from `SourceAlpha`, `feDiffuseLighting`, and
-`feSpecularLighting`, using bounded `userSpaceOnUse` filter coordinates and `linearRGB` filter
-interpolation. It adds the contour as a separate unfiltered path, keeps shape text outside the
-filter, and draws a 3D picture's ordinary outline as a centered SVG path so the image bounds do not
-shrink. Unique per-effect IDs prevent cross-slide collisions. Existing wrapper transforms, outer
-shadows, media ownership, and cleanup remain in their owning renderers.
+The renderer treats `bevelT@w` as the inward face extent and `bevelT@h` as elevation that scales
+lighting contrast. It partitions the clipped bevel ring into top, right, bottom, and left regions,
+then paints each region with an independent `userSpaceOnUse` gradient. Solid shapes use opaque
+material-color stops so specular highlights retain the source hue; pictures use translucent
+overlays so their pixels remain visible. It adds the contour as a separate path, keeps shape text
+outside the lighting overlay, and draws a 3D picture's ordinary outline as a centered SVG path so
+the image bounds do not shrink. Unique per-effect IDs prevent cross-slide collisions. Existing
+wrapper transforms, outer shadows, media ownership, and cleanup remain in their owning renderers.
 
 Anything outside that full tuple stays on the existing flat path with a stable reason. Perspective,
 nonzero extrusion, other materials/bevels/lights, gradient/pattern/group/image-filled shapes,

@@ -9,9 +9,11 @@
 import type { Shape3DProperties, Shape3DRotation } from '../model/nodes/Shape3D';
 import type { RenderContext } from './RenderContext';
 import { resolveColor } from './StyleResolver';
-import { applyLumOff, applySatMod } from '../utils/color';
+import { applyLumMod, applyLumOff, applySatMod } from '../utils/color';
 
 type StaticShape3DSurface = 'shape' | 'picture';
+type StaticShape3DGeometry = 'rect' | 'roundrect';
+type BevelFace = 'top' | 'right' | 'bottom' | 'left';
 
 type StaticShape3DFallbackReason =
   | 'missing-properties'
@@ -45,6 +47,7 @@ export interface StaticShape3DFlatPlan {
 export interface StaticShape3DSupportedPlan {
   mode: 'orthographic-top-bevel';
   surface: StaticShape3DSurface;
+  geometry: StaticShape3DGeometry;
   faceColor?: string;
   bounds: { width: number; height: number };
   bevel: {
@@ -78,7 +81,6 @@ interface AppendStaticShape3DEffectsOptions {
 
 interface AppendedStaticShape3DEffects {
   group: SVGGElement;
-  filterId: string;
   clipId: string;
 }
 
@@ -181,6 +183,7 @@ export function buildStaticShape3DPlan(
   return {
     mode: 'orthographic-top-bevel',
     surface: target.nodeType,
+    geometry: preset as StaticShape3DGeometry,
     faceColor:
       target.nodeType === 'shape' && target.baseFill
         ? applySatMod(applyLumOff(target.baseFill, 3500), 102000)
@@ -211,32 +214,112 @@ function appendStop(
   gradient.appendChild(stop);
 }
 
-function appendAlphaScale(
-  ns: string,
-  filter: SVGFilterElement,
-  input: string,
-  result: string,
-  slope: number,
+function appendBevelStop(
+  gradient: SVGLinearGradientElement,
+  plan: StaticShape3DSupportedPlan,
+  offset: string,
+  overlayColor: string,
+  overlayOpacity: number,
 ): void {
-  const transfer = document.createElementNS(ns, 'feComponentTransfer');
-  transfer.setAttribute('in', input);
-  transfer.setAttribute('result', result);
-  const alpha = document.createElementNS(ns, 'feFuncA');
-  alpha.setAttribute('type', 'linear');
-  alpha.setAttribute('slope', String(slope));
-  transfer.appendChild(alpha);
-  filter.appendChild(transfer);
+  if (plan.surface !== 'shape' || !plan.faceColor) {
+    appendStop(gradient, offset, overlayColor, overlayOpacity);
+    return;
+  }
+
+  // Solid materials retain their hue under PowerPoint lighting. Resolve each stop to an opaque
+  // material color; a translucent white overlay washes the specular band toward gray.
+  const materialColor =
+    overlayColor === '#FFFFFF'
+      ? applySatMod(
+          applyLumOff(plan.faceColor, Math.round(overlayOpacity * 40000)),
+          Math.round(100000 + overlayOpacity * 130000),
+        )
+      : applyLumMod(plan.faceColor, Math.round((1 - overlayOpacity * 0.85) * 100000));
+  appendStop(gradient, offset, materialColor, 1);
 }
 
-function appendDistantLight(
-  ns: string,
-  parent: SVGElement,
-  plan: StaticShape3DSupportedPlan,
-): void {
-  const light = document.createElementNS(ns, 'feDistantLight');
-  light.setAttribute('azimuth', String(plan.light.azimuth));
-  light.setAttribute('elevation', String(plan.light.elevation));
-  parent.appendChild(light);
+interface BevelFaceDefinition {
+  face: BevelFace;
+  gradient: { x1: number; y1: number; x2: number; y2: number };
+  points: readonly [number, number][];
+  stops: readonly [offset: string, color: string, opacity: number][];
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function buildBevelFaces(
+  bounds: { width: number; height: number },
+  inset: number,
+): readonly BevelFaceDefinition[] {
+  const { width, height } = bounds;
+  return [
+    {
+      face: 'top',
+      gradient: { x1: 0, y1: 0, x2: 0, y2: inset },
+      points: [
+        [0, 0],
+        [width, 0],
+        [width - inset, inset],
+        [inset, inset],
+      ],
+      stops: [
+        ['0%', '#000000', 0.28],
+        ['18%', '#000000', 0.08],
+        ['35%', '#FFFFFF', 0.28],
+        ['58%', '#FFFFFF', 0.58],
+        ['82%', '#FFFFFF', 0.18],
+        ['100%', '#FFFFFF', 0],
+      ],
+    },
+    {
+      face: 'right',
+      gradient: { x1: width, y1: 0, x2: width - inset, y2: 0 },
+      points: [
+        [width, 0],
+        [width, height],
+        [width - inset, height - inset],
+        [width - inset, inset],
+      ],
+      stops: [
+        ['0%', '#000000', 0.9],
+        ['55%', '#000000', 0.62],
+        ['100%', '#000000', 0],
+      ],
+    },
+    {
+      face: 'bottom',
+      gradient: { x1: 0, y1: height, x2: 0, y2: height - inset },
+      points: [
+        [width, height],
+        [0, height],
+        [inset, height - inset],
+        [width - inset, height - inset],
+      ],
+      stops: [
+        ['0%', '#000000', 0.8],
+        ['52%', '#000000', 0.55],
+        ['100%', '#000000', 0],
+      ],
+    },
+    {
+      face: 'left',
+      gradient: { x1: 0, y1: 0, x2: inset, y2: 0 },
+      points: [
+        [0, height],
+        [0, 0],
+        [inset, inset],
+        [inset, height - inset],
+      ],
+      stops: [
+        ['0%', '#000000', 0.48],
+        ['45%', '#000000', 0.16],
+        ['65%', '#FFFFFF', 0.1],
+        ['100%', '#FFFFFF', 0],
+      ],
+    },
+  ];
 }
 
 /** Append the scoped bevel overlay without filtering sibling text or mutating the base path. */
@@ -257,8 +340,6 @@ export function appendStaticShape3DEffects(
   const ns = 'http://www.w3.org/2000/svg';
   const id = ++shape3dIdCounter;
   const clipId = `shape3d-clip-${id}`;
-  const gradientId = `shape3d-gradient-${id}`;
-  const filterId = `shape3d-filter-${id}`;
 
   const clipPath = document.createElementNS(ns, 'clipPath');
   clipPath.id = clipId;
@@ -267,92 +348,6 @@ export function appendStaticShape3DEffects(
   clipShape.setAttribute('d', pathD);
   clipPath.appendChild(clipShape);
   defs.appendChild(clipPath);
-
-  const gradient = document.createElementNS(ns, 'linearGradient');
-  gradient.id = gradientId;
-  gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
-  gradient.setAttribute('color-interpolation', 'linearRGB');
-  gradient.setAttribute('x1', '0');
-  gradient.setAttribute('y1', '0');
-  gradient.setAttribute('x2', String(bounds.width));
-  gradient.setAttribute('y2', String(bounds.height));
-  const isPicture = plan.surface === 'picture';
-  appendStop(gradient, '0%', '#FFFFFF', isPicture ? 0.62 : 0.72);
-  appendStop(gradient, '38%', '#FFFFFF', isPicture ? 0.12 : 0.18);
-  appendStop(gradient, '56%', '#000000', isPicture ? 0.08 : 0.12);
-  appendStop(gradient, '100%', '#000000', isPicture ? 0.62 : 0.72);
-  defs.appendChild(gradient);
-
-  const filter = document.createElementNS(ns, 'filter');
-  filter.id = filterId;
-  filter.dataset.pptxShape3dFilter = 'orthographic-top-bevel';
-  filter.setAttribute('filterUnits', 'userSpaceOnUse');
-  filter.setAttribute('primitiveUnits', 'userSpaceOnUse');
-  filter.setAttribute('color-interpolation-filters', 'linearRGB');
-  const bevelExtent = Math.max(plan.bevel.width, plan.bevel.height, plan.contour?.width ?? 0, 1);
-  const margin = Math.min(bevelExtent * 2, Math.max(bounds.width, bounds.height));
-  filter.setAttribute('x', String(-margin));
-  filter.setAttribute('y', String(-margin));
-  filter.setAttribute('width', String(bounds.width + margin * 2));
-  filter.setAttribute('height', String(bounds.height + margin * 2));
-
-  const blur = document.createElementNS(ns, 'feGaussianBlur');
-  blur.setAttribute('in', 'SourceAlpha');
-  blur.setAttribute(
-    'stdDeviation',
-    `${Math.max(0.25, plan.bevel.width / 4)} ${Math.max(0.25, plan.bevel.height / 4)}`,
-  );
-  blur.setAttribute('result', 'shape3d-bump');
-  filter.appendChild(blur);
-
-  const diffuse = document.createElementNS(ns, 'feDiffuseLighting');
-  diffuse.setAttribute('in', 'shape3d-bump');
-  diffuse.setAttribute('surfaceScale', String(Math.max(1, bevelExtent * 0.8)));
-  diffuse.setAttribute('diffuseConstant', plan.light.rig === 'threePt' ? '0.78' : '0.65');
-  diffuse.setAttribute('lighting-color', '#FFFFFF');
-  diffuse.setAttribute('result', 'shape3d-diffuse');
-  appendDistantLight(ns, diffuse, plan);
-  filter.appendChild(diffuse);
-
-  const diffuseClip = document.createElementNS(ns, 'feComposite');
-  diffuseClip.setAttribute('in', 'shape3d-diffuse');
-  diffuseClip.setAttribute('in2', 'SourceAlpha');
-  diffuseClip.setAttribute('operator', 'in');
-  diffuseClip.setAttribute('result', 'shape3d-diffuse-clip');
-  filter.appendChild(diffuseClip);
-  appendAlphaScale(ns, filter, 'shape3d-diffuse-clip', 'shape3d-diffuse-tone', 0.28);
-
-  const specular = document.createElementNS(ns, 'feSpecularLighting');
-  specular.setAttribute('in', 'shape3d-bump');
-  specular.setAttribute('surfaceScale', String(Math.max(1, bevelExtent)));
-  specular.setAttribute('specularConstant', plan.light.rig === 'threePt' ? '0.82' : '0.65');
-  specular.setAttribute('specularExponent', '18');
-  specular.setAttribute('lighting-color', '#FFFFFF');
-  specular.setAttribute('result', 'shape3d-specular');
-  appendDistantLight(ns, specular, plan);
-  filter.appendChild(specular);
-
-  const specularClip = document.createElementNS(ns, 'feComposite');
-  specularClip.setAttribute('in', 'shape3d-specular');
-  specularClip.setAttribute('in2', 'SourceAlpha');
-  specularClip.setAttribute('operator', 'in');
-  specularClip.setAttribute('result', 'shape3d-specular-clip');
-  filter.appendChild(specularClip);
-  appendAlphaScale(ns, filter, 'shape3d-specular-clip', 'shape3d-specular-tone', 0.5);
-
-  const multiply = document.createElementNS(ns, 'feBlend');
-  multiply.setAttribute('in', 'SourceGraphic');
-  multiply.setAttribute('in2', 'shape3d-diffuse-tone');
-  multiply.setAttribute('mode', 'multiply');
-  multiply.setAttribute('result', 'shape3d-lit-edge');
-  filter.appendChild(multiply);
-
-  const screen = document.createElementNS(ns, 'feBlend');
-  screen.setAttribute('in', 'shape3d-lit-edge');
-  screen.setAttribute('in2', 'shape3d-specular-tone');
-  screen.setAttribute('mode', 'screen');
-  filter.appendChild(screen);
-  defs.appendChild(filter);
 
   const group = document.createElementNS(ns, 'g');
   group.dataset.pptxShape3dBevel = 'orthographic-top-bevel';
@@ -364,19 +359,55 @@ export function appendStaticShape3DEffects(
     faceSheen.setAttribute('d', pathD);
     faceSheen.setAttribute('fill', plan.faceColor);
     faceSheen.setAttribute('stroke', 'none');
-    faceSheen.dataset.pptxShape3dFace = 'sheen';
+    faceSheen.dataset.pptxShape3dSurface = 'sheen';
     group.appendChild(faceSheen);
   }
 
-  const bevelPath = document.createElementNS(ns, 'path');
-  bevelPath.setAttribute('d', pathD);
-  bevelPath.setAttribute('fill', 'none');
-  bevelPath.setAttribute('stroke', `url(#${gradientId})`);
-  bevelPath.setAttribute('stroke-width', String(Math.max(plan.bevel.width, plan.bevel.height) * 2));
-  bevelPath.setAttribute('stroke-linejoin', 'round');
-  bevelPath.setAttribute('filter', `url(#${filterId})`);
-  bevelPath.setAttribute('opacity', plan.surface === 'picture' ? '0.82' : '0.9');
-  group.appendChild(bevelPath);
+  // bevelT@w is the in-plane inset. bevelT@h is elevation, so it scales contrast without
+  // making the visible ring wider. Four clipped strokes preserve the directional face normals
+  // that are lost when the bevel is represented by one filtered border.
+  const inset = Math.min(plan.bevel.width, bounds.width / 2, bounds.height / 2);
+  const heightStrength = clamp(Math.sqrt(plan.bevel.height / inset), 0.65, 1.25);
+  const surfaceStrength = plan.surface === 'picture' ? 0.9 : 1;
+  const rigStrength = plan.light.rig === 'threePt' ? 1 : 0.9;
+  const opacityScale = heightStrength * surfaceStrength * rigStrength;
+
+  for (const definition of buildBevelFaces(bounds, inset)) {
+    const faceId = `${id}-${definition.face}`;
+    const gradientId = `shape3d-gradient-${faceId}`;
+    const faceClipId = `shape3d-face-clip-${faceId}`;
+
+    const gradient = document.createElementNS(ns, 'linearGradient');
+    gradient.id = gradientId;
+    gradient.dataset.pptxShape3dFaceGradient = definition.face;
+    gradient.setAttribute('gradientUnits', 'userSpaceOnUse');
+    gradient.setAttribute('color-interpolation', 'linearRGB');
+    for (const [name, value] of Object.entries(definition.gradient)) {
+      gradient.setAttribute(name, String(value));
+    }
+    for (const [offset, color, opacity] of definition.stops) {
+      appendBevelStop(gradient, plan, offset, color, clamp(opacity * opacityScale, 0, 1));
+    }
+    defs.appendChild(gradient);
+
+    const faceClip = document.createElementNS(ns, 'clipPath');
+    faceClip.id = faceClipId;
+    faceClip.setAttribute('clipPathUnits', 'userSpaceOnUse');
+    const polygon = document.createElementNS(ns, 'polygon');
+    polygon.setAttribute('points', definition.points.map(([x, y]) => `${x},${y}`).join(' '));
+    faceClip.appendChild(polygon);
+    defs.appendChild(faceClip);
+
+    const facePath = document.createElementNS(ns, 'path');
+    facePath.dataset.pptxShape3dFace = definition.face;
+    facePath.setAttribute('d', pathD);
+    facePath.setAttribute('fill', 'none');
+    facePath.setAttribute('stroke', `url(#${gradientId})`);
+    facePath.setAttribute('stroke-width', String(inset * 2));
+    facePath.setAttribute('stroke-linejoin', plan.geometry === 'roundrect' ? 'round' : 'miter');
+    facePath.setAttribute('clip-path', `url(#${faceClipId})`);
+    group.appendChild(facePath);
+  }
   svg.appendChild(group);
 
   if (plan.contour) {
@@ -393,5 +424,5 @@ export function appendStaticShape3DEffects(
   }
 
   if (!defs.parentNode) svg.insertBefore(defs, svg.firstChild);
-  return { group, filterId, clipId };
+  return { group, clipId };
 }

@@ -54,6 +54,7 @@ describe('buildStaticShape3DPlan', () => {
     expect(plan).toMatchObject({
       mode: 'orthographic-top-bevel',
       surface: 'shape',
+      geometry: 'roundrect',
       faceColor: '#327ec4',
       bevel: { preset: 'circle' },
       contour: { color: '#FFFFFF' },
@@ -195,7 +196,7 @@ describe('buildStaticShape3DPlan', () => {
 });
 
 describe('appendStaticShape3DEffects', () => {
-  it('adds bounded source-alpha lighting, a clipped bevel, and a separate contour', () => {
+  it('partitions the inward bevel into independently lit faces and a separate contour', () => {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');
     const defs = document.createElementNS(ns, 'defs');
@@ -225,28 +226,56 @@ describe('appendStaticShape3DEffects', () => {
     });
 
     expect(result).toBeTruthy();
-    const filter = svg.querySelector('filter[data-pptx-shape3d-filter]');
-    expect(filter).toBeTruthy();
-    expect(filter?.getAttribute('filterUnits')).toBe('userSpaceOnUse');
-    expect(filter?.getAttribute('color-interpolation-filters')).toBe('linearRGB');
-    for (const name of ['x', 'y', 'width', 'height']) {
-      expect(Number(filter?.getAttribute(name)), name).toSatisfy(Number.isFinite);
-    }
-    expect(filter?.querySelector('feGaussianBlur')?.getAttribute('in')).toBe('SourceAlpha');
-    expect(filter?.querySelector('feDiffuseLighting feDistantLight')).toBeTruthy();
-    expect(filter?.querySelector('feSpecularLighting feDistantLight')).toBeTruthy();
-
     const bevel = svg.querySelector('[data-pptx-shape3d-bevel]');
     expect(bevel?.getAttribute('clip-path')).toMatch(/^url\(#shape3d-clip-/);
-    expect(bevel?.querySelector('path[filter]')?.getAttribute('d')).toBe(pathD);
-    expect(bevel?.querySelector('path[filter]')?.getAttribute('filter')).toMatch(
-      /^url\(#shape3d-filter-/,
-    );
+    expect(
+      Array.from(bevel?.querySelectorAll('path[data-pptx-shape3d-face]') ?? [], (path) =>
+        path.getAttribute('data-pptx-shape3d-face'),
+      ),
+    ).toEqual(['top', 'right', 'bottom', 'left']);
+    expect(bevel?.querySelectorAll('path[data-pptx-shape3d-face][filter]')).toHaveLength(0);
+    expect(
+      Array.from(bevel?.querySelectorAll('path[data-pptx-shape3d-face]') ?? []).every(
+        (path) => path.getAttribute('d') === pathD,
+      ),
+    ).toBe(true);
+    expect(svg.querySelectorAll('linearGradient[data-pptx-shape3d-face-gradient]')).toHaveLength(4);
 
     const contour = svg.querySelector('path[data-pptx-shape3d-contour]');
     expect(contour?.getAttribute('fill')).toBe('none');
     expect(contour?.getAttribute('stroke')).toBe('#FFFFFF');
     expect(contour?.hasAttribute('filter')).toBe(false);
+  });
+
+  it('uses bevel width for the inward extent and height only for lighting contrast', () => {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const defs = document.createElementNS(ns, 'defs');
+    svg.appendChild(defs);
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape.replace('h="127000"', 'h="254000"')),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      createMockRenderContext(),
+    );
+
+    appendStaticShape3DEffects({
+      svg,
+      defs,
+      pathD: 'M0,0 H200 V100 H0 Z',
+      bounds: { width: 200, height: 100 },
+      plan,
+    });
+
+    for (const face of svg.querySelectorAll('path[data-pptx-shape3d-face]')) {
+      expect(Number(face.getAttribute('stroke-width'))).toBeCloseTo(26.6667, 3);
+    }
   });
 
   it('allocates unique local IDs and is a no-op for a flat plan', () => {

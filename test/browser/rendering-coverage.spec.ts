@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PNG } from 'pngjs';
 
 // Set PLAYWRIGHT_CHANNEL=chrome on machines with Chrome but no downloaded Chromium.
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL });
@@ -313,6 +314,119 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   );
   const second = await host.screenshot();
   expect(first.equals(second)).toBe(true);
+});
+
+test('orthographic circle bevel uses PowerPoint-like face lighting instead of a flat border', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="3D face lighting"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT w="127000" h="127000" prst="circle"/></a:sp3d>
+        </p:spPr>
+      </p:sp>`;
+    document.body.style.margin = '0';
+    const rendered = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    rendered.id = 'shape3d-face-lighting';
+    document.body.append(rendered);
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
+
+  const png = PNG.sync.read(await page.locator('#shape3d-face-lighting').screenshot());
+  const rgb = (x: number, y: number): [number, number, number] => {
+    const offset = (y * png.width + x) * 4;
+    return [png.data[offset], png.data[offset + 1], png.data[offset + 2]];
+  };
+  const luminance = ([r, g, b]: [number, number, number]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const center = rgb(100, 50);
+  const topSpecular = rgb(100, 7);
+
+  expect(luminance(topSpecular)).toBeGreaterThan(luminance(center) + 30);
+  expect(topSpecular[2] - topSpecular[0]).toBeGreaterThan(100);
+  expect(luminance(rgb(4, 50))).toBeLessThan(luminance(center));
+  expect(luminance(rgb(195, 50))).toBeLessThan(luminance(center) - 25);
+  expect(luminance(rgb(100, 95))).toBeLessThan(luminance(center) - 20);
+  for (const [inner, face] of rgb(20, 50).map((channel, index) => [channel, center[index]])) {
+    expect(Math.abs(inner - face)).toBeLessThanOrEqual(5);
+  }
+});
+
+test('paragraph defRPr and shape fontRef keep DrawingML color precedence in a browser', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const colors = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const specimens = [
+      {
+        name: 'paragraph-srgb',
+        paragraphFill: '<a:solidFill><a:srgbClr val="C00000"/></a:solidFill>',
+        runFill: '',
+      },
+      {
+        name: 'paragraph-scheme',
+        paragraphFill: '<a:solidFill><a:schemeClr val="accent2"/></a:solidFill>',
+        runFill: '',
+      },
+      {
+        name: 'explicit-run',
+        paragraphFill: '<a:solidFill><a:schemeClr val="accent2"/></a:solidFill>',
+        runFill: '<a:solidFill><a:srgbClr val="7030A0"/></a:solidFill>',
+      },
+      { name: 'fontref-fallback', paragraphFill: '', runFill: '' },
+    ];
+
+    return specimens.map(({ name, paragraphFill, runFill }) => {
+      const xml = `
+        <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+              xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <p:nvSpPr><p:cNvPr id="1" name="${name}"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+          <p:spPr>
+            <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+            <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>
+          </p:spPr>
+          <p:style>
+            <a:lnRef idx="0"><a:schemeClr val="accent1"/></a:lnRef>
+            <a:fillRef idx="0"><a:schemeClr val="accent1"/></a:fillRef>
+            <a:effectRef idx="0"><a:schemeClr val="accent1"/></a:effectRef>
+            <a:fontRef idx="minor"><a:schemeClr val="accent1"/></a:fontRef>
+          </p:style>
+          <p:txBody><a:bodyPr/><a:lstStyle/><a:p>
+            <a:pPr><a:defRPr>${paragraphFill}</a:defRPr></a:pPr>
+            <a:r><a:rPr lang="zh-CN">${runFill}</a:rPr><a:t>${name}</a:t></a:r>
+          </a:p></p:txBody>
+        </p:sp>`;
+      const rendered = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      document.body.append(rendered);
+      return getComputedStyle(rendered.querySelector('span')!).color;
+    });
+  });
+
+  expect(colors).toEqual([
+    'rgb(192, 0, 0)',
+    'rgb(237, 125, 49)',
+    'rgb(112, 48, 160)',
+    'rgb(68, 114, 196)',
+  ]);
 });
 
 for (const hostWhiteSpace of ['normal', 'pre', 'nowrap']) {

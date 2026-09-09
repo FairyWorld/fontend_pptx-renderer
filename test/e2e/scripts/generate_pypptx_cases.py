@@ -145,6 +145,48 @@ def _add_cjk_run(paragraph, text: str, **style):
     return run
 
 
+def _replace_text_solid_fill(parent, color_kind: str, color_value: str) -> None:
+    """Write a schema-ordered DrawingML text color without python-pptx defaults."""
+    for fill_name in ("noFill", "solidFill", "gradFill", "blipFill", "pattFill", "grpFill"):
+        old = parent.find(qn(f"a:{fill_name}"))
+        if old is not None:
+            parent.remove(old)
+    solid_fill = etree.Element(qn("a:solidFill"))
+    etree.SubElement(solid_fill, qn(f"a:{color_kind}"), val=color_value)
+    parent.insert(0, solid_fill)
+
+
+def _set_shape_font_ref_color(shape, scheme_color: str) -> None:
+    """Add a complete p:style tuple with fontRef as the observable fallback color."""
+    shape_element = shape._element
+    old_style = shape_element.find(qn("p:style"))
+    if old_style is not None:
+        shape_element.remove(old_style)
+    style = etree.Element(qn("p:style"))
+    for tag_name, index in (("lnRef", "0"), ("fillRef", "0"), ("effectRef", "0")):
+        reference = etree.SubElement(style, qn(f"a:{tag_name}"), idx=index)
+        etree.SubElement(reference, qn("a:schemeClr"), val="accent1")
+    font_ref = etree.SubElement(style, qn("a:fontRef"), idx="minor")
+    etree.SubElement(font_ref, qn("a:schemeClr"), val=scheme_color)
+    tx_body = shape_element.find(qn("p:txBody"))
+    if tx_body is None:
+        raise RuntimeError("shape has no p:txBody")
+    shape_element.insert(shape_element.index(tx_body), style)
+
+
+def _set_paragraph_default_color(paragraph, color_kind: str, color_value: str) -> None:
+    p_pr = paragraph._p.get_or_add_pPr()
+    old_default = p_pr.find(qn("a:defRPr"))
+    if old_default is not None:
+        p_pr.remove(old_default)
+    default_run_properties = etree.SubElement(p_pr, qn("a:defRPr"))
+    _replace_text_solid_fill(default_run_properties, color_kind, color_value)
+
+
+def _set_run_explicit_color(run, color_kind: str, color_value: str) -> None:
+    _replace_text_solid_fill(run._r.get_or_add_rPr(), color_kind, color_value)
+
+
 def _set_cjk_paragraph_text(paragraph, text: str, **style) -> None:
     """Set paragraph text so vertical tabs become OOXML soft line breaks."""
     paragraph.text = text
@@ -964,6 +1006,118 @@ def _build_text_cases() -> list[CaseDef]:
             "bodyPr.horzOverflow=overflow",
             "bodyPr.vertOverflow=overflow",
             "autofit.inverse-opt-out",
+        ),
+    )
+
+    # --- Paragraph default-run color precedence (issues #21 / #23 follow-up) ---
+    def _color_precedence_coverage(*features: str) -> dict:
+        return {
+            "oracle": "native-powerpoint",
+            "requiredFonts": ["Microsoft YaHei"],
+            "features": ["text.color.precedence", *features],
+        }
+
+    def _build_color_precedence_case(
+        prs,
+        *,
+        width: float,
+        height: float,
+        left: float,
+        top: float,
+        text: str,
+        default_color: tuple[str, str] | None,
+        run_color: tuple[str, str] | None = None,
+    ):
+        _, shape, tf = _add_cjk_textbox(
+            prs,
+            width=width,
+            height=height,
+            left=left,
+            top=top,
+        )
+        _configure_text_body(tf, wrap="square", autofit="noAutofit", anchor="ctr")
+        paragraph = tf.paragraphs[0]
+        paragraph.alignment = PP_ALIGN.CENTER
+        run = _add_cjk_run(paragraph, text, font_size_pt=28, bold=True)
+        _set_shape_font_ref_color(shape, "accent1")
+        if default_color is not None:
+            _set_paragraph_default_color(paragraph, *default_color)
+        if run_color is not None:
+            _set_run_explicit_color(run, *run_color)
+
+    _add(
+        "defrpr-srgb-over-fontref-square",
+        lambda prs: _build_color_precedence_case(
+            prs,
+            width=3.4,
+            height=3.4,
+            left=5.0,
+            top=1.7,
+            text="段落默认色优先 SRGB RED",
+            default_color=("srgbClr", "C00000"),
+        ),
+        coverage=_color_precedence_coverage(
+            "shape.style.fontRef=accent1",
+            "paragraph.defRPr.solidFill.srgbClr=C00000",
+            "layout.aspectRatio=square",
+            "precedence.paragraph-defRPr-over-shape-fontRef",
+        ),
+    )
+    _add(
+        "defrpr-scheme-over-fontref-wide",
+        lambda prs: _build_color_precedence_case(
+            prs,
+            width=8.8,
+            height=1.8,
+            left=2.2,
+            top=2.8,
+            text="段落 schemeClr accent2 应覆盖 shape fontRef accent1",
+            default_color=("schemeClr", "accent2"),
+        ),
+        coverage=_color_precedence_coverage(
+            "shape.style.fontRef=accent1",
+            "paragraph.defRPr.solidFill.schemeClr=accent2",
+            "layout.aspectRatio=wide",
+            "precedence.paragraph-defRPr-over-shape-fontRef",
+        ),
+    )
+    _add(
+        "run-color-over-defrpr-tall",
+        lambda prs: _build_color_precedence_case(
+            prs,
+            width=2.4,
+            height=5.0,
+            left=5.5,
+            top=1.0,
+            text="显式 RUN 紫色覆盖段落默认橙色",
+            default_color=("schemeClr", "accent2"),
+            run_color=("srgbClr", "7030A0"),
+        ),
+        coverage=_color_precedence_coverage(
+            "shape.style.fontRef=accent1",
+            "paragraph.defRPr.solidFill.schemeClr=accent2",
+            "run.rPr.solidFill.srgbClr=7030A0",
+            "layout.aspectRatio=tall",
+            "precedence.run-rPr-over-paragraph-defRPr",
+        ),
+    )
+    _add(
+        "fontref-fallback-no-defrpr",
+        lambda prs: _build_color_precedence_case(
+            prs,
+            width=6.5,
+            height=2.2,
+            left=3.4,
+            top=2.5,
+            text="无显式颜色时使用 shape fontRef accent1",
+            default_color=None,
+        ),
+        coverage=_color_precedence_coverage(
+            "shape.style.fontRef=accent1",
+            "paragraph.defRPr.color=absent",
+            "run.rPr.color=absent",
+            "precedence.fontRef-fallback",
+            "precedence.inverse-opt-out",
         ),
     )
 

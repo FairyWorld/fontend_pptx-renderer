@@ -73,10 +73,14 @@ def test_cjk_text_layout_matrix_is_registered():
         "oracle-pypptx-text-0053-cjk-sp-autofit-tall-growth",
         "oracle-pypptx-text-0054-cjk-sp-autofit-wide-compact",
         "oracle-pypptx-text-0055-cjk-sp-autofit-explicit-overflow",
+        "oracle-pypptx-text-0056-defrpr-srgb-over-fontref-square",
+        "oracle-pypptx-text-0057-defrpr-scheme-over-fontref-wide",
+        "oracle-pypptx-text-0058-run-color-over-defrpr-tall",
+        "oracle-pypptx-text-0059-fontref-fallback-no-defrpr",
     }
 
     assert expected_names.issubset(text_names)
-    assert len(text_names) == 55
+    assert len(text_names) == 59
 
 
 def test_cjk_text_layout_matrix_serializes_autofit_and_spacing_ooxml(tmp_path: Path):
@@ -169,6 +173,74 @@ def test_cjk_text_layout_matrix_serializes_autofit_and_spacing_ooxml(tmp_path: P
         "boolean(.//a:bodyPr[@wrap='none'][@horzOverflow='overflow'][@vertOverflow='overflow']/a:spAutoFit)",
         namespaces=ns,
     )
+
+
+def test_defrpr_color_precedence_matrix_serializes_exact_ooxml(tmp_path: Path):
+    generator = _load_generator_module()
+    wanted = {
+        "oracle-pypptx-text-0056-defrpr-srgb-over-fontref-square",
+        "oracle-pypptx-text-0057-defrpr-scheme-over-fontref-wide",
+        "oracle-pypptx-text-0058-run-color-over-defrpr-tall",
+        "oracle-pypptx-text-0059-fontref-fallback-no-defrpr",
+    }
+    cases = {
+        case["name"]: case
+        for case in generator._build_all_case_defs()
+        if case["name"] in wanted
+    }
+    assert set(cases) == wanted
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    roots = {}
+    for name, case in cases.items():
+        pptx_path = tmp_path / name / "source.pptx"
+        generator._generate_pptx(case, pptx_path)
+        with ZipFile(pptx_path) as zf:
+            roots[name] = etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+
+    square = roots["oracle-pypptx-text-0056-defrpr-srgb-over-fontref-square"]
+    square_ext = square.xpath(".//p:sp/p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+    assert square_ext.get("cx") == square_ext.get("cy")
+    assert square.xpath(
+        "boolean(.//p:sp/p:style/a:fontRef/a:schemeClr[@val='accent1'])",
+        namespaces=ns,
+    )
+    assert square.xpath(
+        "boolean(.//a:pPr/a:defRPr/a:solidFill/a:srgbClr[@val='C00000'])",
+        namespaces=ns,
+    )
+    assert not square.xpath(".//a:r/a:rPr/a:solidFill", namespaces=ns)
+
+    wide = roots["oracle-pypptx-text-0057-defrpr-scheme-over-fontref-wide"]
+    wide_ext = wide.xpath(".//p:sp/p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+    assert int(wide_ext.get("cx")) > int(wide_ext.get("cy"))
+    assert wide.xpath(
+        "boolean(.//a:pPr/a:defRPr/a:solidFill/a:schemeClr[@val='accent2'])",
+        namespaces=ns,
+    )
+
+    tall = roots["oracle-pypptx-text-0058-run-color-over-defrpr-tall"]
+    tall_ext = tall.xpath(".//p:sp/p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+    assert int(tall_ext.get("cy")) > int(tall_ext.get("cx"))
+    assert tall.xpath(
+        "boolean(.//a:pPr/a:defRPr/a:solidFill/a:schemeClr[@val='accent2'])",
+        namespaces=ns,
+    )
+    assert tall.xpath(
+        "boolean(.//a:r/a:rPr/a:solidFill/a:srgbClr[@val='7030A0'])",
+        namespaces=ns,
+    )
+
+    inverse = roots["oracle-pypptx-text-0059-fontref-fallback-no-defrpr"]
+    assert inverse.xpath(
+        "boolean(.//p:sp/p:style/a:fontRef/a:schemeClr[@val='accent1'])",
+        namespaces=ns,
+    )
+    assert not inverse.xpath(".//a:pPr/a:defRPr/a:solidFill", namespaces=ns)
+    assert not inverse.xpath(".//a:r/a:rPr/a:solidFill", namespaces=ns)
 
 
 def test_case_pattern_selection_supports_exact_and_glob_filters():

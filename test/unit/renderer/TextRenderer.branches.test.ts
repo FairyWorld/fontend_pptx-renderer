@@ -1523,6 +1523,62 @@ describe('TextRenderer — branch coverage (uncovered paths)', () => {
       expect(span!.style.color).toContain('0'); // green
     });
 
+    it('prefers paragraph defRPr srgb color over fontRefColor', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(
+              '<pPr><defRPr><solidFill><srgbClr val="C00000"/></solidFill></defRPr></pPr>',
+            ),
+            runs: [{ text: 'Paragraph default wins' }],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body, undefined, { fontRefColor: '#4472C4' });
+
+      expect(container.querySelector('span')!.style.color).toBe('rgb(192, 0, 0)');
+    });
+
+    it('resolves paragraph defRPr scheme color before fontRefColor', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(
+              '<pPr><defRPr><solidFill><schemeClr val="accent2"/></solidFill></defRPr></pPr>',
+            ),
+            runs: [{ text: 'Scheme default wins' }],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body, undefined, { fontRefColor: '#4472C4' });
+
+      expect(container.querySelector('span')!.style.color).toBe('rgb(237, 125, 49)');
+    });
+
+    it('keeps explicit run color above paragraph defRPr and fontRefColor', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(
+              '<pPr><defRPr><solidFill><schemeClr val="accent2"/></solidFill></defRPr></pPr>',
+            ),
+            runs: [
+              {
+                text: 'Run wins',
+                properties: xmlNode('<rPr><solidFill><srgbClr val="7030A0"/></solidFill></rPr>'),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const container = renderToContainer(body, undefined, { fontRefColor: '#4472C4' });
+
+      expect(container.querySelector('span')!.style.color).toBe('rgb(112, 48, 160)');
+    });
+
     it('applies fontRefColor when run has no explicit color', () => {
       const body = makeTextBody({
         paragraphs: [

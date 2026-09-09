@@ -164,12 +164,13 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 134 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 138 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
-- **Text** (55 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
+- **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
   placeholder inheritance, plus a 16-case CJK wrap/autofit/line-spacing interaction matrix whose
-  final four cases cover square/wide/tall `spAutoFit` growth and explicit-overflow opt-out
+  final four cases cover square/wide/tall `spAutoFit` growth and explicit-overflow opt-out, and a
+  four-case `defRPr`/`fontRef` color-precedence matrix with explicit-run and inverse controls
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Static DrawingML 3D** (7 cases): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
@@ -185,7 +186,7 @@ Generate cases:
 cd test/e2e
 .venv/bin/python3 scripts/generate_pypptx_cases.py
 
-# Focus one or more exact/glob patterns; this example selects text IDs 0040-0055.
+# Focus one or more exact/glob patterns; this example selects text IDs 0040-0059.
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-text-00[45]*'
 

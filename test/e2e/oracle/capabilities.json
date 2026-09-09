@@ -140,6 +140,9 @@
       ],
       "scope": {
         "bevelTopPresets": ["circle"],
+        "bevelWidthSemantics": ["inward-face-extent"],
+        "bevelHeightSemantics": ["lighting-contrast"],
+        "bevelFaces": ["top", "right", "bottom", "left"],
         "camera": ["orthographicFront"],
         "cameraRotation": ["absent"],
         "coexistingEffects": ["outerShdw"],
@@ -249,11 +252,16 @@
         }
       ],
       "scope": {
-        "precedence": ["paragraph-defRPr-over-shape-fontRef"],
+        "aspectRatios": ["square", "wide", "tall"],
+        "precedence": [
+          "run-rPr-over-paragraph-defRPr",
+          "paragraph-defRPr-over-shape-fontRef",
+          "shape-fontRef-fallback-when-local-color-absent"
+        ],
         "properties": ["solidFill", "schemeClr", "srgbClr"]
       },
-      "fallback": "Resolve the nearest available inherited text color and record missing explicit precedence evidence.",
-      "implementationPaths": ["src/renderer/TextRenderer.ts", "src/renderer/StyleResolver.ts", "test/unit/renderer/TextRenderer.test.ts"],
+      "fallback": "Use the shape fontRef only when neither the run nor paragraph defRPr declares a local text fill.",
+      "implementationPaths": ["CHANGELOG.md", "README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/StyleResolver.ts", "src/renderer/TextRenderer.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-text-005[6-9]-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/TextRenderer.branches.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/21", "https://github.com/aiden0z/pptx-renderer/issues/23"]
     },
