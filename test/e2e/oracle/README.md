@@ -42,7 +42,8 @@ bounded top-bevel capability additionally requires a `--bevel-report`; the camer
 requires a `--camera-report`. Their derived `bevel-local` and `camera-local` gates bind the exact
 case set, source/ground-truth hashes, and per-slide raster hashes to the same clean revision and
 current files. Other `--passed-gate` values only record checks already executed by the caller; they
-are not run by the command. Review rows require an explicit case verdict.
+are not run by the command. The API promotes any visible per-slide review flag to the case level, so
+a strong average cannot hide a local mismatch. Review rows require an explicit case verdict.
 
 ## Current Implemented Pieces
 

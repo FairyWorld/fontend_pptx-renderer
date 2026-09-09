@@ -736,8 +736,12 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
 
     # --- Warning layer: flag for human review (does NOT auto-fail) ---
     warning_reasons = [reason for reason in triage_reasons if reason.startswith("warn:")]
-    needs_review = bool(evaluation_errors) or avg_ssim < SSIM_WARNING_THRESHOLD
-    if not evaluation_errors and needs_review:
+    ssim_needs_review = any(
+        slide.get("needsReview") is True and not slide.get("oracleMismatch")
+        for slide in per_slide
+    )
+    needs_review = bool(evaluation_errors) or ssim_needs_review or oracle_mismatch_count > 0
+    if not evaluation_errors and ssim_needs_review:
         warning_reasons.append("warn:ssim_below_review_threshold")
     if oracle_mismatch_count:
         warning_reasons.append("warn:oracle_ground_truth_mismatch")

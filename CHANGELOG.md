@@ -74,7 +74,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   84-slide native matrix now covers square explicit paint, wide theme-reference paint, and grouped
   tall rendering for every preset.
 - Report per-slide oracle runtime failures separately from visual metrics, retry transient batch
-  failures, and serialize browser startup and cancellation cleanup.
+  failures, serialize browser startup and cancellation cleanup, and require case-level manual review
+  when any visible slide falls below the review threshold even if the case average remains above it.
 - The python-pptx corpus generator now supports native PDF export on macOS, repeatable exact/glob
   case filters, and SHA-256 artifact records while keeping cached case metadata synchronized.
 - Map Office percentage line and paragraph spacing through its native line unit, trim outer

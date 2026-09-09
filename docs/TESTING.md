@@ -431,9 +431,12 @@ These two metrics determine automated pass/fail for this oracle evaluator. Their
 
 ### Warning Layer (human review)
 
-| Condition     | Flag                | Purpose                                                     |
-| ------------- | ------------------- | ----------------------------------------------------------- |
-| `ssim < 0.99` | `needsReview: true` | Flags near-misses for human inspection without auto-failing |
+| Condition                       | Flag                | Purpose                                                     |
+| ------------------------------- | ------------------- | ----------------------------------------------------------- |
+| Any visible slide `ssim < 0.99` | `needsReview: true` | Flags near-misses for human inspection without auto-failing |
+
+The case-level flag is the union of visible per-slide review flags, evaluation errors, and detected
+oracle page mismatches. A high multi-slide average cannot hide one page that needs inspection.
 
 ### Diagnostic Layer (display only)
 
