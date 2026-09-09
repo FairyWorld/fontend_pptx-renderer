@@ -61,6 +61,15 @@ function visibleParagraphCount(textBody: TextBody): number {
   ).length;
 }
 
+function hasExplicitVisibleRunFontSize(textBody: TextBody): boolean {
+  return textBody.paragraphs.some((paragraph) =>
+    paragraph.runs.some(
+      (run) =>
+        run.text != null && run.text.length > 0 && run.properties?.numAttr('sz') !== undefined,
+    ),
+  );
+}
+
 function hasExplicitParagraphSpacing(textBody: TextBody): boolean {
   return textBody.paragraphs.some((paragraph) => {
     const pPr = paragraph.properties;
@@ -1758,6 +1767,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
   let mainSvgNs: string | null = null;
   let mainDefs: SVGDefsElement | null = null;
   let mainPath: SVGPathElement | null = null;
+  let mainSvg: SVGSVGElement | null = null;
   let mainSvgBounds: { w: number; h: number } | null = null;
   if (pathD) {
     const svgNs = 'http://www.w3.org/2000/svg';
@@ -1771,6 +1781,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
     svg.style.left = '0';
     svg.style.top = '0';
     svg.style.overflow = 'visible';
+    mainSvg = svg;
 
     const blipFill = spPr.child('blipFill');
     const blipUrl = blipFill.exists() ? resolveShapeBlipUrl(blipFill, ctx) : null;
@@ -2646,6 +2657,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       const vertOverflow =
         (bodyPr ? bodyPr.attr('vertOverflow') : undefined) ??
         (fallbackBp ? fallbackBp.attr('vertOverflow') : undefined);
+      const ownTextAnchor = bodyPr ? bodyPr.attr('anchor') : undefined;
+      const fallbackTextAnchor = fallbackBp ? fallbackBp.attr('anchor') : undefined;
+      const resolvedTextAnchor = ownTextAnchor || fallbackTextAnchor;
       const spAutoFitAllowsHorizontalOverflow =
         hasSpAutoFit && !hasNormAutofit && horzOverflow === 'overflow';
       const spAutoFitAllowsVerticalOverflow =
@@ -2684,6 +2698,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       // normAutofit: PowerPoint stores the computed fontScale (1000ths of percent).
       // Apply it as a CSS transform to shrink text so it fits the shape.
       let needsDynamicAutofit = false;
+      let usesNativeShapeAutofitCandidate = false;
       if (hasNormAutofit && normAutofit) {
         textContainer.style.overflowX = 'hidden';
         textContainer.style.overflowY = 'hidden';
@@ -2696,9 +2711,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           textContainer.style.lineHeight = `${lnFactor}`;
         }
       }
-      // spAutoFit requests in-shape text fitting. In browser rendering we cannot
-      // resize the absolutely positioned shape like PowerPoint editor behavior,
-      // so use bounded dynamic scaling to prevent bleed across neighboring nodes.
+      // spAutoFit resizes the shape to contain the text. Keep the bounded measurement
+      // path for compact labels and explicit overflow axes; a standalone text box can
+      // switch to native shape growth after its wrapped and unwrapped bounds are known.
       if (hasSpAutoFit && !hasNormAutofit) {
         if (spAutoFitAllowsHorizontalOverflow === spAutoFitAllowsVerticalOverflow) {
           const overflow = spAutoFitAllowsHorizontalOverflow ? 'visible' : 'hidden';
@@ -2712,6 +2727,17 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         }
         needsDynamicAutofit =
           !spAutoFitAllowsHorizontalOverflow || !spAutoFitAllowsVerticalOverflow;
+        const textFlow =
+          (bodyPr ? bodyPr.attr('vert') : undefined) ??
+          (fallbackBp ? fallbackBp.attr('vert') : undefined);
+        usesNativeShapeAutofitCandidate =
+          node.source.child('nvSpPr').child('cNvSpPr').attr('txBox') === '1' &&
+          !node.textBoxBounds &&
+          textWrap === 'square' &&
+          (textFlow === undefined || textFlow === 'horz') &&
+          (resolvedTextAnchor === undefined || resolvedTextAnchor === 't') &&
+          horzOverflow === undefined &&
+          vertOverflow === undefined;
       }
       // When no autofit mode is serialized, PowerPoint still keeps simple
       // single-line shape labels within the shape bounds instead of wrapping them
@@ -2753,10 +2779,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         }
 
         // Vertical alignment (anchor): prefer shape's own, then layout placeholder
-        const ownAnchor = bodyPr ? bodyPr.attr('anchor') : undefined;
-        const fallbackAnchor = fallbackBp ? fallbackBp.attr('anchor') : undefined;
-        const anchor = ownAnchor || fallbackAnchor;
-        const hasExplicitTextAnchor = ownAnchor !== undefined || fallbackAnchor !== undefined;
+        const anchor = resolvedTextAnchor;
+        const hasExplicitTextAnchor =
+          ownTextAnchor !== undefined || fallbackTextAnchor !== undefined;
         textAnchor = anchor;
         const vert =
           (bodyPr ? bodyPr.attr('vert') : null) || (fallbackBp ? fallbackBp.attr('vert') : null);
@@ -2894,19 +2919,37 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       // Dynamic text fit: measure rendered text and compute any additional scale
       // needed after OOXML fontScale, spAutoFit, or implicit single-line fitting.
       if (needsDynamicAutofit) {
+        const baseWrapperWidth = wrapper.style.width;
+        const baseWrapperHeight = wrapper.style.height;
         const baseTransform = textContainer.style.transform;
         const baseTransformOrigin = textContainer.style.transformOrigin;
         const baseWidth = textContainer.style.width;
         const baseHeight = textContainer.style.height;
         const baseWhiteSpace = textContainer.style.whiteSpace;
         const baseOverflowY = textContainer.style.overflowY;
+        const baseSvgWidth = mainSvg?.getAttribute('width') ?? null;
+        const baseSvgHeight = mainSvg?.getAttribute('height') ?? null;
+        const baseSvgPreserveAspectRatio = mainSvg?.getAttribute('preserveAspectRatio') ?? null;
         const applyDynamicAutofit = () => {
+          wrapper.style.width = baseWrapperWidth;
+          wrapper.style.height = baseWrapperHeight;
           textContainer.style.transform = baseTransform;
           textContainer.style.transformOrigin = baseTransformOrigin;
           textContainer.style.width = baseWidth;
           textContainer.style.height = baseHeight;
           textContainer.style.whiteSpace = baseWhiteSpace;
           textContainer.style.overflowY = baseOverflowY;
+          if (mainSvg) {
+            if (baseSvgWidth === null) mainSvg.removeAttribute('width');
+            else mainSvg.setAttribute('width', baseSvgWidth);
+            if (baseSvgHeight === null) mainSvg.removeAttribute('height');
+            else mainSvg.setAttribute('height', baseSvgHeight);
+            if (baseSvgPreserveAspectRatio === null) {
+              mainSvg.removeAttribute('preserveAspectRatio');
+            } else {
+              mainSvg.setAttribute('preserveAspectRatio', baseSvgPreserveAspectRatio);
+            }
+          }
 
           // The wrapper is not always in the DOM yet, so temporarily attach it offscreen to measure.
           const wasConnected = wrapper.isConnected;
@@ -2980,6 +3023,32 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
               measurementRoot.removeChild(wrapper);
             }
             wrapper.style.visibility = savedWrapperVisibility;
+          }
+          const unwrappedWidthScale =
+            measuredUnwrappedWidth && contentW > 0 ? containerW / contentW : 1;
+          const shouldGrowStandaloneTextBox =
+            usesNativeShapeAutofitCandidate &&
+            !wrappedFits &&
+            (visibleParagraphCount(textBody) > 1 ||
+              (measuredUnwrappedWidth &&
+                (contentH <= containerH || hasExplicitVisibleRunFontSize(textBody)) &&
+                unwrappedWidthScale < SP_AUTOFIT_UNWRAPPED_WIDTH_SCALE_FLOOR));
+          if (shouldGrowStandaloneTextBox) {
+            const fittedWrapperWidth =
+              textWrap === 'none' ? Math.max(minW, contentW) : Math.max(minW, containerW);
+            const fittedWrapperHeight = Math.max(minH, wrappedContentH);
+            wrapper.style.width = `${fittedWrapperWidth}px`;
+            wrapper.style.height = `${fittedWrapperHeight}px`;
+            textContainer.style.overflowX = 'visible';
+            textContainer.style.overflowY = 'visible';
+            if (mainSvg) {
+              mainSvg.setAttribute('width', String(fittedWrapperWidth));
+              mainSvg.setAttribute('height', String(fittedWrapperHeight));
+              if (fittedWrapperWidth !== minW || fittedWrapperHeight !== minH) {
+                mainSvg.setAttribute('preserveAspectRatio', 'none');
+              }
+            }
+            return;
           }
           let scale = 1;
           const fitWidthOnly =

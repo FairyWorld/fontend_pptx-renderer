@@ -69,10 +69,14 @@ def test_cjk_text_layout_matrix_is_registered():
         "oracle-pypptx-text-0049-cjk-paragraph-spacing-percent",
         "oracle-pypptx-text-0050-cjk-mixed-run-character-spacing",
         "oracle-pypptx-text-0051-cjk-rounded-shape-centered-spacing",
+        "oracle-pypptx-text-0052-cjk-sp-autofit-square-growth",
+        "oracle-pypptx-text-0053-cjk-sp-autofit-tall-growth",
+        "oracle-pypptx-text-0054-cjk-sp-autofit-wide-compact",
+        "oracle-pypptx-text-0055-cjk-sp-autofit-explicit-overflow",
     }
 
     assert expected_names.issubset(text_names)
-    assert len(text_names) == 51
+    assert len(text_names) == 55
 
 
 def test_cjk_text_layout_matrix_serializes_autofit_and_spacing_ooxml(tmp_path: Path):
@@ -85,6 +89,10 @@ def test_cjk_text_layout_matrix_serializes_autofit_and_spacing_ooxml(tmp_path: P
         "oracle-pypptx-text-0049-cjk-paragraph-spacing-percent",
         "oracle-pypptx-text-0050-cjk-mixed-run-character-spacing",
         "oracle-pypptx-text-0051-cjk-rounded-shape-centered-spacing",
+        "oracle-pypptx-text-0052-cjk-sp-autofit-square-growth",
+        "oracle-pypptx-text-0053-cjk-sp-autofit-tall-growth",
+        "oracle-pypptx-text-0054-cjk-sp-autofit-wide-compact",
+        "oracle-pypptx-text-0055-cjk-sp-autofit-explicit-overflow",
     }
     ns = {
         "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
@@ -140,6 +148,27 @@ def test_cjk_text_layout_matrix_serializes_autofit_and_spacing_ooxml(tmp_path: P
     mixed_runs = roots["oracle-pypptx-text-0050-cjk-mixed-run-character-spacing"]
     assert mixed_runs.xpath("boolean(.//a:rPr[@spc='180'])", namespaces=ns)
     assert mixed_runs.xpath("boolean(.//a:rPr[@spc='-120'])", namespaces=ns)
+
+    square = roots["oracle-pypptx-text-0052-cjk-sp-autofit-square-growth"]
+    square_ext = square.xpath(".//p:sp/p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+    assert square_ext.get("cx") == square_ext.get("cy")
+    assert square.xpath("boolean(.//a:bodyPr[@wrap='square']/a:spAutoFit)", namespaces=ns)
+
+    tall = roots["oracle-pypptx-text-0053-cjk-sp-autofit-tall-growth"]
+    tall_ext = tall.xpath(".//p:sp/p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+    assert int(tall_ext.get("cy")) > int(tall_ext.get("cx"))
+    assert tall.xpath("boolean(.//a:bodyPr[@wrap='square']/a:spAutoFit)", namespaces=ns)
+
+    wide = roots["oracle-pypptx-text-0054-cjk-sp-autofit-wide-compact"]
+    wide_ext = wide.xpath(".//p:sp/p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+    assert int(wide_ext.get("cx")) > 10 * int(wide_ext.get("cy"))
+    assert wide.xpath("boolean(.//a:bodyPr[@wrap='square']/a:spAutoFit)", namespaces=ns)
+
+    explicit_overflow = roots["oracle-pypptx-text-0055-cjk-sp-autofit-explicit-overflow"]
+    assert explicit_overflow.xpath(
+        "boolean(.//a:bodyPr[@wrap='none'][@horzOverflow='overflow'][@vertOverflow='overflow']/a:spAutoFit)",
+        namespaces=ns,
+    )
 
 
 def test_case_pattern_selection_supports_exact_and_glob_filters():

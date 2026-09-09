@@ -83,6 +83,8 @@ def _configure_text_body(
     autofit: str | None,
     autofit_attrs: dict[str, str] | None = None,
     anchor: str | None = None,
+    horz_overflow: str | None = None,
+    vert_overflow: str | None = None,
 ) -> None:
     """Set bodyPr values that python-pptx does not expose losslessly."""
     body_pr = text_frame._txBody.find(qn("a:bodyPr"))
@@ -92,6 +94,14 @@ def _configure_text_body(
     body_pr.set("wrap", wrap)
     if anchor is not None:
         body_pr.set("anchor", anchor)
+    for attr_name, attr_value in (
+        ("horzOverflow", horz_overflow),
+        ("vertOverflow", vert_overflow),
+    ):
+        if attr_value is None:
+            body_pr.attrib.pop(attr_name, None)
+        else:
+            body_pr.set(attr_name, attr_value)
     _remove_children(body_pr, ("noAutofit", "normAutofit", "spAutoFit"))
     if autofit is not None:
         etree.SubElement(body_pr, qn(f"a:{autofit}"), **(autofit_attrs or {}))
@@ -887,6 +897,73 @@ def _build_text_cases() -> list[CaseDef]:
             "paragraph.alignment=center",
             "paragraph.manualBreaks",
             "lnSpc.spcPct=120000",
+        ),
+    )
+
+    def _build_cjk_sp_autofit_square(prs):
+        _, _, tf = _add_cjk_textbox(prs, width=2.4, height=2.4)
+        _configure_text_body(tf, wrap="square", autofit="spAutoFit")
+        _add_cjk_run(tf.paragraphs[0], cjk_wrap_text, font_size_pt=30)
+    _add(
+        "cjk-sp-autofit-square-growth",
+        _build_cjk_sp_autofit_square,
+        coverage=_cjk_coverage(
+            "bodyPr.wrap=square",
+            "bodyPr.spAutoFit",
+            "layout.aspectRatio=square",
+            "shape.growth",
+        ),
+    )
+
+    def _build_cjk_sp_autofit_tall(prs):
+        _, _, tf = _add_cjk_textbox(prs, width=1.8, height=3.2, top=0.6)
+        _configure_text_body(tf, wrap="square", autofit="spAutoFit")
+        _add_cjk_run(tf.paragraphs[0], cjk_wrap_text, font_size_pt=30)
+    _add(
+        "cjk-sp-autofit-tall-growth",
+        _build_cjk_sp_autofit_tall,
+        coverage=_cjk_coverage(
+            "bodyPr.wrap=square",
+            "bodyPr.spAutoFit",
+            "layout.aspectRatio=tall",
+            "shape.growth",
+        ),
+    )
+
+    def _build_cjk_sp_autofit_wide(prs):
+        _, _, tf = _add_cjk_textbox(prs, width=8.4, height=0.45)
+        _configure_text_body(tf, wrap="square", autofit="spAutoFit")
+        _add_cjk_run(tf.paragraphs[0], cjk_wrap_text, font_size_pt=30)
+    _add(
+        "cjk-sp-autofit-wide-compact",
+        _build_cjk_sp_autofit_wide,
+        coverage=_cjk_coverage(
+            "bodyPr.wrap=square",
+            "bodyPr.spAutoFit",
+            "layout.aspectRatio=wide",
+            "layout.compact",
+        ),
+    )
+
+    def _build_cjk_sp_autofit_explicit_overflow(prs):
+        _, _, tf = _add_cjk_textbox(prs, width=3.0, height=1.0)
+        _configure_text_body(
+            tf,
+            wrap="none",
+            autofit="spAutoFit",
+            horz_overflow="overflow",
+            vert_overflow="overflow",
+        )
+        _add_cjk_run(tf.paragraphs[0], cjk_wrap_text, font_size_pt=24)
+    _add(
+        "cjk-sp-autofit-explicit-overflow",
+        _build_cjk_sp_autofit_explicit_overflow,
+        coverage=_cjk_coverage(
+            "bodyPr.wrap=none",
+            "bodyPr.spAutoFit",
+            "bodyPr.horzOverflow=overflow",
+            "bodyPr.vertOverflow=overflow",
+            "autofit.inverse-opt-out",
         ),
     )
 

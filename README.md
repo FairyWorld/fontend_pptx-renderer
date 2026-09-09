@@ -663,9 +663,18 @@ Supported chart combinations include combo charts and secondary axes. Sparse sca
 Placeholder inheritance follows the matched layout placeholder into its master category, preserves explicit zero transforms/insets, and resolves omitted body properties and mutually exclusive autofit choices. Explicit no-autofit clipping and whitespace behavior are checked in real browser containers. These combinations do not establish native equivalence for every text/autofit variant.
 
 Percentage line spacing and paragraph before/after spacing follow Office line-unit semantics;
-ordinary text boxes trim spacing outside the first and last visible paragraphs. A 12-case CJK
-native matrix covers wrapping, autofit, line/paragraph spacing, adjacent runs, and parent-shape
-layout, while font availability remains part of the evaluation provenance.
+ordinary text boxes trim spacing outside the first and last visible paragraphs. A 16-case CJK
+native matrix covers wrapping, autofit, line/paragraph spacing, adjacent runs, parent-shape layout,
+and square/wide/tall `spAutoFit` text-box growth, while font availability remains part of the
+evaluation provenance.
+
+For a square-wrapped standalone horizontal text box with top/default anchoring and no explicit
+overflow override, `spAutoFit` can grow the shape at its authored font size. The verified growth
+cohort includes multiple visible paragraphs and single-paragraph runs with an explicit font size
+whose unwrapped width is materially larger than the original box. The wrapper and its shape SVG
+grow together without reflowing absolutely positioned siblings. Explicit overflow axes remain
+authoritative; other wrapping modes, center/bottom anchors, vertical text, inherited compact
+labels, diagram text bounds, and non-text-box shapes retain their bounded measurement paths.
 
 ## Architecture
 

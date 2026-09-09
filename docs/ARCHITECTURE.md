@@ -155,6 +155,33 @@ active for shapes that have not passed that gate. Expanding the production subse
 formula/IR parity, SVG structure, parent renderer, picture clip, browser, package, and current
 native PowerPoint oracle evidence for the selected shape family.
 
+### Text wrapping and shape autofit
+
+`ShapeRenderer` resolves `a:bodyPr` through the existing shape/layout/master inheritance chain
+before it chooses CSS wrapping, overflow, and autofit behavior. `wrap="square"` uses browser line
+wrapping and `wrap="none"` uses a single-line container; both are written as inline styles so a
+host page's `white-space` rule cannot replace the presentation semantics. Explicit
+`horzOverflow` and `vertOverflow` values are resolved independently.
+
+The three autofit choices remain mutually exclusive:
+
+- `noAutofit` keeps the authored font size and applies the requested clip or overflow axes;
+- `normAutofit` applies the serialized `fontScale` and `lnSpcReduction` within the fixed shape;
+- `spAutoFit` measures the final browser text after fonts are ready. A square-wrapped,
+  top/default-anchored standalone horizontal `txBox` with no explicit overflow override can grow
+  when it contains multiple visible
+  paragraphs, or when an explicit visible-run font size would otherwise require material
+  single-line shrinking. The wrapper and its main SVG receive the same grown dimensions, while
+  absolutely positioned siblings keep their coordinates.
+
+Before every measurement pass, the renderer restores the authored wrapper, SVG, whitespace, and
+transform state. This prevents fallback-font measurements from leaving stale growth after the
+declared fonts become available. Other wrapping modes, center/bottom anchors, vertical text,
+diagram-specific text bounds, non-text-box shapes, explicit overflow overrides, and compact labels
+whose size comes only from inheritance remain on the bounded fit path. The native evidence is
+therefore a finite text-box cohort, not a claim of editor-level parity for every PowerPoint autofit
+context.
+
 ### Bounded static DrawingML 3D
 
 `src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,

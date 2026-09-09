@@ -351,6 +351,116 @@ for (const hostWhiteSpace of ['normal', 'pre', 'nowrap']) {
   }
 }
 
+test('spAutoFit grows a wrapped CJK text box without shrinking glyphs or reflowing siblings', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { renderTextFixture } = await import('/test/fixtures/text-coverage.ts');
+    const { element, span, container } = renderTextFixture(
+      '<bodyPr wrap="square" lIns="109728" rIns="109728" tIns="73152" bIns="73152"><spAutoFit/></bodyPr>',
+      '',
+      '',
+      '',
+      '<a:r><a:rPr sz="3000"><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:rPr><a:t>Alpha 坚守问题导向，持续提升复杂演示文稿的渲染质量与一致性。</a:t></a:r>',
+    );
+    const parent = document.createElement('div');
+    Object.assign(parent.style, {
+      position: 'relative',
+      width: '500px',
+      height: '300px',
+    });
+    const sibling = document.createElement('div');
+    Object.assign(sibling.style, {
+      position: 'absolute',
+      left: '0',
+      top: '140px',
+      width: '20px',
+      height: '20px',
+    });
+    parent.append(element, sibling);
+    document.body.append(parent);
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    return {
+      fontSize: getComputedStyle(span).fontSize,
+      lineCount: range.getClientRects().length,
+      transform: container.style.transform,
+      overflowY: getComputedStyle(container).overflowY,
+      shapeHeight: element.getBoundingClientRect().height,
+      textHeight: container.getBoundingClientRect().height,
+      parentHeight: parent.getBoundingClientRect().height,
+      siblingTop: sibling.offsetTop,
+    };
+  });
+
+  expect(result.fontSize).toBe('40px');
+  expect(result.lineCount).toBeGreaterThan(2);
+  expect(result.transform).toBe('');
+  expect(result.overflowY).toBe('visible');
+  expect(result.shapeHeight).toBeGreaterThan(80);
+  expect(result.textHeight).toBeCloseTo(result.shapeHeight, 1);
+  expect(result.parentHeight).toBe(300);
+  expect(result.siblingTop).toBe(140);
+});
+
+test('spAutoFit grows a compact wide text box when its run preserves an explicit font size', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { renderTextFixture } = await import('/test/fixtures/text-coverage.ts');
+    const { element, span, container } = renderTextFixture(
+      '<bodyPr wrap="square"><spAutoFit/></bodyPr>',
+      '',
+      '',
+      '',
+      '<a:r><a:rPr sz="3000"><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:rPr><a:t>Alpha 坚守问题导向，持续提升复杂演示文稿的渲染质量与一致性。</a:t></a:r>',
+      undefined,
+      { cx: 7680960, cy: 411480 },
+    );
+    const centered = renderTextFixture(
+      '<bodyPr wrap="square" anchor="ctr"><spAutoFit/></bodyPr>',
+      '',
+      '',
+      '',
+      '<a:r><a:rPr sz="3000"><a:latin typeface="Microsoft YaHei"/><a:ea typeface="Microsoft YaHei"/></a:rPr><a:t>Alpha 坚守问题导向，持续提升复杂演示文稿的渲染质量与一致性。</a:t></a:r>',
+      undefined,
+      { cx: 7680960, cy: 411480 },
+    );
+    document.body.append(element, centered.element);
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    return {
+      fontSize: getComputedStyle(span).fontSize,
+      lineCount: range.getClientRects().length,
+      transform: container.style.transform,
+      overflowY: getComputedStyle(container).overflowY,
+      shapeWidth: element.getBoundingClientRect().width,
+      shapeHeight: element.getBoundingClientRect().height,
+      centeredTransform: centered.container.style.transform,
+      centeredShapeHeight: centered.element.getBoundingClientRect().height,
+    };
+  });
+
+  expect(result.fontSize).toBe('40px');
+  expect(result.lineCount).toBeGreaterThan(1);
+  expect(result.transform).toBe('');
+  expect(result.overflowY).toBe('visible');
+  expect(result.shapeWidth).toBeCloseTo(806.4, 1);
+  expect(result.shapeHeight).toBeGreaterThan(43.2);
+  expect(result.centeredTransform).toContain('scale(');
+  expect(result.centeredShapeHeight).toBeCloseTo(43.2, 1);
+});
+
 for (const [x, y] of [
   ['clip', 'clip'],
   ['clip', 'overflow'],

@@ -2482,7 +2482,7 @@ describe('ShapeRenderer', () => {
     }
   });
 
-  it('keeps bullet spAutoFit text at full size when nowrap fits the original box (xcloud-solution slide 27)', () => {
+  it('grows a multi-paragraph spAutoFit text box at full size (xcloud-solution slide 27)', () => {
     const isFitContainer = (el: HTMLElement) =>
       el.style.display === 'flex' && el.style.flexDirection === 'column';
     const clientWidthSpy = vi
@@ -2552,12 +2552,13 @@ describe('ShapeRenderer', () => {
       ) as HTMLElement | undefined;
 
       expect(textContainer).toBeDefined();
-      expect(textContainer!.style.whiteSpace).toBe('nowrap');
+      expect(textContainer!.style.whiteSpace).toBe('normal');
       expect(textContainer!.style.transform).not.toContain('scale(');
-      expect(textContainer!.style.overflowX).toBe('hidden');
-      expect(textContainer!.style.overflowY).toBe('hidden');
+      expect(textContainer!.style.overflowX).toBe('visible');
+      expect(textContainer!.style.overflowY).toBe('visible');
       expect(textContainer!.style.width).toBe('100%');
       expect(textContainer!.style.height).toBe('100%');
+      expect(el.style.height).toBe('73px');
     } finally {
       clientWidthSpy.mockRestore();
       clientHeightSpy.mockRestore();
@@ -2604,7 +2605,7 @@ describe('ShapeRenderer', () => {
     expect(span?.style.fontSize).toBe('72pt');
   });
 
-  it('remeasures dynamic spAutoFit after fonts are ready to remove stale fallback-font scaling', async () => {
+  it('remeasures spAutoFit after fonts are ready to remove stale fallback-font growth', async () => {
     const isFitContainer = (el: HTMLElement) =>
       el.style.display === 'flex' && el.style.flexDirection === 'column';
     let fontsReady = false;
@@ -2680,7 +2681,8 @@ describe('ShapeRenderer', () => {
       ) as HTMLElement | undefined;
 
       expect(textContainer).toBeDefined();
-      expect(textContainer!.style.transform).toContain('scale(');
+      expect(textContainer!.style.transform).not.toContain('scale(');
+      expect(el.style.height).toBe('120px');
 
       document.body.appendChild(el);
       resolveFontsReady();
@@ -2696,6 +2698,7 @@ describe('ShapeRenderer', () => {
       expect(textContainer!.style.transform).not.toContain('scale(');
       expect(textContainer!.style.width).toBe('100%');
       expect(textContainer!.style.height).toBe('100%');
+      expect(parseFloat(el.style.height)).toBeLessThan(60);
     } finally {
       clientWidthSpy.mockRestore();
       clientHeightSpy.mockRestore();

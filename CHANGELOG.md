@@ -28,8 +28,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   bounded face, byte, and processing budgets plus host-font fallback for rejected faces.
 - Added `fontFaces` options to `PptxViewer` and headless `renderSlide()` so host applications can
   register missing regular/bold font data before PowerPoint text layout is measured.
-- Added a 12-case CJK native-oracle matrix for wrap, autofit, line/paragraph spacing, adjacent
-  run spacing, and parent-shape layout, with tracked coverage/font metadata and ignored binaries.
+- Added a 16-case CJK native-oracle matrix for wrap, autofit, line/paragraph spacing, adjacent
+  run spacing, parent-shape layout, and square/wide/tall `spAutoFit` growth, with tracked
+  coverage/font metadata and ignored binaries.
 - Added optional local font profiles and per-evaluation provenance for PPTX/ground-truth/font
   hashes, renderer Git state, and the actual browser version.
 
@@ -48,7 +49,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - The python-pptx corpus generator now supports native PDF export on macOS, repeatable exact/glob
   case filters, and SHA-256 artifact records while keeping cached case metadata synchronized.
 - Map Office percentage line and paragraph spacing through its native line unit, trim outer
-  first/last paragraph spacing, and use text-container defaults validated by the 12-case CJK matrix.
+  first/last paragraph spacing, and use text-container defaults validated by the 16-case CJK matrix.
+- Grow verified standalone horizontal `spAutoFit` text boxes at their authored font size when
+  native PowerPoint expands multi-paragraph or explicit-size content, while keeping explicit
+  overflow axes and bounded real-deck label handling authoritative.
 - Stage macOS PowerPoint input/output in one fixed ignored runtime directory and use a bounded
   timeout so local corpus generation does not require a new folder grant for every case.
 - Make the native macro smoke validate a non-empty SmartArt catalog produced in the fixed runtime
@@ -62,6 +66,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Fixed
 
+- Preserve wrapped CJK `spAutoFit` text at its authored size instead of collapsing narrow or
+  compact-wide text boxes into a scaled single line; font-ready remeasurement now also restores
+  the original wrapper and SVG dimensions before applying the final fit.
 - Keep near-fit, single-paragraph square-wrapped headings on one line with a conservative 2%
   browser-metric correction while preserving deliberate multi-line text.
 - Resolve macOS PowerPoint exports and macro hosts by exact full path, close only that presentation,

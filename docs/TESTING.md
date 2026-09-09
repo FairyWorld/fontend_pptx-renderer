@@ -216,7 +216,7 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, bounded static DrawingML 3D, composite, and chart interaction cases,
-use the python-pptx generator. It currently defines 130 cases: 51 text, 31 shape-adjustment, 7
+use the python-pptx generator. It currently defines 134 cases: 55 text, 31 shape-adjustment, 7
 static 3D, 20 composite, and 21 chart cases. The static 3D matrix covers flat opt-out, picture and
 shape containers, `twoPt:t` and `threePt:t` lighting, rect/roundRect, white contour, wide/tall
 aspect ratios, a non-identity group, and the light rotation plus implicit defaults observed in the
@@ -228,9 +228,13 @@ wide/tall extents, a non-identity parent group, contour layering, stable repeate
 effect IDs, no horizontal growth, picture-URL disposal, and the flat fallback for an unsupported
 camera. The accepted support claim is limited to the exact tuple in
 `drawingml.shape.3d.top-bevel-contour`; a high aggregate score cannot broaden that registry scope.
-The CJK text matrix at IDs 0040-0051 covers square/no-wrap behavior, omitted and explicit autofit
-modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, and centered
-text inside a parent shape.
+The CJK text matrix at IDs 0040-0055 covers square/no-wrap behavior, omitted and explicit autofit
+modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, centered text
+inside a parent shape, and square/wide/tall `spAutoFit` growth. IDs 0052-0054 require native
+PowerPoint and the renderer to retain the explicit 30 pt CJK run while growing the standalone text
+box; ID 0055 is the inverse control where explicit horizontal and vertical overflow remain visible
+and suppress shape growth. Browser coverage also checks that host `white-space` values cannot
+change the result and that absolutely positioned siblings do not reflow.
 
 ```bash
 cd test/e2e

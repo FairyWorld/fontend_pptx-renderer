@@ -325,25 +325,33 @@ test('text overflow combinations remain non-scrollable in Chromium', async ({ pa
         import(/* @vite-ignore */ mockContextModuleUrl),
       ]);
     const combinations = [
-      { name: 'bounded', attributes: '', expected: ['hidden', 'hidden'] },
+      {
+        name: 'shape-growth',
+        attributes: '',
+        expected: ['visible', 'visible'],
+        grows: true,
+      },
       {
         name: 'both-visible',
         attributes: 'horzOverflow="overflow" vertOverflow="overflow"',
         expected: ['visible', 'visible'],
+        grows: false,
       },
       {
         name: 'horizontal-visible',
         attributes: 'horzOverflow="overflow"',
         expected: ['visible', 'clip'],
+        grows: false,
       },
       {
         name: 'vertical-visible',
         attributes: 'vertOverflow="overflow"',
         expected: ['clip', 'visible'],
+        grows: false,
       },
     ];
 
-    return combinations.map(({ name, attributes, expected }) => {
+    return combinations.map(({ name, attributes, expected, grows }) => {
       const xml = `
         <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -376,6 +384,9 @@ test('text overflow combinations remain non-scrollable in Chromium', async ({ pa
         inline: [container.style.overflowX, container.style.overflowY],
         computed: [computed.overflowX, computed.overflowY],
         expected,
+        grows,
+        shapeHeight: shape.getBoundingClientRect().height,
+        transform: container.style.transform,
       };
     });
   });
@@ -383,6 +394,12 @@ test('text overflow combinations remain non-scrollable in Chromium', async ({ pa
   for (const combination of result) {
     expect(combination.inline, combination.name).toEqual(combination.expected);
     expect(combination.computed, combination.name).toEqual(combination.expected);
+    if (combination.grows) {
+      expect(combination.transform, combination.name).toBe('');
+      expect(combination.shapeHeight, combination.name).toBeGreaterThan(20);
+    } else {
+      expect(combination.shapeHeight, combination.name).toBeCloseTo(20, 1);
+    }
   }
 });
 
