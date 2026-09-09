@@ -56,6 +56,61 @@
       "implementationFingerprint": "3f50324630802af50a652ecf066fea1f0cbd997bb16f35588e3bb6d3cc44a9ac"
     },
     {
+      "acceptedAt": "2026-09-09T03:46:30.593537Z",
+      "acceptedRevision": "3f198a27ecea016b01db5f5a590cef994650b2db",
+      "capabilityId": "drawingml.shape.3d.top-bevel-contour",
+      "caseIds": [
+        "oracle-pypptx-shape3d-0001-flat-optout",
+        "oracle-pypptx-shape3d-0002-picture-rect-circle-bevel",
+        "oracle-pypptx-shape3d-0003-roundrect-bevel-contour",
+        "oracle-pypptx-shape3d-0004-wide-bevel",
+        "oracle-pypptx-shape3d-0005-tall-bevel",
+        "oracle-pypptx-shape3d-0006-grouped-bevel",
+        "oracle-pypptx-shape3d-0007-real-picture-bevel-slice"
+      ],
+      "caseInputFingerprints": [
+        "74c293774148224d54e34c80472c7280e09c686636453b360f2714240825ee30",
+        "29bec7b160ce0bbf9c34db115a8eadb8e966a86d314f33e0af51684437f2519d",
+        "8c5f0ede21ee648bd5fb55596184d74e0835d9aaada4d60a2d6f97bfd21473de",
+        "7da11976af2dea3d49c23da51fd4f8fb50ffd904519a62712dd6dc951972afdf",
+        "7815571167b8b6d20f7eb4dcfd88c4bdb9c7906da5de2326a5fb06183b547c50",
+        "2166baf4afae4a734db5fbad8ae09f003fd97cda92fec910414add8ab34d400d",
+        "20c39f252ad36ebf82ee66f8c74898ef233bbaf1390b88465d7ee2356eb02a5e"
+      ],
+      "definitionFingerprint": "27967ee9a9d91ca2dee97d55a71c1659907a45cccee3996fc66b053d6a5ef642",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "performance",
+        "package-size",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "80539ecfd1d62ec467e58f99a97014d0c03c35c49cb89a4c44409caebae20ddc",
+        "d07478481195114c6e63234721acb67f86f1420a7afc9586420e62c7d8d794df",
+        "46188dcd382fb59092ecbb553817f51e7bee4af3512b663fe194d7d1f76a9be3",
+        "32a747512f24c52ffeb6046e78d0480232e1305abe533ca6d1c15c426aff6b55",
+        "6322d925c54679d16e75bfcefc57fa233f2570be8ca084702f1d9f40468a378e",
+        "e915fa15ff5dec8af0f8ed9f6573e0928f6606d38476dee5a31fdc0fd39907ba",
+        "3a4860cd5aa591c9ba078a1ebdaa0e643acf9c8781b3373a5c333a26e2a06eca"
+      ],
+      "implementationFingerprint": "eb2100c112861216e5a6f1c12f8171c940de58b655989b8e057a64f505213e19"
+    },
+    {
       "acceptedAt": "2026-09-08T18:56:55.317403Z",
       "acceptedRevision": "0d144fcce9716200c9af0a9dbdb90cffacfae3ff",
       "capabilityId": "drawingml.shape.geometry.adjustment.donut",
@@ -130,6 +185,103 @@
         "281354124eb5154215df6a427e07db635d3ee7702eff4256b69c0338afcc40f3"
       ],
       "implementationFingerprint": "906ab63d1ba2e5358e71717b43419f2e98ea410c462ec99824eb0a0561700212"
+    },
+    {
+      "acceptedAt": "2026-09-09T05:02:00Z",
+      "acceptedRevision": "3f198a27ecea016b01db5f5a590cef994650b2db",
+      "capabilityId": "drawingml.shape.geometry.adjustment.donut",
+      "caseIds": [
+        "oracle-pypptx-shape-adj-0009-donut-thin-ring",
+        "oracle-pypptx-shape-adj-0010-donut-thick-ring"
+      ],
+      "caseInputFingerprints": [
+        "3c7b3ec7f92e9278ed70ec005c77c6cca8e976de6b173c7c8164d7a17378fc9f",
+        "0d3cf4374c22780bc82a1293b9a2ef9fe8974f8d21d8c00205522351a1f67328"
+      ],
+      "definitionFingerprint": "f2bd0a7e926d2ed0c0508b6713de4e29e9351080cf75ca9d98febab73d00cfd9",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "3dbac9d5a51d29b9e3ad13371950d4dea42bd601d70cc89e9e8f0d6c905d8b98",
+        "281354124eb5154215df6a427e07db635d3ee7702eff4256b69c0338afcc40f3"
+      ],
+      "implementationFingerprint": "15d3847da317207fdf4bf0da6d24d88d96e4ad1586cefe902cedd47c5b36b856"
+    },
+    {
+      "acceptedAt": "2026-09-09T03:45:55.888906Z",
+      "acceptedRevision": "3f198a27ecea016b01db5f5a590cef994650b2db",
+      "capabilityId": "drawingml.text.body.wrap-overflow",
+      "caseIds": [
+        "oracle-pypptx-text-0040-cjk-wrap-square-no-autofit",
+        "oracle-pypptx-text-0041-cjk-wrap-square-implicit-autofit",
+        "oracle-pypptx-text-0042-cjk-wrap-none-no-autofit",
+        "oracle-pypptx-text-0043-cjk-sp-autofit-narrow",
+        "oracle-pypptx-text-0044-cjk-norm-autofit-scaled",
+        "oracle-pypptx-text-0052-cjk-sp-autofit-square-growth",
+        "oracle-pypptx-text-0053-cjk-sp-autofit-tall-growth",
+        "oracle-pypptx-text-0054-cjk-sp-autofit-wide-compact",
+        "oracle-pypptx-text-0055-cjk-sp-autofit-explicit-overflow"
+      ],
+      "caseInputFingerprints": [
+        "eadaa28bccc34400ef0b1e2b7f7516343d16c99285a69513a23d56aac8c2b9de",
+        "2b25a0ec6f3b8c62c9510d3916faa50f37971c5f6315662dcd8b2dccf8e1ab12",
+        "77872b05f106820f4584607fc3f6db7d508bdcdfc140955f176fe90aca1b0f3a",
+        "56ba9406487f69423cd39066052f550e0ae720a9df02e9fb2078444e416b2ae7",
+        "dfddf5c4da8b794d974fba719b25e87bcf45a1d0cf3c519e468e2174f9ee9893",
+        "3c487344da09dcee42519e11fd515de6635f661617279e901c71d16cc6da75fd",
+        "02c079b0391251a21a432d82c4e0189845674751a792e02e7465a9e5372b9b04",
+        "866e1b336610912af2df317f758b86970ee52d82242e4d11fc0681aab0dd7381",
+        "9589c1a44948cd558b3babfc51be26703341e1e7c9c0981d8b32e77bf0f69dfa"
+      ],
+      "definitionFingerprint": "55d2d25ab09a8049f82b36de56a9bd243543f1ba07a994875de9312b8857e367",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "910d3b1ad2d1b3bd8833e44cedc465814895098d60594cca443cafe753a14b1f",
+        "7f01c5a008a1d067ac1ad77051bdc74d8cffee3cff3ab9d74b2cea84374680ad",
+        "dff23931c8d037e4d35ad76d1b6fc261a73ef0a03792ee50d0ac74eb52b49dad",
+        "0f856ee65abbd1ffecc4d7ca7137967dc6f9fc65e88445ac23dd300c3cc8f5f8",
+        "5e27156fe91e5dfbd519e410eacff1440439d29a5a7cbf47ebdd0d3a9f324675",
+        "07f5bf95bd428980ea308a7e771572af260647589ee518339f333f65c1a4ce86",
+        "fd712bddeafe26ab8cb6a2851c41af3462feeabbeefc67745840ad7b322f05f6",
+        "7c2b24e5737f3aa79c4ecaba2a192bca38b2c2ce9e6c042cc96dfa2bccd7829c",
+        "61b36ab48767092cb35fab493af037d6d31f3b5996f0d82f7a4e1c4c4f79886f"
+      ],
+      "implementationFingerprint": "02f4dcc3fbd94b38a661f185f0a417ec3977723ca996312aad7eabd6658f5dc2"
     }
   ],
   "schemaVersion": 1
