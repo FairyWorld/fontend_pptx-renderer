@@ -9,7 +9,8 @@
 import type { Shape3DProperties, Shape3DRotation } from '../model/nodes/Shape3D';
 import type { RenderContext } from './RenderContext';
 import { resolveColor } from './StyleResolver';
-import { applyLumMod, applyLumOff, applySatMod } from '../utils/color';
+import { applyLumMod, applyLumOff, applySatMod, hexToRgb } from '../utils/color';
+import { fitShape3DRasterScale, renderCircleBevelOverlay } from './shape3d/BevelLighting';
 
 type StaticShape3DSurface = 'shape' | 'picture';
 type StaticShape3DGeometry = 'rect' | 'roundrect';
@@ -93,6 +94,8 @@ interface AppendStaticShape3DEffectsOptions {
   pathD: string;
   bounds: { width: number; height: number };
   plan: StaticShape3DPlan;
+  /** Without a render context, the synchronous vector fallback remains in place. */
+  ctx?: RenderContext;
 }
 
 interface AppendedStaticShape3DEffects {
@@ -102,6 +105,10 @@ interface AppendedStaticShape3DEffects {
 
 const SUPPORTED_SHAPE_PRESETS = new Set(['rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v1';
+const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
+const TARGET_SHAPE3D_RASTER_SCALE = 2;
+const shape3dTaskTails = new WeakMap<Promise<void>[], Promise<void>>();
 let shape3dIdCounter = 0;
 
 function flat(
@@ -224,10 +231,10 @@ export function buildStaticShape3DPlan(
 
   const rig = scene.lightRig;
   const rotation = scene.lightRotation;
-  // PowerPoint's top rigs illuminate the upper-left face in the scoped native cases. The real
-  // picture sentinel carries a 120-degree revolution; retain it in the plan and rotate the mapped
-  // light modestly instead of broadening support to arbitrary rotations.
-  const azimuth = rig === 'threePt' ? 315 : rotation?.revolution === 120 ? 285 : 300;
+  // The scoped native three-point rig is top-dominant with a small leftward component: both side
+  // faces darken, while the right face is darker. The real picture sentinel carries a 120-degree
+  // revolution; retain it in the plan instead of broadening support to arbitrary rotations.
+  const azimuth = rig === 'threePt' ? 350 : rotation?.revolution === 120 ? 285 : 300;
 
   return {
     mode: 'orthographic-top-bevel',
@@ -371,11 +378,232 @@ function buildBevelFaces(
   ];
 }
 
+function shape3DLightingCacheKey(
+  pathD: string,
+  plan: StaticShape3DSupportedPlan,
+  rasterWidth: number,
+  rasterHeight: number,
+): string {
+  return [
+    `shape3d-lighting:${SHAPE3D_LIGHTING_VERSION}`,
+    plan.surface,
+    plan.geometry,
+    `${plan.bounds.width}x${plan.bounds.height}`,
+    `${rasterWidth}x${rasterHeight}`,
+    `${plan.bevel.width}:${plan.bevel.height}`,
+    `${plan.light.rig}:${plan.light.azimuth}:${plan.light.elevation}`,
+    pathD,
+  ].join('|');
+}
+
+function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob | undefined> {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob ?? undefined), 'image/png');
+  });
+}
+
+async function waitForImageDecode(url: string, signal: AbortSignal | undefined): Promise<boolean> {
+  if (signal?.aborted) return false;
+  const image = document.createElement('img');
+
+  let removeAbortListener: () => void = () => {};
+  const abort = new Promise<boolean>((resolve) => {
+    if (!signal) return;
+    const onAbort = () => resolve(false);
+    signal.addEventListener('abort', onAbort, { once: true });
+    removeAbortListener = () => signal.removeEventListener('abort', onAbort);
+  });
+
+  const decoded = new Promise<boolean>((resolve) => {
+    if (typeof image.decode === 'function') {
+      image.src = url;
+      void image.decode().then(
+        () => resolve(true),
+        () => resolve(false),
+      );
+    } else {
+      image.onload = () => resolve(true);
+      image.onerror = () => resolve(false);
+      image.src = url;
+    }
+  });
+
+  try {
+    return signal ? await Promise.race([decoded, abort]) : await decoded;
+  } finally {
+    removeAbortListener();
+  }
+}
+
+function appendLightingImage(
+  group: SVGGElement,
+  url: string,
+  bounds: { width: number; height: number },
+): void {
+  const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+  image.dataset.pptxShape3dLighting = 'distance-field';
+  image.setAttribute('x', '0');
+  image.setAttribute('y', '0');
+  image.setAttribute('width', String(bounds.width));
+  image.setAttribute('height', String(bounds.height));
+  image.setAttribute('preserveAspectRatio', 'none');
+  image.setAttribute('href', url);
+  for (const face of group.querySelectorAll('[data-pptx-shape3d-face]')) face.remove();
+  group.appendChild(image);
+}
+
+function applySolidMaterialLighting(
+  lighting: Uint8ClampedArray,
+  faceColor: string,
+): Uint8ClampedArray {
+  const positive = new Uint8Array(256 * 3);
+  const negative = new Uint8Array(256 * 3);
+  for (let alpha = 1; alpha <= 255; alpha += 1) {
+    const strength = alpha / 255;
+    const lightColor = hexToRgb(
+      applySatMod(
+        applyLumOff(faceColor, Math.round(strength * 40000)),
+        Math.round(100000 + strength * 130000),
+      ),
+    );
+    const shadowColor = hexToRgb(
+      applyLumMod(faceColor, Math.round((1 - strength * 0.85) * 100000)),
+    );
+    for (const [table, color] of [
+      [positive, lightColor],
+      [negative, shadowColor],
+    ] as const) {
+      const offset = alpha * 3;
+      table[offset] = color.r;
+      table[offset + 1] = color.g;
+      table[offset + 2] = color.b;
+    }
+  }
+
+  const material = new Uint8ClampedArray(lighting.length);
+  for (let offset = 0; offset < lighting.length; offset += 4) {
+    const strength = lighting[offset + 3];
+    if (strength === 0) continue;
+    const table = lighting[offset] >= 128 ? positive : negative;
+    const colorOffset = strength * 3;
+    material[offset] = table[colorOffset];
+    material[offset + 1] = table[colorOffset + 1];
+    material[offset + 2] = table[colorOffset + 2];
+    material[offset + 3] = 255;
+  }
+  return material;
+}
+
+async function renderDistanceFieldLighting(
+  group: SVGGElement,
+  pathD: string,
+  plan: StaticShape3DSupportedPlan,
+  ctx: RenderContext,
+): Promise<void> {
+  if (ctx.signal?.aborted || typeof Path2D !== 'function') return;
+
+  const scale = fitShape3DRasterScale(
+    plan.bounds.width,
+    plan.bounds.height,
+    TARGET_SHAPE3D_RASTER_SCALE,
+    MAX_SHAPE3D_RASTER_PIXELS,
+  );
+  if (scale < 0.25) return;
+  const rasterWidth = Math.max(1, Math.ceil(plan.bounds.width * scale));
+  const rasterHeight = Math.max(1, Math.ceil(plan.bounds.height * scale));
+  const cacheKey = shape3DLightingCacheKey(pathD, plan, rasterWidth, rasterHeight);
+  const cachedUrl = ctx.mediaUrlCache.get(cacheKey);
+  if (cachedUrl) {
+    if ((await waitForImageDecode(cachedUrl, ctx.signal)) && !ctx.signal?.aborted) {
+      appendLightingImage(group, cachedUrl, plan.bounds);
+    }
+    return;
+  }
+
+  const maskCanvas = document.createElement('canvas');
+  maskCanvas.width = rasterWidth;
+  maskCanvas.height = rasterHeight;
+  const maskContext = maskCanvas.getContext('2d', { willReadFrequently: true });
+  if (!maskContext) return;
+  maskContext.setTransform(
+    rasterWidth / plan.bounds.width,
+    0,
+    0,
+    rasterHeight / plan.bounds.height,
+    0,
+    0,
+  );
+  maskContext.fillStyle = '#000000';
+  maskContext.fill(new Path2D(pathD), 'evenodd');
+
+  const rgba = maskContext.getImageData(0, 0, rasterWidth, rasterHeight).data;
+  const alpha = new Uint8Array(rasterWidth * rasterHeight);
+  for (let pixel = 0, offset = 3; pixel < alpha.length; pixel += 1, offset += 4) {
+    alpha[pixel] = rgba[offset];
+  }
+  const effectiveScale = Math.sqrt(
+    (rasterWidth / plan.bounds.width) * (rasterHeight / plan.bounds.height),
+  );
+  let lighting = renderCircleBevelOverlay(alpha, rasterWidth, rasterHeight, {
+    bandPx: plan.bevel.width * effectiveScale,
+    heightPx: plan.bevel.height * effectiveScale,
+    lightAzimuthDeg: plan.light.azimuth,
+    lightElevationDeg: plan.light.elevation,
+  });
+  if (plan.surface === 'shape' && plan.faceColor) {
+    lighting = applySolidMaterialLighting(lighting, plan.faceColor);
+  }
+
+  const outputCanvas = document.createElement('canvas');
+  outputCanvas.width = rasterWidth;
+  outputCanvas.height = rasterHeight;
+  const outputContext = outputCanvas.getContext('2d');
+  if (!outputContext) return;
+  const imageData = outputContext.createImageData(rasterWidth, rasterHeight);
+  imageData.data.set(lighting);
+  outputContext.putImageData(imageData, 0, 0);
+  const blob = await canvasToPngBlob(outputCanvas);
+  if (!blob || ctx.signal?.aborted) return;
+
+  const existingUrl = ctx.mediaUrlCache.get(cacheKey);
+  const url = existingUrl ?? URL.createObjectURL(blob);
+  const ownsUrl = !existingUrl;
+  if (ownsUrl) ctx.mediaUrlCache.set(cacheKey, url);
+  const decoded = await waitForImageDecode(url, ctx.signal);
+  if (!decoded) {
+    if (ownsUrl && ctx.mediaUrlCache.get(cacheKey) === url && !ctx.signal?.aborted) {
+      ctx.mediaUrlCache.delete(cacheKey);
+      URL.revokeObjectURL(url);
+    }
+    return;
+  }
+  if (!ctx.signal?.aborted) appendLightingImage(group, url, plan.bounds);
+}
+
+function scheduleDistanceFieldLighting(
+  group: SVGGElement,
+  pathD: string,
+  plan: StaticShape3DSupportedPlan,
+  ctx: RenderContext,
+): void {
+  const run = () => renderDistanceFieldLighting(group, pathD, plan, ctx).catch(() => undefined);
+  const tasks = ctx.asyncTasks;
+  if (!tasks) {
+    void run();
+    return;
+  }
+
+  const previous = shape3dTaskTails.get(tasks);
+  const task = previous ? previous.then(run, run) : run();
+  shape3dTaskTails.set(tasks, task);
+  tasks.push(task);
+}
+
 /** Append the scoped bevel overlay without filtering sibling text or mutating the base path. */
 export function appendStaticShape3DEffects(
   options: AppendStaticShape3DEffectsOptions,
 ): AppendedStaticShape3DEffects | undefined {
-  const { svg, defs, pathD, bounds, plan } = options;
+  const { svg, defs, pathD, bounds, plan, ctx } = options;
   if (plan.mode !== 'orthographic-top-bevel' || !pathD) return undefined;
   if (
     !Number.isFinite(bounds.width) ||
@@ -471,6 +699,8 @@ export function appendStaticShape3DEffects(
     contour.setAttribute('pointer-events', 'none');
     svg.appendChild(contour);
   }
+
+  if (ctx) scheduleDistanceFieldLighting(group, pathD, plan, ctx);
 
   if (!defs.parentNode) svg.insertBefore(defs, svg.firstChild);
   return { group, clipId };

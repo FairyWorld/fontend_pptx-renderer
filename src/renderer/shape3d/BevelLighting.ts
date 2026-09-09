@@ -142,7 +142,7 @@ export function renderCircleBevelOverlay(
 
       const bevelResponse = Math.max(0, normalX * lightX + normalY * lightY + normalZ * lightZ);
       const lightingDelta = bevelResponse - Math.max(0, lightZ);
-      const opacity = Math.round(clamp(Math.abs(lightingDelta) * 1.25 * coverage, 0, 0.72) * 255);
+      const opacity = Math.round(clamp(Math.abs(lightingDelta) * 1.75 * coverage, 0, 0.72) * 255);
       if (opacity <= 0) continue;
 
       const outputOffset = pixelIndex * 4;

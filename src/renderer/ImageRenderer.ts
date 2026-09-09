@@ -523,6 +523,7 @@ function renderClippedSvgImage(
       pathD: clipPathD,
       bounds: { width: node.size.w, height: node.size.h },
       plan: shape3dPlan,
+      ctx,
     });
   }
   if (pictureOutline) {

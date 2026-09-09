@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseXml } from '../../../src/parser/XmlParser';
 import { parseShapeNode } from '../../../src/model/nodes/ShapeNode';
 import {
@@ -34,6 +34,75 @@ const supportedShape = `
     <a:bevelT w="127000" h="127000" prst="circle"/>
     <a:contourClr><a:srgbClr val="FFFFFF"/></a:contourClr>
   </a:sp3d>`;
+
+const originalImageDecode = Object.getOwnPropertyDescriptor(
+  HTMLImageElement.prototype,
+  'decode',
+);
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  if (originalImageDecode) {
+    Object.defineProperty(HTMLImageElement.prototype, 'decode', originalImageDecode);
+  } else {
+    delete (HTMLImageElement.prototype as Partial<HTMLImageElement>).decode;
+  }
+});
+
+function installShape3DRasterMocks() {
+  vi.stubGlobal(
+    'Path2D',
+    class MockPath2D {
+      constructor(readonly path: string) {}
+    },
+  );
+
+  const maskContext = {
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    fill: vi.fn(),
+    fillStyle: '',
+    getImageData: vi.fn((_x: number, _y: number, width: number, height: number) => {
+      const data = new Uint8ClampedArray(width * height * 4);
+      for (let offset = 3; offset < data.length; offset += 4) data[offset] = 255;
+      return { data, width, height } as ImageData;
+    }),
+  };
+  const outputContext = {
+    createImageData: vi.fn((width: number, height: number) => ({
+      data: new Uint8ClampedArray(width * height * 4),
+      width,
+      height,
+    })),
+    putImageData: vi.fn(),
+  };
+  let contextCount = 0;
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
+    contextCount += 1;
+    return (contextCount === 1 ? maskContext : outputContext) as never;
+  });
+  let completeBlob: BlobCallback | undefined;
+  const toBlob = vi
+    .spyOn(HTMLCanvasElement.prototype, 'toBlob')
+    .mockImplementation((callback) => {
+      completeBlob = callback;
+    });
+  Object.defineProperty(HTMLImageElement.prototype, 'decode', {
+    configurable: true,
+    value: vi.fn().mockResolvedValue(undefined),
+  });
+
+  return {
+    maskContext,
+    outputContext,
+    toBlob,
+    complete(blob: Blob | null) {
+      if (!completeBlob) throw new Error('toBlob callback was not registered');
+      completeBlob(blob);
+    },
+  };
+}
 
 describe('buildStaticShape3DPlan', () => {
   it('builds the bounded orthographic circle top-bevel and contour plan', () => {
@@ -239,6 +308,175 @@ describe('buildStaticShape3DPlan', () => {
 });
 
 describe('appendStaticShape3DEffects', () => {
+  it('keeps vector faces until the contour-aware texture is ready, then swaps only the lighting', async () => {
+    const mocks = installShape3DRasterMocks();
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const defs = document.createElementNS(ns, 'defs');
+    svg.appendChild(defs);
+    const ctx = createMockRenderContext({ asyncTasks: [] });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'roundRect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      ctx,
+    );
+
+    const result = appendStaticShape3DEffects({
+      svg,
+      defs,
+      pathD: 'M0,20 Q0,0 20,0 H180 Q200,0 200,20 V80 Q200,100 180,100 H20 Q0,100 0,80 Z',
+      bounds: { width: 200, height: 100 },
+      plan,
+      ctx,
+    });
+
+    expect(result?.group.querySelectorAll('[data-pptx-shape3d-face]')).toHaveLength(4);
+    expect(result?.group.querySelector('[data-pptx-shape3d-lighting]')).toBeNull();
+    expect(ctx.asyncTasks).toHaveLength(1);
+    mocks.complete(new Blob([new Uint8Array([1, 2, 3])], { type: 'image/png' }));
+    await Promise.all(ctx.asyncTasks!);
+
+    expect(result?.group.querySelectorAll('[data-pptx-shape3d-face]')).toHaveLength(0);
+    const lighting = result?.group.querySelector('[data-pptx-shape3d-lighting]');
+    expect(lighting?.getAttribute('data-pptx-shape3d-lighting')).toBe('distance-field');
+    expect(lighting?.getAttribute('width')).toBe('200');
+    expect(lighting?.getAttribute('height')).toBe('100');
+    expect(ctx.mediaUrlCache.size).toBe(1);
+    expect(mocks.maskContext.fill).toHaveBeenCalledWith(expect.anything(), 'evenodd');
+    expect(mocks.outputContext.putImageData).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the vector fallback and blocks late DOM writes when the slide is aborted', async () => {
+    const mocks = installShape3DRasterMocks();
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const defs = document.createElementNS(ns, 'defs');
+    svg.appendChild(defs);
+    const abortController = new AbortController();
+    const ctx = createMockRenderContext({ asyncTasks: [], signal: abortController.signal });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      ctx,
+    );
+    const result = appendStaticShape3DEffects({
+      svg,
+      defs,
+      pathD: 'M0,0 H200 V100 H0 Z',
+      bounds: { width: 200, height: 100 },
+      plan,
+      ctx,
+    });
+
+    abortController.abort();
+    mocks.complete(new Blob([new Uint8Array([1])], { type: 'image/png' }));
+    await Promise.all(ctx.asyncTasks!);
+
+    expect(result?.group.querySelectorAll('[data-pptx-shape3d-face]')).toHaveLength(4);
+    expect(result?.group.querySelector('[data-pptx-shape3d-lighting]')).toBeNull();
+    expect(ctx.mediaUrlCache.size).toBe(0);
+  });
+
+  it('reuses a completed texture through the render-context media cache', async () => {
+    const mocks = installShape3DRasterMocks();
+    const ns = 'http://www.w3.org/2000/svg';
+    const makeSvg = () => {
+      const svg = document.createElementNS(ns, 'svg');
+      const defs = document.createElementNS(ns, 'defs');
+      svg.appendChild(defs);
+      return { svg, defs };
+    };
+    const ctx = createMockRenderContext({ asyncTasks: [] });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      ctx,
+    );
+    const first = makeSvg();
+    appendStaticShape3DEffects({
+      ...first,
+      pathD: 'M0,0 H200 V100 H0 Z',
+      bounds: { width: 200, height: 100 },
+      plan,
+      ctx,
+    });
+    mocks.complete(new Blob([new Uint8Array([1])], { type: 'image/png' }));
+    await Promise.all(ctx.asyncTasks!);
+
+    const firstHref = first.svg
+      .querySelector('[data-pptx-shape3d-lighting]')
+      ?.getAttribute('href');
+    const second = makeSvg();
+    appendStaticShape3DEffects({
+      ...second,
+      pathD: 'M0,0 H200 V100 H0 Z',
+      bounds: { width: 200, height: 100 },
+      plan,
+      ctx,
+    });
+    await Promise.all(ctx.asyncTasks!);
+
+    expect(second.svg.querySelector('[data-pptx-shape3d-lighting]')?.getAttribute('href')).toBe(
+      firstHref,
+    );
+    expect(mocks.toBlob).toHaveBeenCalledOnce();
+  });
+
+  it('resolves a missing Canvas backend without removing the vector fallback', async () => {
+    vi.stubGlobal('Path2D', class MockPath2D {});
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const defs = document.createElementNS(ns, 'defs');
+    svg.appendChild(defs);
+    const ctx = createMockRenderContext({ asyncTasks: [] });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      ctx,
+    );
+    const result = appendStaticShape3DEffects({
+      svg,
+      defs,
+      pathD: 'M0,0 H200 V100 H0 Z',
+      bounds: { width: 200, height: 100 },
+      plan,
+      ctx,
+    });
+    await Promise.all(ctx.asyncTasks!);
+
+    expect(result?.group.querySelectorAll('[data-pptx-shape3d-face]')).toHaveLength(4);
+    expect(result?.group.querySelector('[data-pptx-shape3d-lighting]')).toBeNull();
+  });
+
   it('partitions the inward bevel into independently lit faces and a separate contour', () => {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');

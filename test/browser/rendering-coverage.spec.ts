@@ -190,6 +190,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     });
     document.body.append(host);
     const ctx = createMockRenderContext();
+    const shape3dTasks: Promise<void>[] = [];
     for (const spec of [
       ['rect', 260, 80, '2F75B5'],
       ['rect', 80, 220, '2F75B5'],
@@ -198,7 +199,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     ] as const) {
       const shape = renderShape(
         parseShapeNode(parseXml(shapeXml(...spec))),
-        createMockRenderContext(),
+        createMockRenderContext({ asyncTasks: shape3dTasks }),
       );
       shape.style.position = 'relative';
       shape.style.left = '0';
@@ -228,7 +229,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
       </p:grpSp>`;
     const group = renderGroup(
       parseGroupNode(parseXml(groupXml)),
-      createMockRenderContext(),
+      createMockRenderContext({ asyncTasks: shape3dTasks }),
       (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
     );
     group.style.position = 'relative';
@@ -268,18 +269,31 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     document.body.append(handle.element);
     await handle.ready;
     const disposableHadBevel = !!handle.element.querySelector('[data-pptx-shape3d-bevel]');
+    const disposableHadLighting = !!handle.element.querySelector(
+      '[data-pptx-shape3d-lighting="distance-field"]',
+    );
     handle.dispose();
     URL.revokeObjectURL = originalRevoke;
     handle.element.remove();
 
+    await Promise.all(shape3dTasks);
     await document.fonts.ready;
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
     );
     const ids = Array.from(host.querySelectorAll('[id]'), (element) => element.id);
     const groupChild = group.firstElementChild as HTMLElement;
+    const roundRectLighting = host.children[2].querySelector(
+      '[data-pptx-shape3d-lighting="distance-field"]',
+    ) as SVGGraphicsElement;
+    const groupLighting = group.querySelector(
+      '[data-pptx-shape3d-lighting="distance-field"]',
+    ) as SVGGraphicsElement;
     return {
       bevelCount: host.querySelectorAll('[data-pptx-shape3d-bevel]').length,
+      lightingCount: host.querySelectorAll(
+        '[data-pptx-shape3d-lighting="distance-field"]',
+      ).length,
       flatHasBevel: !!flat.querySelector('[data-pptx-shape3d-bevel]'),
       uniqueIds: new Set(ids).size === ids.length,
       noHorizontalGrowth: host.scrollWidth === host.clientWidth,
@@ -289,7 +303,16 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
         childWidth: groupChild.getBoundingClientRect().width,
         childHeight: groupChild.getBoundingClientRect().height,
       },
+      roundRectLightingBounds: {
+        width: roundRectLighting.getBoundingClientRect().width,
+        height: roundRectLighting.getBoundingClientRect().height,
+      },
+      groupLightingBounds: {
+        width: groupLighting.getBoundingClientRect().width,
+        height: groupLighting.getBoundingClientRect().height,
+      },
       disposableHadBevel,
+      disposableHadLighting,
       revokedCount: revoked.length,
     };
   });
@@ -297,14 +320,18 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   expect(result).toEqual(
     expect.objectContaining({
       bevelCount: 5,
+      lightingCount: 5,
       flatHasBevel: false,
       uniqueIds: true,
       noHorizontalGrowth: true,
       disposableHadBevel: true,
-      revokedCount: 1,
+      disposableHadLighting: true,
+      revokedCount: 2,
     }),
   );
   expect(result.groupBounds).toEqual({ width: 200, height: 100, childWidth: 100, childHeight: 50 });
+  expect(result.roundRectLightingBounds).toEqual({ width: 220, height: 100 });
+  expect(result.groupLightingBounds).toEqual({ width: 100, height: 50 });
 
   const host = page.locator('#shape3d-browser-host');
   const first = await host.screenshot();
@@ -339,9 +366,11 @@ test('orthographic circle bevel uses PowerPoint-like face lighting instead of a 
         </p:spPr>
       </p:sp>`;
     document.body.style.margin = '0';
-    const rendered = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const ctx = createMockRenderContext({ asyncTasks: [] });
+    const rendered = renderShape(parseShapeNode(parseXml(xml)), ctx);
     rendered.id = 'shape3d-face-lighting';
     document.body.append(rendered);
+    await Promise.all(ctx.asyncTasks!);
     await document.fonts.ready;
     await new Promise<void>((resolve) =>
       requestAnimationFrame(() => requestAnimationFrame(() => resolve())),

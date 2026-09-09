@@ -2553,6 +2553,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         pathD,
         bounds: { width: svgW, height: svgH },
         plan: shape3dPlan,
+        ctx,
       });
 
       // Some multi-path detail rendering adds masks/gradients after the initial defs population.
