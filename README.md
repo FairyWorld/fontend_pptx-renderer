@@ -626,7 +626,9 @@ the exact SVG silhouette into an alpha mask. An exact interior Euclidean distanc
 continuous perimeter normals; a circular cross-section and the bounded light rig produce the final
 bevel texture. This makes rounded corners follow the source contour instead of inheriting rectangular
 face edges. Shape textures retain the resolved material hue, while picture textures remain relative
-black/white lighting so the source pixels stay visible.
+black/white lighting so the source pixels stay visible. The supported implicit `twoPt:t` picture
+response uses its native-validated edge direction and a lower material intensity than opaque solid
+shapes; the bevel geometry remains shared.
 
 The asynchronous texture work is serialized per slide, capped at 262,144 pixels per texture, cached
 with the render context, and tied to slide abort and blob-URL cleanup. If Canvas, decoding, scale, or

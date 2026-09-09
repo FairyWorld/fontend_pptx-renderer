@@ -38,6 +38,7 @@ const defaultOptions = {
   heightPx: 4,
   lightAzimuthDeg: 315,
   lightElevationDeg: 50,
+  intensity: 1.75,
 };
 
 describe('renderCircleBevelOverlay', () => {
@@ -124,6 +125,28 @@ describe('renderCircleBevelOverlay', () => {
     expect(totalContrast(high)).toBeGreaterThan(totalContrast(low));
   });
 
+  it('uses material intensity to scale contrast without changing the bevel band', () => {
+    const width = 51;
+    const height = 31;
+    const alpha = filledRect(width, height);
+    const subtle = renderCircleBevelOverlay(alpha, width, height, {
+      ...defaultOptions,
+      intensity: 0.8,
+    });
+    const strong = renderCircleBevelOverlay(alpha, width, height, {
+      ...defaultOptions,
+      intensity: 1.75,
+    });
+    const totalContrast = (rgba: Uint8ClampedArray) => {
+      let total = 0;
+      for (let offset = 3; offset < rgba.length; offset += 4) total += rgba[offset];
+      return total;
+    };
+
+    expect(nonTransparentPixels(subtle)).toBe(nonTransparentPixels(strong));
+    expect(totalContrast(subtle)).toBeLessThan(totalContrast(strong));
+  });
+
   it('rejects invalid bevel inputs rather than emitting non-finite pixels', () => {
     expect(() =>
       renderCircleBevelOverlay(filledRect(2, 2), 2, 2, {
@@ -131,6 +154,12 @@ describe('renderCircleBevelOverlay', () => {
         bandPx: 0,
       }),
     ).toThrow(/bandPx and heightPx must be positive/);
+    expect(() =>
+      renderCircleBevelOverlay(filledRect(2, 2), 2, 2, {
+        ...defaultOptions,
+        intensity: Number.NaN,
+      }),
+    ).toThrow(/intensity must be a non-negative finite number/);
   });
 });
 

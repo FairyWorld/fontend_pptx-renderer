@@ -228,9 +228,12 @@ than retaining rectangular face boundaries.
 
 The resulting transparent texture replaces only the fallback lighting after its object URL decodes.
 Solid shapes map light and shadow through material-color lookup tables so highlights retain the
-source hue; pictures use relative black/white overlays so their pixels remain visible. Texture work
-is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry, dimensions,
-bevel, light, surface, raster size, and algorithm version, and guarded by the slide abort signal.
+source hue; pictures use relative black/white overlays so their pixels remain visible. The render
+plan carries material intensity separately from bevel geometry. Native evidence calibrates the
+implicit `twoPt:t` picture response independently from the solid-shape `threePt:t` response. Texture
+work is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry,
+dimensions, bevel, light, intensity, surface, raster size, and algorithm version, and guarded by the
+slide abort signal.
 Failure, insufficient raster scale, or disposal leaves the vector fallback in place and prevents
 late DOM writes or cache repopulation.
 

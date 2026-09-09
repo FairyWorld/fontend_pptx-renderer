@@ -48,7 +48,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   distance field, continuous perimeter normals, and a circular cross-section. Bevel width controls
   edge extent while height controls lighting contrast; a bounded cached texture replaces a
   synchronous vector fallback only after decode, preserving contour, group, outline, outer-shadow,
-  abort, and cleanup behavior. Unmatched 3D tuples stay flat.
+  abort, and cleanup behavior. Picture lighting now uses its native-validated `twoPt:t` direction
+  and material intensity independently from solid-shape lighting. Unmatched 3D tuples stay flat.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
   renderer, browser, picture-clip, and native PowerPoint comparison gates.

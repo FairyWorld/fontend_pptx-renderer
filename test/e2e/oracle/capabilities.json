@@ -151,6 +151,7 @@
         "lightDirection": ["t"],
         "lightRig": ["twoPt", "threePt"],
         "lightRotation": ["absent", "twoPt:t:lat0-lon0-rev120"],
+        "materialResponse": ["shape-hue-preserving", "picture-relative-overlay"],
         "nodeKinds": ["shape", "picture"],
         "pictureFill": ["stretch"],
         "picturePresets": ["rect"],

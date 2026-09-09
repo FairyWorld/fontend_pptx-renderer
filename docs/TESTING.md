@@ -300,6 +300,8 @@ resolution-limited and remains covered by full-slide and manual gates rather tha
 few pixels. The flat control has no applicable region. This local metric complements the full-page
 SSIM/color-histogram gate; it does not replace it. Each native API slide row fingerprints the exact
 reference and HTML rasters. The metric generator rejects a stale or replaced raster before scoring.
+It is also sensitive to material-specific lighting: the tracked picture case must retain the native
+top/right shadow and bottom/left relief instead of passing only because its rectangular bounds match.
 
 PowerPoint automation on macOS requires an unlocked interactive session. Error `-9074` while the
 same known-good deck exports normally in an unlocked session is an environment failure, not a
@@ -536,7 +538,8 @@ solid `rect`/`roundRect` shapes and rectangular stretch-filled pictures, with th
 `twoPt:t`/`threePt:t` lighting tuple, zero extrusion, an optional contour with a resolvable color,
 and an optional outer shadow. The visual gate checks that `bevelT@w` controls the inward edge width,
 `bevelT@h` changes contrast rather than geometry, directional lighting remains distinct, and rounded
-corners follow continuous silhouette normals. Verification
+corners follow continuous silhouette normals. The picture row additionally verifies the lower
+relative-overlay response and native `twoPt:t` edge ordering. Verification
 uses all seven `oracle-pypptx-shape3d-*` case reports, the same seven earlier-revision baselines,
 the derived `bevel-local` report, explicit manual verdicts for review rows, and the `source`,
 `structural`, `unit`, `browser`, `performance`, `package-size`, and `docs` caller-run gates.

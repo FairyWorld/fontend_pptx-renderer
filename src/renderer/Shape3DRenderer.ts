@@ -83,6 +83,7 @@ export interface StaticShape3DSupportedPlan {
     rotation?: Shape3DRotation;
     azimuth: number;
     elevation: number;
+    intensity: number;
   };
 }
 
@@ -231,10 +232,13 @@ export function buildStaticShape3DPlan(
 
   const rig = scene.lightRig;
   const rotation = scene.lightRotation;
-  // The scoped native three-point rig is top-dominant with a small leftward component: both side
-  // faces darken, while the right face is darker. The real picture sentinel carries a 120-degree
-  // revolution; retain it in the plan instead of broadening support to arbitrary rotations.
-  const azimuth = rig === 'threePt' ? 350 : rotation?.revolution === 120 ? 285 : 300;
+  // Native evidence gives each bounded rig a distinct response. The implicit two-point picture
+  // light is lower-left dominant and more elevated; three-point is top-dominant with a small
+  // leftward component. Keep the separately observed 120-degree sentinel explicit instead of
+  // broadening support to arbitrary rotations.
+  const rotatedPictureSentinel = rig === 'twoPt' && rotation?.revolution === 120;
+  const azimuth = rig === 'threePt' ? 350 : rotatedPictureSentinel ? 285 : 225;
+  const elevation = rig === 'threePt' ? 50 : rotatedPictureSentinel ? 45 : 60;
 
   return {
     mode: 'orthographic-top-bevel',
@@ -252,7 +256,8 @@ export function buildStaticShape3DPlan(
       direction: 't',
       rotation,
       azimuth,
-      elevation: rig === 'threePt' ? 50 : 45,
+      elevation,
+      intensity: target.nodeType === 'picture' ? 0.8 : 1.75,
     },
   };
 }
@@ -391,7 +396,7 @@ function shape3DLightingCacheKey(
     `${plan.bounds.width}x${plan.bounds.height}`,
     `${rasterWidth}x${rasterHeight}`,
     `${plan.bevel.width}:${plan.bevel.height}`,
-    `${plan.light.rig}:${plan.light.azimuth}:${plan.light.elevation}`,
+    `${plan.light.rig}:${plan.light.azimuth}:${plan.light.elevation}:${plan.light.intensity}`,
     pathD,
   ].join('|');
 }
@@ -549,6 +554,7 @@ async function renderDistanceFieldLighting(
     heightPx: plan.bevel.height * effectiveScale,
     lightAzimuthDeg: plan.light.azimuth,
     lightElevationDeg: plan.light.elevation,
+    intensity: plan.light.intensity,
   });
   if (plan.surface === 'shape' && plan.faceColor) {
     lighting = applySolidMaterialLighting(lighting, plan.faceColor);

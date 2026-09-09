@@ -1,6 +1,6 @@
 import { interiorDistanceField } from './DistanceField';
 
-export interface CircleBevelLightingOptions {
+interface CircleBevelLightingOptions {
   /** Width of the bevel band in raster pixels. */
   bandPx: number;
   /** Height of the circular bevel profile in raster pixels. */
@@ -9,6 +9,8 @@ export interface CircleBevelLightingOptions {
   lightAzimuthDeg: number;
   /** Light elevation above the slide plane. */
   lightElevationDeg: number;
+  /** Material-specific response strength applied to the signed Lambert delta. */
+  intensity: number;
 }
 
 function clamp(value: number, minimum: number, maximum: number): number {
@@ -79,6 +81,9 @@ function assertLightingOptions(options: CircleBevelLightingOptions): void {
   if (!Number.isFinite(options.lightAzimuthDeg) || !Number.isFinite(options.lightElevationDeg)) {
     throw new RangeError('light angles must be finite numbers');
   }
+  if (!Number.isFinite(options.intensity) || options.intensity < 0) {
+    throw new RangeError('intensity must be a non-negative finite number');
+  }
 }
 
 /**
@@ -142,7 +147,9 @@ export function renderCircleBevelOverlay(
 
       const bevelResponse = Math.max(0, normalX * lightX + normalY * lightY + normalZ * lightZ);
       const lightingDelta = bevelResponse - Math.max(0, lightZ);
-      const opacity = Math.round(clamp(Math.abs(lightingDelta) * 1.75 * coverage, 0, 0.72) * 255);
+      const opacity = Math.round(
+        clamp(Math.abs(lightingDelta) * options.intensity * coverage, 0, 0.72) * 255,
+      );
       if (opacity <= 0) continue;
 
       const outputOffset = pixelIndex * 4;

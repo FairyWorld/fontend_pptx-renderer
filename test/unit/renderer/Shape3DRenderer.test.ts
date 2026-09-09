@@ -163,6 +163,33 @@ describe('buildStaticShape3DPlan', () => {
     });
   });
 
+  it('calibrates implicit two-point picture lighting to the native edge ordering', () => {
+    const shape3d = parseShape3D(
+      `<a:scene3d>
+         <a:camera prst="orthographicFront"/>
+         <a:lightRig rig="twoPt" dir="t"/>
+       </a:scene3d>`,
+      `<a:sp3d extrusionH="0"><a:bevelT w="127000" h="127000" prst="circle"/></a:sp3d>`,
+    );
+    const plan = buildStaticShape3DPlan(
+      shape3d,
+      { nodeType: 'picture', presetGeometry: 'rect', width: 704, height: 384 },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'orthographic-top-bevel',
+      surface: 'picture',
+      light: {
+        rig: 'twoPt',
+        direction: 't',
+        azimuth: 225,
+        elevation: 60,
+        intensity: 0.8,
+      },
+    });
+  });
+
   it.each([
     [
       'conflicting effect',
