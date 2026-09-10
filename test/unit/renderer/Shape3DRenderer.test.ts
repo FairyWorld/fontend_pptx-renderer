@@ -53,6 +53,12 @@ const perspectiveTextCameraScene = `
     <a:lightRig rig="threePt" dir="t"/>
   </a:scene3d>`;
 
+const perspectiveLeftTextCameraScene = `
+  <a:scene3d>
+    <a:camera prst="perspectiveLeft" fov="7200000"/>
+    <a:lightRig rig="threePt" dir="t"/>
+  </a:scene3d>`;
+
 const originalImageDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
 
 afterEach(() => {
@@ -245,6 +251,71 @@ describe('buildStaticShape3DPlan', () => {
     if (plan.mode !== 'camera-projected-text-plane') throw new Error('expected text plan');
     expect(plan.corners[0].x).toBeCloseTo(-3.5, 1);
     expect(plan.corners[3].y).toBeCloseTo(428.5, 1);
+  });
+
+  it('applies the perspective-left preset rotation to a top-anchored editable-text plane', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveLeftTextCameraScene, ''),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'none',
+        hasVisibleStroke: false,
+        hasVisibleText: true,
+        textPlane: {
+          wrap: 'none',
+          autofit: 'spAutoFit',
+        },
+      },
+      createMockRenderContext({
+        presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+      }),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'camera-projected-text-plane',
+      camera: {
+        kind: 'perspective',
+        preset: 'perspectiveLeft',
+        rotation: { latitude: 0, longitude: 20, revolution: 0 },
+        fieldOfView: 120,
+      },
+    });
+    if (plan.mode !== 'camera-projected-text-plane') throw new Error('expected text plan');
+    expect(plan.corners[0].x).toBeLessThan(plan.corners[1].x);
+    expect(plan.corners[0].y).toBeGreaterThan(plan.corners[1].y);
+  });
+
+  it.each([
+    [
+      'explicit camera rotation',
+      perspectiveLeftTextCameraScene.replace(
+        '<a:camera prst="perspectiveLeft" fov="7200000"/>',
+        '<a:camera prst="perspectiveLeft" fov="7200000"><a:rot lat="0" lon="1200000" rev="0"/></a:camera>',
+      ),
+      undefined,
+      'camera-rotation',
+    ],
+    ['explicit center anchor', perspectiveLeftTextCameraScene, 'ctr', 'text-body-properties'],
+  ])('keeps perspective-left text with %s on the flat fallback', (_label, scene, anchor, reason) => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(scene, ''),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'none',
+        hasVisibleStroke: false,
+        hasVisibleText: true,
+        textPlane: { wrap: 'none', anchor, autofit: 'spAutoFit' },
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toEqual({ mode: 'flat', reason });
   });
 
   it('keeps unverified scene-only text-body modes on the flat fallback', () => {

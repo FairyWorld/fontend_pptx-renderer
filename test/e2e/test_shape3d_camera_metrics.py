@@ -167,6 +167,14 @@ def test_extracts_only_zero_depth_rect_camera_planes(tmp_path):
         '<a:bodyPr wrap="none" anchor="ctr"><a:spAutoFit/></a:bodyPr><a:lstStyle/><a:p><a:r><a:t>Visible text</a:t></a:r></a:p>',
     )
     unverified_text_plane = text_plane.replace('wrap="none"', 'wrap="square"')
+    perspective_left_text_plane = text_plane.replace(
+        '<a:camera prst="perspectiveContrastingRightFacing" fov="5100000"><a:rot lat="0" lon="19532225" rev="0"/></a:camera>',
+        '<a:camera prst="perspectiveLeft" fov="7200000"/>',
+    ).replace(' anchor="ctr"', '')
+    perspective_left_with_explicit_rotation = perspective_left_text_plane.replace(
+        '<a:camera prst="perspectiveLeft" fov="7200000"/>',
+        '<a:camera prst="perspectiveLeft" fov="7200000"><a:rot lat="0" lon="1200000" rev="0"/></a:camera>',
+    )
     negatives = [
         positive.replace('prst="rect"', 'prst="ellipse"'),
         positive.replace('prst="orthographicFront"', 'prst="perspectiveFront"'),
@@ -190,12 +198,14 @@ def test_extracts_only_zero_depth_rect_camera_planes(tmp_path):
         archive.writestr("ppt/slides/slide4.xml", implicit_zero_depth)
         archive.writestr("ppt/slides/slide5.xml", unverified_implicit_orthographic)
         archive.writestr("ppt/slides/slide6.xml", text_plane)
-        archive.writestr("ppt/slides/slide7.xml", unverified_text_plane)
-        for index, negative in enumerate(negatives, start=8):
+        archive.writestr("ppt/slides/slide7.xml", perspective_left_text_plane)
+        archive.writestr("ppt/slides/slide8.xml", unverified_text_plane)
+        archive.writestr("ppt/slides/slide9.xml", perspective_left_with_explicit_rotation)
+        for index, negative in enumerate(negatives, start=10):
             archive.writestr(f"ppt/slides/slide{index}.xml", negative)
 
     assert extract_camera_slide_indices(source) == {0, 1, 2, 3}
-    assert extract_text_camera_slide_indices(source) == {5}
+    assert extract_text_camera_slide_indices(source) == {5, 6}
 
     wrong_theme = tmp_path / "camera-wrong-theme.pptx"
     with ZipFile(source) as source_archive, ZipFile(wrong_theme, "w", ZIP_DEFLATED) as target:
@@ -205,7 +215,7 @@ def test_extracts_only_zero_depth_rect_camera_planes(tmp_path):
                 data = data.replace(b"4F81BD", b"4472C4")
             target.writestr(name, data)
     assert extract_camera_slide_indices(wrong_theme) == {0, 1, 3}
-    assert extract_text_camera_slide_indices(wrong_theme) == {5}
+    assert extract_text_camera_slide_indices(wrong_theme) == {5, 6}
 
 
 def test_camera_report_binds_exact_native_rasters_and_rejects_hash_drift(tmp_path):

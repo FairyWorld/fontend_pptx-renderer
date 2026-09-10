@@ -163,7 +163,7 @@ export interface StaticShape3DTextCameraPlan {
   corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint];
   camera: {
     kind: 'perspective';
-    preset: 'perspectiveContrastingRightFacing';
+    preset: 'perspectiveContrastingRightFacing' | 'perspectiveLeft';
     rotation: Shape3DRotation;
     fieldOfView: number;
   };
@@ -219,6 +219,7 @@ const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_RELAXED_MODERATELY_PROJECTION_SCALE = 0.996;
 const PERSPECTIVE_CONTRASTING_RIGHT_FACING_VIEWPORT_SCALE = 0.95;
+const PERSPECTIVE_LEFT_VIEWPORT_SCALE = 0.95;
 const shape3dTaskTails = new WeakMap<Promise<void>[], Promise<void>>();
 let shape3dIdCounter = 0;
 
@@ -406,33 +407,54 @@ function buildCameraProjectionPlan(
     if (
       !textPlane ||
       textPlane.wrap !== 'none' ||
-      textPlane.anchor !== 'ctr' ||
       textPlane.autofit !== 'spAutoFit' ||
       textPlane.vertical !== undefined ||
       textPlane.hasIndependentBounds
     ) {
       return flat('text-body-properties');
     }
-    if (scene.cameraPreset !== 'perspectiveContrastingRightFacing') {
+    let preset: StaticShape3DTextCameraPlan['camera']['preset'];
+    let rotation: Shape3DRotation;
+    let fieldOfView: number;
+    let presetViewportScale: number;
+    if (scene.cameraPreset === 'perspectiveContrastingRightFacing') {
+      if (textPlane.anchor !== 'ctr') return flat('text-body-properties');
+      if (scene.fieldOfView === undefined || Math.abs(scene.fieldOfView - 85) > 1e-6) {
+        return flat('camera-field-of-view');
+      }
+      const expectedRotation = {
+        latitude: 0,
+        longitude: 19532225 / 60000,
+        revolution: 0,
+      };
+      if (!rotationEquals(scene.cameraRotation, expectedRotation)) return flat('camera-rotation');
+      preset = 'perspectiveContrastingRightFacing';
+      rotation = scene.cameraRotation!;
+      fieldOfView = scene.fieldOfView;
+      presetViewportScale = PERSPECTIVE_CONTRASTING_RIGHT_FACING_VIEWPORT_SCALE;
+    } else if (scene.cameraPreset === 'perspectiveLeft') {
+      if (textPlane.anchor !== undefined) return flat('text-body-properties');
+      if (scene.fieldOfView === undefined || Math.abs(scene.fieldOfView - 120) > 1e-6) {
+        return flat('camera-field-of-view');
+      }
+      if (scene.cameraRotation) return flat('camera-rotation');
+      // The preset carries a 20-degree longitude when a:rot is absent. This fixed rotation is
+      // defined by the Office camera preset and preserves the source's implicit semantics.
+      preset = 'perspectiveLeft';
+      rotation = { latitude: 0, longitude: 20, revolution: 0 };
+      fieldOfView = scene.fieldOfView;
+      presetViewportScale = PERSPECTIVE_LEFT_VIEWPORT_SCALE;
+    } else {
       return flat('camera-preset');
     }
-    if (scene.fieldOfView === undefined || Math.abs(scene.fieldOfView - 85) > 1e-6) {
-      return flat('camera-field-of-view');
-    }
-    const expectedRotation = {
-      latitude: 0,
-      longitude: 19532225 / 60000,
-      revolution: 0,
-    };
-    if (!rotationEquals(scene.cameraRotation, expectedRotation)) return flat('camera-rotation');
     const projection = projectFlatPlane({
       kind: 'perspective',
       width: target.width,
       height: target.height,
       presentationWidth: ctx.presentation.width,
-      rotation: scene.cameraRotation!,
-      fieldOfView: scene.fieldOfView,
-      presetViewportScale: PERSPECTIVE_CONTRASTING_RIGHT_FACING_VIEWPORT_SCALE,
+      rotation,
+      fieldOfView,
+      presetViewportScale,
     });
     if (!projection) return flat('projection-out-of-range');
     return {
@@ -443,9 +465,9 @@ function buildCameraProjectionPlan(
       corners: projection.corners,
       camera: {
         kind: 'perspective',
-        preset: 'perspectiveContrastingRightFacing',
-        rotation: scene.cameraRotation!,
-        fieldOfView: scene.fieldOfView,
+        preset,
+        rotation,
+        fieldOfView,
       },
     };
   }

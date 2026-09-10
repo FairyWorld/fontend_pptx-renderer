@@ -213,12 +213,26 @@ def _is_supported_text_camera_shape(shape) -> bool:
         return False
     camera = scene.find("a:camera", NS)
     light = scene.find("a:lightRig", NS)
+    camera_supported = False
+    expected_anchor: str | None = None
+    if camera is not None:
+        if (
+            camera.get("prst") == "perspectiveContrastingRightFacing"
+            and camera.get("fov") == "5100000"
+            and _rotation_matches(camera.find("a:rot", NS), (0, 19532225, 0))
+        ):
+            camera_supported = True
+            expected_anchor = "ctr"
+        elif (
+            camera.get("prst") == "perspectiveLeft"
+            and camera.get("fov") == "7200000"
+            and camera.find("a:rot", NS) is None
+        ):
+            camera_supported = True
     if (
         camera is None
-        or camera.get("prst") != "perspectiveContrastingRightFacing"
-        or camera.get("fov") != "5100000"
+        or not camera_supported
         or camera.get("zoom") is not None
-        or not _rotation_matches(camera.find("a:rot", NS), (0, 19532225, 0))
         or light is None
         or light.get("rig") != "threePt"
         or light.get("dir") != "t"
@@ -239,7 +253,7 @@ def _is_supported_text_camera_shape(shape) -> bool:
         or shape.find("p:style", NS) is not None
         or body is None
         or body.get("wrap") != "none"
-        or body.get("anchor") != "ctr"
+        or body.get("anchor") != expected_anchor
         or body.get("vert") is not None
         or body.find("a:spAutoFit", NS) is None
         or body.find("a:normAutofit", NS) is not None

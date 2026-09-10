@@ -581,6 +581,73 @@ test('scene-only camera projection preserves live text and rejects styled text p
   expect(result.styledText).toContain('Editable camera text');
 });
 
+test('perspective-left preset projects top-anchored live text and rejects explicit rotation', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const shapeXml = (explicitRotation: boolean) => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="Perspective-left text"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/>
+          <a:scene3d>
+            <a:camera prst="perspectiveLeft" fov="7200000">
+              ${explicitRotation ? '<a:rot lat="0" lon="1200000" rev="0"/>' : ''}
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:spPr>
+        <p:txBody><a:bodyPr wrap="none"><a:spAutoFit/></a:bodyPr><a:lstStyle/>
+          <a:p><a:r><a:rPr sz="2800"/><a:t>透视文本 LEFT 120</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>`;
+    const presentation = {
+      ...createMockRenderContext().presentation,
+      width: 1280,
+      height: 720,
+    };
+    const projectedShape = renderShape(
+      parseShapeNode(parseXml(shapeXml(false))),
+      createMockRenderContext({ presentation }),
+    );
+    const explicitRotationShape = renderShape(
+      parseShapeNode(parseXml(shapeXml(true))),
+      createMockRenderContext({ presentation }),
+    );
+    explicitRotationShape.style.left = '600px';
+    document.body.append(projectedShape, explicitRotationShape);
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    const projected = projectedShape.querySelector<HTMLElement>(
+      '[data-pptx-shape3d-projected-text-plane="perspective"]',
+    );
+    return {
+      projected: !!projected,
+      transform: projected ? getComputedStyle(projected).transform : '',
+      text: projected?.textContent,
+      rasterized: !!projected?.querySelector('canvas, img, svg'),
+      explicitRotationProjected: !!explicitRotationShape.querySelector(
+        '[data-pptx-shape3d-projected-text-plane]',
+      ),
+    };
+  });
+
+  expect(result.projected).toBe(true);
+  expect(result.transform).toMatch(/^matrix3d\(/);
+  expect(result.text).toContain('透视文本 LEFT 120');
+  expect(result.rasterized).toBe(false);
+  expect(result.explicitRotationProjected).toBe(false);
+});
+
 test('static 3D donut composes with its upper adjustment bound and a solid theme fill', async ({
   page,
 }) => {
