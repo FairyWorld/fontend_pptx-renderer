@@ -204,6 +204,9 @@
       ],
       "scope": {
         "bevelTopPresets": ["circle"],
+        "bevelPresetEncoding": ["explicit-circle", "implicit-circle-default"],
+        "bevelDimensionEncoding": ["explicit-positive", "implicit-76200-emu-per-axis"],
+        "bevelDefaultRows": ["rect:square:w+h+prst", "roundRect:wide:w", "ellipse:tall:h"],
         "bevelWidthSemantics": ["inward-face-extent"],
         "bevelHeightSemantics": ["lighting-contrast"],
         "bevelShading": ["circle-cross-section", "continuous-perimeter-normals", "silhouette-interior-distance-field"],

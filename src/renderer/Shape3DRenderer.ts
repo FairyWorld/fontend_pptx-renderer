@@ -262,7 +262,7 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
-const SHAPE3D_LIGHTING_VERSION = 'distance-field-v2';
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v3';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
@@ -279,7 +279,12 @@ const SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS = [
   { aspect: 1.6, strength: 0.45 },
 ] as const;
 
-function solidBevelShadowStrength(width: number, height: number): number {
+export function solidBevelShadowStrength(
+  width: number,
+  height: number,
+  geometry: StaticShape3DGeometry,
+  bevelWidth: number,
+): number {
   const aspect = width / height;
   let lower: (typeof SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS)[number] =
     SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[0];
@@ -295,7 +300,20 @@ function solidBevelShadowStrength(width: number, height: number): number {
   const lowerLog = Math.log(lower.aspect);
   const upperLog = Math.log(upper.aspect);
   const ratio = clamp((Math.log(aspect) - lowerLog) / Math.max(upperLog - lowerLog, 1e-9), 0, 1);
-  return lower.strength + (upper.strength - lower.strength) * ratio;
+  const aspectStrength = lower.strength + (upper.strength - lower.strength) * ratio;
+  if (geometry !== 'rect' || Math.abs(aspect - 1) > 1e-6) return aspectStrength;
+
+  // The native 6 pt square-rectangle probe has a steeper dark face than the existing 10 pt
+  // cohort, while roundRect/ellipse/donut keep the aspect-only response. Interpolate only across
+  // those two native-backed rectangular anchors so the 10 pt donut calibration remains unchanged.
+  const defaultBevelWidth = 8;
+  const establishedBevelWidth = 40 / 3;
+  const smallBevelWeight = clamp(
+    (establishedBevelWidth - bevelWidth) / (establishedBevelWidth - defaultBevelWidth),
+    0,
+    1,
+  );
+  return aspectStrength + (0.7 - aspectStrength) * smallBevelWeight;
 }
 
 function flat(
@@ -1089,7 +1107,12 @@ async function renderDistanceFieldLighting(
     lighting = applySolidMaterialLighting(
       lighting,
       plan.faceColor,
-      solidBevelShadowStrength(plan.bounds.width, plan.bounds.height),
+      solidBevelShadowStrength(
+        plan.bounds.width,
+        plan.bounds.height,
+        plan.geometry,
+        plan.bevel.width,
+      ),
     );
   }
 

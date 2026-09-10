@@ -30,6 +30,7 @@ HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
 PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 MIN_EVALUABLE_BAND_PX = 4.0
+DEFAULT_BEVEL_DIMENSION_EMU = 76200.0
 
 
 @dataclass(frozen=True)
@@ -154,7 +155,7 @@ def _shape_regions(
         bevel = shape_properties.find("a:sp3d/a:bevelT", NS)
         if bevel is None or bevel.get("prst", "circle") != "circle":
             continue
-        bevel_width = _float_attr(bevel, "w")
+        bevel_width = _float_attr(bevel, "w", DEFAULT_BEVEL_DIMENSION_EMU)
         xfrm = shape_properties.find("a:xfrm", NS)
         offset = xfrm.find("a:off", NS) if xfrm is not None else None
         extent = xfrm.find("a:ext", NS) if xfrm is not None else None
@@ -510,6 +511,38 @@ def _load_json(path: Path) -> Mapping[str, Any]:
     return value
 
 
+def _equivalent_slide_pairs(repo: Path, case_id: str) -> list[tuple[int, int]]:
+    oracle_root = repo / "test/e2e/oracle"
+    matches = sorted(oracle_root.glob(f"*/{case_id}.json"))
+    if not matches:
+        return []
+    if len(matches) > 1:
+        raise ValueError(f"case metadata is ambiguous: {case_id}")
+    payload = _load_json(matches[0])
+    assertions = payload.get("assertions")
+    if assertions is None:
+        return []
+    if not isinstance(assertions, Mapping):
+        raise ValueError(f"case assertions must be an object: {case_id}")
+    values = assertions.get("equivalentSlidePairs", [])
+    if not isinstance(values, list):
+        raise ValueError(f"equivalentSlidePairs must be a list: {case_id}")
+    pairs: list[tuple[int, int]] = []
+    for value in values:
+        if (
+            not isinstance(value, list)
+            or len(value) != 2
+            or any(not isinstance(index, int) or isinstance(index, bool) or index < 0 for index in value)
+            or value[0] == value[1]
+        ):
+            raise ValueError(f"equivalent slide pair is invalid: {case_id}")
+        pair = (value[0], value[1])
+        if pair in pairs:
+            raise ValueError(f"equivalent slide pair is duplicated: {case_id}")
+        pairs.append(pair)
+    return pairs
+
+
 def build_bevel_report(
     case_report_paths: Sequence[Path],
     repo: Path,
@@ -599,6 +632,27 @@ def build_bevel_report(
                     "passed": all(item["metrics"]["passed"] for item in region_results),
                 }
             )
+        slides_by_index = {slide["slideIdx"]: slide for slide in slide_results}
+        equivalence_pairs: list[dict[str, Any]] = []
+        for left_index, right_index in _equivalent_slide_pairs(repo, case_id):
+            left = slides_by_index.get(left_index)
+            right = slides_by_index.get(right_index)
+            if left is None or right is None:
+                raise ValueError(
+                    f"equivalent slide pair is missing bevel evidence: "
+                    f"{case_id} slides {left_index}/{right_index}"
+                )
+            reference_equal = left["referenceSha256"] == right["referenceSha256"]
+            candidate_equal = left["candidateSha256"] == right["candidateSha256"]
+            equivalence_pairs.append(
+                {
+                    "leftSlideIdx": left_index,
+                    "rightSlideIdx": right_index,
+                    "referenceEqual": reference_equal,
+                    "candidateEqual": candidate_equal,
+                    "passed": reference_equal and candidate_equal,
+                }
+            )
         applicable = any(
             region["metrics"].get("evaluable") is True
             for slide in slide_results
@@ -606,7 +660,7 @@ def build_bevel_report(
         )
         case_passed = all(slide["passed"] for slide in slide_results) and (
             not regions or bool(slide_results)
-        )
+        ) and all(pair["passed"] for pair in equivalence_pairs)
         cases.append(
             {
                 "caseId": case_id,
@@ -615,11 +669,12 @@ def build_bevel_report(
                 "applicable": applicable,
                 "passed": case_passed,
                 "slides": slide_results,
+                "equivalencePairs": equivalence_pairs,
             }
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "score": SCORE_THRESHOLD,

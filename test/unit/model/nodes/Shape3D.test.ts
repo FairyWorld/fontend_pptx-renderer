@@ -92,6 +92,39 @@ describe('parseShape3DProperties', () => {
     });
   });
 
+  it('applies the DrawingML 76200 EMU bevel dimension defaults independently', () => {
+    const result = parseSpPr(`
+      <spPr>
+        <scene3d>
+          <camera prst="orthographicFront"/>
+          <lightRig rig="threePt" dir="t"/>
+        </scene3d>
+        <sp3d>
+          <bevelT/>
+          <bevelB w="12700" prst="relaxedInset"/>
+        </sp3d>
+      </spPr>
+    `);
+
+    expect(result).toMatchObject({
+      shape: {
+        bevelTop: {
+          preset: 'circle',
+          presetExplicit: false,
+          width: 8,
+          height: 8,
+        },
+        bevelBottom: {
+          preset: 'relaxedInset',
+          presetExplicit: true,
+          width: 4 / 3,
+          height: 8,
+        },
+      },
+      parseIssues: [],
+    });
+  });
+
   it('retains valid 3D observations without treating renderer support as a parse issue', () => {
     const result = parseSpPr(`
       <spPr>

@@ -530,8 +530,6 @@ def test_flowchart_zero_adjustment_case_json_records_all_three_slides(tmp_path: 
             "paint=explicitSolid|themeStyleReference",
         ],
     }
-
-
 def test_static_shape3d_matrix_is_registered():
     generator = _load_generator_module()
     names = {
@@ -557,6 +555,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
         "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix",
         "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
+        "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
     }
 
 
@@ -588,6 +587,7 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
         "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix",
         "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
+        "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
     }
     for name in positive_names:
         root = roots[name]
@@ -691,6 +691,77 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         "[@l='12000'][@t='8000'][@r='18000'][@b='10000'])",
         namespaces=ns,
     )
+
+
+def test_static_shape3d_default_top_bevel_matrix_serializes_implicit_and_explicit_pairs(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"]
+        == "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix"
+    )
+    assert case["slide_count"] == 6
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as archive:
+        roots = [
+            etree.fromstring(archive.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 7)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    bevels = [root.xpath(".//a:sp3d/a:bevelT", namespaces=ns)[0] for root in roots]
+    assert bevels[0].attrib == {}
+    assert bevels[1].attrib == {"w": "76200", "h": "76200", "prst": "circle"}
+    assert bevels[2].attrib == {"h": "76200", "prst": "circle"}
+    assert bevels[3].attrib == {"w": "76200", "h": "76200", "prst": "circle"}
+    assert bevels[4].attrib == {"w": "76200", "prst": "circle"}
+    assert bevels[5].attrib == {"w": "76200", "h": "76200", "prst": "circle"}
+
+    presets = [
+        root.xpath("string(.//p:sp/p:spPr/a:prstGeom/@prst)", namespaces=ns)
+        for root in roots
+    ]
+    assert presets == ["rect", "rect", "roundRect", "roundRect", "ellipse", "ellipse"]
+
+
+def test_static_shape3d_default_top_bevel_case_json_records_all_six_slides(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"]
+        == "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix"
+    )
+
+    payload = __import__("json").loads(
+        generator._write_case_json(case, tmp_path).read_text(encoding="utf-8")
+    )
+
+    assert len(payload["slides"]) == 6
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "features": [
+            "p:sp.prstGeom=rect|roundRect|ellipse",
+            "geometry.aspect=square|wide|tall",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT.prst=implicit-circle|explicit-circle",
+            "a:sp3d.bevelT.w=implicit-76200|explicit-76200",
+            "a:sp3d.bevelT.h=implicit-76200|explicit-76200",
+        ],
+    }
+    assert payload["assertions"] == {
+        "equivalentSlidePairs": [[0, 1], [2, 3], [4, 5]],
+    }
 
 
 def test_static_shape3d_scene_only_plane_matrix_serializes_absent_shape_format_and_modalities(

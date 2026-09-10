@@ -341,6 +341,32 @@ def test_extracts_group_scaled_bounds_and_bevel_width_from_ooxml(tmp_path):
     ]
 
 
+def test_extracts_the_drawingml_default_bevel_width_when_w_is_omitted(tmp_path):
+    source = tmp_path / "default-bevel.pptx"
+    presentation = """
+      <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:sldSz cx="1000000" cy="500000"/>
+      </p:presentation>"""
+    slide = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:spPr>
+          <a:xfrm><a:off x="100000" y="50000"/><a:ext cx="400000" cy="300000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT/></a:sp3d>
+        </p:spPr></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/presentation.xml", presentation)
+        archive.writestr("ppt/slides/slide1.xml", slide)
+
+    [region] = extract_shape3d_regions(source)
+
+    assert region.bevel_width_x == pytest.approx(76200 / 1000000)
+    assert region.bevel_width_y == pytest.approx(76200 / 500000)
+
+
 def test_extracts_donut_adjustment_for_the_bevel_mask(tmp_path):
     source = tmp_path / "donut.pptx"
     presentation = """
@@ -467,3 +493,114 @@ def test_bevel_report_binds_the_exact_native_report_rasters(tmp_path):
     native_path.write_text(json.dumps(native), encoding="utf-8")
     with pytest.raises(ValueError, match="native report artifact"):
         build_bevel_report([native_path], repo, reports_dir)
+
+
+def test_bevel_report_enforces_declared_implicit_explicit_slide_equivalence(tmp_path):
+    repo = tmp_path / "repo"
+    case_id = "shape3d-default-bevel-pair"
+    source = repo / f"test/e2e/testdata/cases/{case_id}/source.pptx"
+    source.parent.mkdir(parents=True)
+    presentation = """
+      <p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+        <p:sldSz cx="300" cy="200"/>
+      </p:presentation>"""
+    slide = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:spPr>
+          <a:xfrm><a:off x="60" y="50"/><a:ext cx="180" cy="100"/></a:xfrm>
+          <a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 20000"/></a:avLst></a:prstGeom>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+          <a:sp3d><a:bevelT w="12" h="8" prst="circle"/></a:sp3d>
+        </p:spPr></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/presentation.xml", presentation)
+        archive.writestr("ppt/slides/slide1.xml", slide)
+        archive.writestr("ppt/slides/slide2.xml", slide)
+
+    case_path = repo / f"test/e2e/oracle/cases-pypptx/{case_id}.json"
+    case_path.parent.mkdir(parents=True)
+    case_path.write_text(
+        json.dumps({"assertions": {"equivalentSlidePairs": [[0, 1]]}}),
+        encoding="utf-8",
+    )
+
+    reference, flat, _region = _bevel_specimen()
+    reports_dir = repo / "test/e2e/reports"
+    reports_dir.mkdir(parents=True)
+
+    def write_artifacts(second_candidate: np.ndarray):
+        for slide_index, candidate in ((0, reference), (1, second_candidate)):
+            Image.fromarray(reference).save(reports_dir / f"{case_id}_slide{slide_index}_pdf.png")
+            Image.fromarray(candidate).save(
+                reports_dir / f"{case_id}_slide{slide_index}_html.png"
+            )
+
+    def artifact(path):
+        return {
+            "path": path.relative_to(repo).as_posix(),
+            "sizeBytes": path.stat().st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+
+    def native_report():
+        return {
+            "testFile": case_id,
+            "provenance": {
+                "renderer": {"revision": "a" * 40, "dirty": False},
+                "inputs": {
+                    "sourcePptx": {
+                        "path": source.relative_to(repo).as_posix(),
+                        "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                    },
+                    "groundTruth": {"combinedSha256": "f" * 64},
+                },
+            },
+            "perSlide": [
+                {
+                    "slideIdx": slide_index,
+                    "hidden": False,
+                    "renderArtifacts": {
+                        "reference": artifact(
+                            reports_dir / f"{case_id}_slide{slide_index}_pdf.png"
+                        ),
+                        "candidate": artifact(
+                            reports_dir / f"{case_id}_slide{slide_index}_html.png"
+                        ),
+                    },
+                }
+                for slide_index in range(2)
+            ],
+        }
+
+    native_path = repo / "native.json"
+    write_artifacts(reference)
+    native_path.write_text(json.dumps(native_report()), encoding="utf-8")
+
+    matched = build_bevel_report([native_path], repo, reports_dir)
+
+    assert matched["schemaVersion"] == 3
+    assert matched["caseResults"][0]["equivalencePairs"] == [
+        {
+            "leftSlideIdx": 0,
+            "rightSlideIdx": 1,
+            "referenceEqual": True,
+            "candidateEqual": True,
+            "passed": True,
+        }
+    ]
+    assert matched["passed"] is True
+
+    write_artifacts(flat)
+    native_path.write_text(json.dumps(native_report()), encoding="utf-8")
+    mismatched = build_bevel_report([native_path], repo, reports_dir)
+
+    assert mismatched["caseResults"][0]["equivalencePairs"][0] == {
+        "leftSlideIdx": 0,
+        "rightSlideIdx": 1,
+        "referenceEqual": True,
+        "candidateEqual": False,
+        "passed": False,
+    }
+    assert mismatched["passed"] is False

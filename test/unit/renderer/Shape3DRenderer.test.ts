@@ -4,6 +4,7 @@ import { parseShapeNode } from '../../../src/model/nodes/ShapeNode';
 import {
   appendStaticShape3DEffects,
   buildStaticShape3DPlan,
+  solidBevelShadowStrength,
 } from '../../../src/renderer/Shape3DRenderer';
 import { createMockRenderContext } from '../helpers/mockContext';
 
@@ -130,6 +131,13 @@ function installShape3DRasterMocks() {
 }
 
 describe('buildStaticShape3DPlan', () => {
+  it('raises only the native-backed small rectangular bevel shadow response', () => {
+    expect(solidBevelShadowStrength(200, 200, 'rect', 8)).toBeCloseTo(0.7, 5);
+    expect(solidBevelShadowStrength(200, 200, 'rect', 40 / 3)).toBeCloseTo(0.58, 5);
+    expect(solidBevelShadowStrength(200, 200, 'roundRect', 8)).toBeCloseTo(0.58, 5);
+    expect(solidBevelShadowStrength(200, 200, 'donut', 8)).toBeCloseTo(0.58, 5);
+  });
+
   it('builds the native-backed flat-plane perspective camera plan', () => {
     const ctx = createMockRenderContext({
       presentation: {
@@ -703,6 +711,26 @@ describe('buildStaticShape3DPlan', () => {
     expect(plan.bevel.width).toBeCloseTo(13.3333, 3);
     expect(plan.bevel.height).toBeCloseTo(13.3333, 3);
     expect(plan.contour?.width).toBeCloseTo(1.3333, 3);
+  });
+
+  it('builds the top-bevel plan from the DrawingML default bevel dimensions', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, '<a:sp3d extrusionH="0"><a:bevelT/></a:sp3d>'),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 200,
+        height: 100,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'orthographic-top-bevel',
+      bevel: { preset: 'circle', width: 8, height: 8 },
+    });
   });
 
   it('accepts the exact real-corpus picture light rotation and implicit circle bevel', () => {

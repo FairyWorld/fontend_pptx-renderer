@@ -83,6 +83,9 @@ export interface Shape3DProperties {
   parseIssues: Shape3DParseIssue[];
 }
 
+// DrawingML CT_Bevel defaults both dimensions to 76200 EMU (6 pt).
+const DEFAULT_BEVEL_DIMENSION_EMU = 76200;
+
 function addIssue(issues: Shape3DParseIssue[], issue: Shape3DParseIssue): void {
   if (!issues.includes(issue)) issues.push(issue);
 }
@@ -145,8 +148,8 @@ function parseBevel(
   return {
     preset: explicitPreset ?? 'circle',
     presetExplicit: explicitPreset !== undefined,
-    width: parseLength(node, 'w', 0, issues),
-    height: parseLength(node, 'h', 0, issues),
+    width: parseLength(node, 'w', DEFAULT_BEVEL_DIMENSION_EMU, issues),
+    height: parseLength(node, 'h', DEFAULT_BEVEL_DIMENSION_EMU, issues),
   };
 }
 

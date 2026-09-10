@@ -112,7 +112,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
         {"slideIdx": 0, "hidden": False, "renderArtifacts": native_artifacts}
     ]
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": {
             "score": 0.6,
@@ -133,6 +133,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                 ],
                 "applicable": True,
                 "passed": passed,
+                "equivalencePairs": [],
                 "slides": [
                     {
                         "slideIdx": 0,
@@ -889,4 +890,50 @@ def test_rejects_tampered_bevel_artifacts_and_inconsistent_metric_results(tmp_pa
             baseline_reports=[baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             bevel_report=overdark,
+        )
+
+
+def test_rejects_inconsistent_bevel_equivalence_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "bevel-local"),
+    )
+    current = native_report("default-bevel-pair")
+    baseline = native_report("default-bevel-pair", revision="b" * 40)
+    evidence = bevel_report(current, repo)
+    native_slide = current["perSlide"][0]
+    second_native_slide = {
+        **native_slide,
+        "slideIdx": 1,
+    }
+    current["perSlide"].append(second_native_slide)
+    evidence_slide = evidence["caseResults"][0]["slides"][0]
+    evidence["caseResults"][0]["slides"].append(
+        {
+            **evidence_slide,
+            "slideIdx": 1,
+        }
+    )
+    evidence["caseResults"][0]["equivalencePairs"] = [
+        {
+            "leftSlideIdx": 0,
+            "rightSlideIdx": 1,
+            "referenceEqual": False,
+            "candidateEqual": True,
+            "passed": False,
+        }
+    ]
+    evidence["caseResults"][0]["passed"] = False
+    evidence["passed"] = False
+
+    with pytest.raises(CapabilityVerificationError, match="equivalence evidence is inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            bevel_report=evidence,
         )

@@ -206,7 +206,10 @@ does not claim pixel-identical font metrics across every host font installation.
 field-of-view, zoom, light, bevel, contour, extrusion, material, and color observations. It attaches
 those observations to both shape and picture nodes; only malformed numeric values become parse issues. Serialization
 removes the retained `SafeXmlNode` color source while preserving its JSON-safe observation, so
-detection remains independent from renderer support policy.
+detection remains independent from renderer support policy. `CT_Bevel` omission is resolved at the
+model boundary: `prst` defaults to `circle`, while `w` and `h` default independently to 76200 EMU
+(6 pt / 8 CSS px at 96 dpi). Explicit zeros remain zeros and therefore do not become a positive
+bevel plan.
 
 `src/renderer/Shape3DRenderer.ts` is a narrow decision and effect layer. It returns either an
 `orthographic-top-bevel` plan, a `camera-projected-plane` plan, a
@@ -228,7 +231,10 @@ The top-bevel plan requires all of the following:
   top/bottom sums each leave more than the renderer's `0.001` visible-fraction tolerance.
 
 The renderer treats `bevelT@w` as the inward face extent and `bevelT@h` as elevation that scales
-lighting contrast. It immediately paints four clipped `userSpaceOnUse` gradients as a synchronous
+lighting contrast. A six-slide native matrix pairs omitted/default encodings with explicit
+`circle`/76200-EMU values for a square rectangle, wide round rectangle, and tall ellipse. Both
+PowerPoint and renderer pairs must have identical raster hashes. It immediately paints four clipped
+`userSpaceOnUse` gradients as a synchronous
 fallback. When a render context is available, it rasterizes the exact even-odd SVG path into a
 Canvas alpha mask at up to 2x scale within a 262,144-pixel budget. `DistanceField.ts` computes the
 exact interior Euclidean distance transform, and `BevelLighting.ts` smooths its gradient into
@@ -242,7 +248,9 @@ source hue; pictures use relative black/white overlays so their pixels remain vi
 plan carries material intensity separately from bevel geometry. Solid-shape highlights preserve the
 common material response, while shadow attenuation is interpolated over log aspect ratio from the
 native square, wide, and tall matrices; this avoids making the dark bevel face progressively too
-heavy as the silhouette widens. Native evidence calibrates the implicit `twoPt:t` picture response
+heavy as the silhouette widens. A separate 6 pt square-rectangle anchor corrects its native dark
+face while leaving the established 10 pt donut and non-rectangular responses unchanged. Native
+evidence calibrates the implicit `twoPt:t` picture response
 independently from the solid-shape `threePt:t` response. Texture
 work is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry,
 dimensions, bevel, light, intensity, surface, raster size, and algorithm version, and guarded by the

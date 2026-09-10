@@ -18,16 +18,18 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus a sixteen-case, thirty-seven-slide
+  shapes and pictures, with stable renderer fallback reasons, plus a seventeen-case, forty-three-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
   ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
   vertical and combined source crops, plus explicit- and implicit-depth camera planes, editable-text
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
-  implicit-rotation `perspectiveRight` picture matrix with source-crop interactions.
-- Added a schema-v2 bevel-ring fidelity metric and derived capability gate with independent dynamic
+  implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
+  omitted/explicit default top-bevel dimensions.
+- Added a schema-v3 bevel-ring fidelity metric and derived capability gate with independent dynamic
   range and shadow-amplitude floors plus material-specific solid/picture highlight floors, alongside
-  an opt-in ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, and
-  effect-bearing inputs.
+  exact native/renderer slide-equivalence assertions for alternate OOXML encodings and an opt-in
+  ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, and effect-bearing
+  inputs.
 - Added a schema-v4 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,
@@ -80,7 +82,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   abort, and cleanup behavior. Picture lighting now uses its native-validated `twoPt:t` direction
   and material intensity independently from solid-shape lighting. Solid highlights retain their
   common material mapping while dark-face attenuation is interpolated across the native square,
-  wide, and tall matrices. Unmatched 3D tuples stay flat.
+  wide, and tall matrices. Missing circular top-bevel preset/width/height attributes now use the
+  DrawingML `circle` and 76200 EMU defaults independently; the native 6 pt square-rectangle row has
+  a bounded shadow anchor without changing the accepted 10 pt donut response. Unmatched 3D tuples
+  stay flat.
 - Validate ellipse bevels across square explicit paint, wide theme-reference paint, and a tall
   ellipse under a non-identity group transform; all three use the same source-silhouette distance
   field instead of a geometry-specific lighting approximation.

@@ -228,8 +228,8 @@ def _apply_bounded_shape3d(
     *,
     light_rig: str = "threePt",
     light_rotation: tuple[int, int, int] | None = None,
-    bevel_width_emu: int = 127000,
-    bevel_height_emu: int = 127000,
+    bevel_width_emu: int | None = 127000,
+    bevel_height_emu: int | None = 127000,
     bevel_preset: str | None = "circle",
     explicit_zero_extrusion: bool = True,
     contour_width_emu: int | None = None,
@@ -254,10 +254,11 @@ def _apply_bounded_shape3d(
     if contour_width_emu is not None:
         sp3d_attrs["contourW"] = str(contour_width_emu)
     sp3d = etree.Element(qn("a:sp3d"), **sp3d_attrs)
-    bevel_attrs = {
-        "w": str(bevel_width_emu),
-        "h": str(bevel_height_emu),
-    }
+    bevel_attrs = {}
+    if bevel_width_emu is not None:
+        bevel_attrs["w"] = str(bevel_width_emu)
+    if bevel_height_emu is not None:
+        bevel_attrs["h"] = str(bevel_height_emu)
     if bevel_preset is not None:
         bevel_attrs["prst"] = bevel_preset
     etree.SubElement(sp3d, qn("a:bevelT"), **bevel_attrs)
@@ -1417,7 +1418,14 @@ def _build_shape3d_cases() -> list[CaseDef]:
     cases: list[CaseDef] = []
     seq = 0
 
-    def _add(slug: str, build_fn, *, features: list[str], slide_count: int = 1):
+    def _add(
+        slug: str,
+        build_fn,
+        *,
+        features: list[str],
+        slide_count: int = 1,
+        assertions: dict | None = None,
+    ):
         nonlocal seq
         seq += 1
         case = {
@@ -1430,6 +1438,8 @@ def _build_shape3d_cases() -> list[CaseDef]:
         }
         if slide_count != 1:
             case["slide_count"] = slide_count
+        if assertions is not None:
+            case["assertions"] = assertions
         cases.append(case)
 
     def _add_picture(prs, *, apply_3d: bool):
@@ -2175,6 +2185,91 @@ def _build_shape3d_cases() -> list[CaseDef]:
             "a:sp3d=absent",
             "effects=absent",
         ],
+    )
+
+    def _add_default_top_bevel_probe(
+        prs,
+        *,
+        shape_type,
+        width: float,
+        height: float,
+        bevel_width_emu: int | None,
+        bevel_height_emu: int | None,
+        bevel_preset: str | None,
+        name: str,
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_shape(
+            shape_type,
+            _emu((13.333 - width) / 2),
+            _emu((7.5 - height) / 2),
+            _emu(width),
+            _emu(height),
+        )
+        shape.name = name
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
+        shape.line.fill.background()
+        _apply_bounded_shape3d(
+            shape,
+            bevel_width_emu=bevel_width_emu,
+            bevel_height_emu=bevel_height_emu,
+            bevel_preset=bevel_preset,
+        )
+
+    def _build_default_top_bevel_dimensions_matrix(prs) -> None:
+        for shape_type, width, height, omitted, explicit in (
+            (
+                MSO_SHAPE.RECTANGLE,
+                4.2,
+                4.2,
+                (None, None, None, "Rect implicit bevel defaults"),
+                (76200, 76200, "circle", "Rect explicit bevel defaults"),
+            ),
+            (
+                MSO_SHAPE.ROUNDED_RECTANGLE,
+                8.0,
+                3.2,
+                (None, 76200, "circle", "RoundRect implicit bevel width"),
+                (76200, 76200, "circle", "RoundRect explicit bevel width"),
+            ),
+            (
+                MSO_SHAPE.OVAL,
+                3.2,
+                5.4,
+                (76200, None, "circle", "Ellipse implicit bevel height"),
+                (76200, 76200, "circle", "Ellipse explicit bevel height"),
+            ),
+        ):
+            for bevel_width, bevel_height, bevel_preset, name in (omitted, explicit):
+                _add_default_top_bevel_probe(
+                    prs,
+                    shape_type=shape_type,
+                    width=width,
+                    height=height,
+                    bevel_width_emu=bevel_width,
+                    bevel_height_emu=bevel_height,
+                    bevel_preset=bevel_preset,
+                    name=name,
+                )
+
+    _add(
+        "default-top-bevel-dimensions-matrix",
+        _build_default_top_bevel_dimensions_matrix,
+        slide_count=6,
+        features=[
+            "p:sp.prstGeom=rect|roundRect|ellipse",
+            "geometry.aspect=square|wide|tall",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT.prst=implicit-circle|explicit-circle",
+            "a:sp3d.bevelT.w=implicit-76200|explicit-76200",
+            "a:sp3d.bevelT.h=implicit-76200|explicit-76200",
+        ],
+        assertions={
+            "equivalentSlidePairs": [[0, 1], [2, 3], [4, 5]],
+        },
     )
 
     return cases
@@ -3209,6 +3304,8 @@ def _write_case_json(case_def: CaseDef, cases_dir: Path) -> Path:
     }
     if coverage := case_def.get("coverage"):
         payload["coverage"] = coverage
+    if assertions := case_def.get("assertions"):
+        payload["assertions"] = assertions
     out = cases_dir / f"{name}.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")

@@ -219,8 +219,8 @@ def _validate_bevel_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 2:
-        raise CapabilityVerificationError("bevel-local report requires schemaVersion=2")
+    if report.get("schemaVersion") != 3:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=3")
     renderer = _mapping(report.get("renderer"), "bevel-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -470,12 +470,58 @@ def _validate_bevel_local(
             if slide.get("passed") is not slide_passed:
                 raise CapabilityVerificationError(f"{context} pass status is inconsistent")
             slide_passes.append(slide_passed)
+        slides_by_index = {slide.get("slideIdx"): slide for slide in slides}
+        equivalence_values = value.get("equivalencePairs")
+        if not isinstance(equivalence_values, list) or any(
+            not isinstance(pair, Mapping) for pair in equivalence_values
+        ):
+            raise CapabilityVerificationError(
+                f"{case_id} bevel-local equivalence pairs must be objects"
+            )
+        seen_pairs: set[tuple[int, int]] = set()
+        equivalence_passes: list[bool] = []
+        for pair_index, pair in enumerate(equivalence_values):
+            context = f"{case_id} bevel-local equivalence pair {pair_index}"
+            left_index = pair.get("leftSlideIdx")
+            right_index = pair.get("rightSlideIdx")
+            if (
+                not isinstance(left_index, int)
+                or isinstance(left_index, bool)
+                or left_index < 0
+                or not isinstance(right_index, int)
+                or isinstance(right_index, bool)
+                or right_index < 0
+                or left_index == right_index
+                or (left_index, right_index) in seen_pairs
+            ):
+                raise CapabilityVerificationError(f"{context} indices are invalid")
+            seen_pairs.add((left_index, right_index))
+            left = slides_by_index.get(left_index)
+            right = slides_by_index.get(right_index)
+            if left is None or right is None:
+                raise CapabilityVerificationError(f"{context} slides are missing")
+            expected_reference_equal = (
+                left.get("referenceSha256") == right.get("referenceSha256")
+            )
+            expected_candidate_equal = (
+                left.get("candidateSha256") == right.get("candidateSha256")
+            )
+            expected_pair_pass = expected_reference_equal and expected_candidate_equal
+            if (
+                pair.get("referenceEqual") is not expected_reference_equal
+                or pair.get("candidateEqual") is not expected_candidate_equal
+                or pair.get("passed") is not expected_pair_pass
+            ):
+                raise CapabilityVerificationError(
+                    f"{context} equivalence evidence is inconsistent"
+                )
+            equivalence_passes.append(expected_pair_pass)
         applicable = value.get("applicable")
         if not isinstance(applicable, bool) or applicable is not (evaluable_regions > 0):
             raise CapabilityVerificationError(f"{case_id} bevel-local applicability is inconsistent")
         if applicable:
             applicable_count += 1
-        case_passed = all(slide_passes)
+        case_passed = all(slide_passes) and all(equivalence_passes)
         if value.get("passed") is not case_passed:
             raise CapabilityVerificationError(f"{case_id} bevel-local pass status is inconsistent")
         all_cases_passed = all_cases_passed and case_passed

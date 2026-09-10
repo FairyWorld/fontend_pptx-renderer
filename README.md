@@ -617,7 +617,9 @@ orthographic circular top bevel and optional contour with silhouette-aware light
 - shape lane: opaque resolved solid-fill `donut`, `ellipse`, `rect`, and `roundRect`; ellipse
   coverage spans square explicit paint, wide theme-reference paint, and tall rendering through a
   non-identity group transform; donut coverage adds the `0..50000` adjustment bounds, the `25000`
-  default, a representative `32000` hole, and grouped/aspect-ratio variants;
+  default, a representative `32000` hole, and grouped/aspect-ratio variants; omitted `bevelT@w`,
+  `bevelT@h`, and `bevelT@prst` use the DrawingML defaults of 76200 EMU per dimension and `circle`
+  for the native-verified rect/roundRect/ellipse rows;
 - picture lane: rectangular, stretch-filled pictures with no `a:srcRect`, or nonnegative source
   crops whose remaining horizontal and vertical extents are both positive;
 - `orthographicFront`, no camera rotation, `twoPt:t` or `threePt:t` lighting, with either no light
@@ -636,7 +638,10 @@ black/white lighting so the source pixels stay visible. The supported implicit `
 response uses its native-validated edge direction and a lower material intensity than opaque solid
 shapes; the bevel geometry remains shared. Solid highlights keep their common material mapping,
 while dark-face attenuation is interpolated across the native square, wide, and tall matrices so a
-wide ellipse or donut does not become disproportionately dark.
+wide ellipse or donut does not become disproportionately dark. The native 6 pt square-rectangle
+row has its own small-bevel shadow anchor; it does not alter the established 10 pt donut response.
+A six-slide matrix pairs each omitted/default encoding with an explicit equivalent, and the local
+gate requires both PowerPoint and renderer raster pairs to remain byte-identical.
 
 The asynchronous texture work is serialized per slide, capped at 262,144 pixels per texture, cached
 with the render context, and tied to slide abort and blob-URL cleanup. If Canvas, decoding, scale, or

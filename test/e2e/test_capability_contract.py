@@ -257,6 +257,15 @@ def test_tracked_capability_contract_is_valid():
 
     validate_acceptance_history(registry, history)
     assert len(registry.capabilities) == 14
+    top_bevel = registry.by_id()["drawingml.shape.3d.top-bevel-contour"]
+    assert top_bevel.scope["bevelPresetEncoding"] == (
+        "explicit-circle",
+        "implicit-circle-default",
+    )
+    assert top_bevel.scope["bevelDimensionEncoding"] == (
+        "explicit-positive",
+        "implicit-76200-emu-per-axis",
+    )
 
 
 def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path: Path):
