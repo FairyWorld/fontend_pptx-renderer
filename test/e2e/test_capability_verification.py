@@ -193,7 +193,7 @@ def camera_report(
         "shadowRingOuterRatio": 0.016,
         "shadowBackgroundLevel": 252.0,
         "minimumReferenceShadowDensity": 0.25,
-        "shadowEnergyRatio": 0.18,
+        "shadowEnergyRatio": 0.70,
         "shadowDirectionCosine": 0.95,
     }
     text_thresholds = {
@@ -658,6 +658,23 @@ def test_rejects_inconsistent_camera_shadow_or_picture_metrics(tmp_path: Path):
             baseline_reports=[plane_baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             camera_report=inconsistent_shadow,
+        )
+
+    materially_weak_shadow = camera_report(plane, repo)
+    materially_weak_shadow["caseResults"][0]["slides"][0]["metrics"].update(
+        shadowEnergyRatio=0.5,
+        shadowPassed=True,
+        passed=True,
+    )
+    with pytest.raises(CapabilityVerificationError, match="shadow metrics are inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [plane],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[plane_baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=materially_weak_shadow,
         )
 
     undetected_shadow = camera_report(plane, repo)

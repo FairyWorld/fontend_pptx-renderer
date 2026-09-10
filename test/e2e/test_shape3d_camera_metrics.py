@@ -50,9 +50,13 @@ def _shadowed_plane_specimen(
     points = np.asarray([(round(x * width), round(y * height)) for x, y in corners], np.int32)
     mask = np.zeros((height, width), dtype=np.uint8)
     cv2.fillConvexPoly(mask, points, 255)
+    shift_y = max(1, round(height / 36))
+    sigma = max(1.0, height / 45)
     shifted = np.zeros_like(mask)
-    shifted[5:] = mask[:-5]
-    shadow = cv2.GaussianBlur(shifted, (0, 0), sigmaX=4, sigmaY=4).astype(np.float64) / 255
+    shifted[shift_y:] = mask[:-shift_y]
+    shadow = (
+        cv2.GaussianBlur(shifted, (0, 0), sigmaX=sigma, sigmaY=sigma).astype(np.float64) / 255
+    )
     background = np.full_like(image, 255, dtype=np.float64)
     background -= shadow[..., None] * 80
     background[mask > 0] = image[mask > 0]
@@ -176,6 +180,20 @@ def test_camera_metric_requires_native_shadow_energy_outside_the_projected_plane
     assert missing["shadowEnergyRatio"] < present["thresholds"]["shadowEnergyRatio"]
     assert missing["shadowPassed"] is False
     assert missing["passed"] is False
+
+
+def test_camera_metric_rejects_a_visible_but_materially_weaker_shadow():
+    corners = ((0.39, 0.28), (0.61, 0.28), (0.79, 0.82), (0.21, 0.82))
+    reference = _shadowed_plane_specimen(600, 360, corners)
+    full_shadow = _shadowed_plane_specimen(300, 180, corners)
+    flat = _plane_specimen(300, 180, corners).astype(np.float64)
+    weak_shadow = np.rint(flat * 0.55 + full_shadow.astype(np.float64) * 0.45).astype(np.uint8)
+
+    metrics = compute_camera_plane_metrics(reference, weak_shadow, shadow_required=True)
+
+    assert 0.18 < metrics["shadowEnergyRatio"] < 0.70
+    assert metrics["shadowPassed"] is False
+    assert metrics["passed"] is False
 
 
 def test_picture_camera_metric_rectifies_projection_and_rejects_wrong_source_crop():

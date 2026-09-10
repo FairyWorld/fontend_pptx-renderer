@@ -669,7 +669,9 @@ nonnegative, and leave positive visible width and height. All three modalities e
 rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion color,
 material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
 its resolved `outerShdw` is applied to the visible projected polygon with a filter region covering
-the projected four-corner bounds. Live-text rows omit the entire shape style.
+the projected four-corner bounds. Blur and distance follow the plane's measured horizontal
+projection scale, and the camera-local gate requires at least `0.70` of measurable native shadow
+energy. Live-text rows omit the entire shape style.
 
 This plane projection uses small independent SVG math rather than a mesh engine: longitude,
 latitude, and revolution rotations are followed by orthographic or perspective division. OOXML

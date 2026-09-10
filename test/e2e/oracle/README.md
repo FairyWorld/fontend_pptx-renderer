@@ -265,7 +265,8 @@ native reports. It binds the exact source, ground truth, revision, and per-slide
 rows use normalized four-corner geometry and three material color bands, requiring corner score
 `0.98`, color score `0.97`, and, for measurable gradients, range ratio `0.65` and direction cosine
 `0.95`. Exact source-required outer shadows additionally require measurable native shadow evidence,
-symmetric candidate/reference energy ratio `0.18`, and direction cosine `0.95`. Editable-text rows
+symmetric candidate/reference energy ratio `0.70`, and direction cosine `0.95`; this makes a
+visible but materially weaker shadow fail the gate. Editable-text rows
 use a `0.25%` resolution-normalized raster tolerance and require bidirectional foreground F1 `0.90`,
 tolerant projected-bounds score `0.98`, and grayscale ink-density retention `0.90`; raw IoU and raw
 bounds remain diagnostic. Picture rows are inverse-projected to `384×384` and require corner score

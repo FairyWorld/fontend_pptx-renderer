@@ -357,7 +357,8 @@ from renderer DOM bounds: normalized corner score must be at least `0.98`, mater
 score at least `0.97`, and a measurable native gradient requires at least `0.65` range ratio and
 `0.95` direction cosine. When source OOXML selects the exact verified theme outer shadow, the native
 reference must expose enough external shadow energy to be measurable; the candidate then requires
-at least `0.18` symmetric energy ratio and `0.95` direction cosine. Live-text rows use a
+at least `0.70` symmetric energy ratio and `0.95` direction cosine. This rejects a visible but
+materially weaker shadow instead of treating mere presence as fidelity. Live-text rows use a
 resolution-normalized raster tolerance of `0.25%`, then require bidirectional foreground F1 `0.90`,
 tolerant projected-bounds score `0.98`, and grayscale ink-density retention `0.90`. Picture rows are
 inverse-projected to `384×384` and require corner score `0.98`, rectified color score `0.95`, and

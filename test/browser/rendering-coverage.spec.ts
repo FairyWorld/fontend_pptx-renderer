@@ -488,6 +488,7 @@ test('bounded camera planes project in a browser and preserve text opt-out and g
     ) as SVGGraphicsElement;
     const shadowedBounds = shadowedProjected.getBBox();
     const shadowFilter = shadowed.querySelector('filter[id^="shape-shadow-"]')!;
+    const shadowPrimitive = shadowFilter.querySelector('feDropShadow');
     const shadowFilterX = Number(shadowFilter.getAttribute('x'));
     const shadowFilterY = Number(shadowFilter.getAttribute('y'));
     const shadowFilterRight = shadowFilterX + Number(shadowFilter.getAttribute('width'));
@@ -505,6 +506,10 @@ test('bounded camera planes project in a browser and preserve text opt-out and g
       gradientInterpolation: gradient?.getAttribute('color-interpolation'),
       shadowedProjectedFilter: shadowedProjected.getAttribute('filter'),
       shadowedBaseFilter: shadowed.querySelector('svg > path')?.getAttribute('filter'),
+      shadowStdDeviation: shadowPrimitive?.getAttribute('stdDeviation'),
+      shadowDx: shadowPrimitive?.getAttribute('dx'),
+      shadowDy: shadowPrimitive?.getAttribute('dy'),
+      shadowColorInterpolation: shadowFilter.getAttribute('color-interpolation-filters'),
       shadowFilterCoversProjection:
         shadowFilterX < shadowedBounds.x &&
         shadowFilterY < shadowedBounds.y &&
@@ -532,6 +537,10 @@ test('bounded camera planes project in a browser and preserve text opt-out and g
   expect(result.gradientInterpolation).toBe('linearRGB');
   expect(result.shadowedProjectedFilter).toMatch(/^url\(#shape-shadow-/);
   expect(result.shadowedBaseFilter).toBeNull();
+  expect(result.shadowStdDeviation).toBe('3.74');
+  expect(result.shadowDx).toBe('0.0');
+  expect(result.shadowDy).toBe('4.3');
+  expect(result.shadowColorInterpolation).toBe('sRGB');
   expect(result.shadowFilterCoversProjection).toBe(true);
   expect(result.textOptOutProjected).toBe(false);
   expect(result.textOptOutBaseHidden).toBe(false);

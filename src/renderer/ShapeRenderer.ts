@@ -448,6 +448,7 @@ function applySvgDropShadowFilter(
     blur: number;
     color: { r: number; g: number; b: number };
     opacity: number;
+    colorInterpolation?: 'linearRGB' | 'sRGB';
   },
 ): void {
   const filterId = `shape-shadow-${++gradientIdCounter}`;
@@ -457,6 +458,9 @@ function applySvgDropShadowFilter(
   const boundsY = bounds.y ?? 0;
   filter.setAttribute('id', filterId);
   filter.setAttribute('filterUnits', 'userSpaceOnUse');
+  if (shadow.colorInterpolation) {
+    filter.setAttribute('color-interpolation-filters', shadow.colorInterpolation);
+  }
   filter.setAttribute('x', String(boundsX - margin));
   filter.setAttribute('y', String(boundsY - margin));
   filter.setAttribute('width', String(bounds.w + margin * 2));
@@ -3255,8 +3259,21 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       const dirDeg = dir / 60000;
       const distPx = emuToPx(dist);
       const blurPx = emuToPx(blurRad);
-      const offsetX = distPx * Math.cos((dirDeg * Math.PI) / 180);
-      const offsetY = distPx * Math.sin((dirDeg * Math.PI) / 180);
+      // The projected replacement path is emitted directly in camera-space coordinates while the
+      // OOXML effect lengths are still expressed for the source plane. Carry the measured
+      // horizontal projection scale into blur and distance; otherwise the native-oracle shadow is
+      // visibly underpowered after the plane widens.
+      const cameraShadowScale =
+        shape3dPlan?.mode === 'camera-projected-plane' && outerShadowBounds
+          ? Math.min(4, Math.max(1, outerShadowBounds.w / Math.max(shape3dPlan.bounds.width, 1)))
+          : 1;
+      const cameraShadowFilterOptions =
+        shape3dPlan?.mode === 'camera-projected-plane'
+          ? ({ colorInterpolation: 'sRGB' } as const)
+          : {};
+      const svgBlurPx = blurPx * cameraShadowScale;
+      const offsetX = distPx * cameraShadowScale * Math.cos((dirDeg * Math.PI) / 180);
+      const offsetY = distPx * cameraShadowScale * Math.sin((dirDeg * Math.PI) / 180);
 
       // Resolve shadow color
       let shadowColor = 'rgba(0,0,0,0.4)';
@@ -3335,9 +3352,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             applySvgDropShadowFilter(mainSvgNs, mainDefs, outerShadowPath, outerShadowBounds, {
               dx: bsX,
               dy: bsY,
-              blur: effectiveBlur,
+              blur: effectiveBlur * cameraShadowScale,
               color: shadowRgb,
               opacity: effectiveAlpha,
+              ...cameraShadowFilterOptions,
             });
           } else {
             wrapper.style.boxShadow = `${bsX.toFixed(1)}px ${bsY.toFixed(1)}px ${effectiveBlur.toFixed(1)}px ${spread.toFixed(1)}px ${attenuatedColor}`;
@@ -3348,9 +3366,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           applySvgDropShadowFilter(mainSvgNs, mainDefs, outerShadowPath, outerShadowBounds, {
             dx: offsetX,
             dy: offsetY,
-            blur: blurPx,
+            blur: svgBlurPx,
             color: shadowRgb,
             opacity: shdAlpha,
+            ...cameraShadowFilterOptions,
           });
         } else {
           appendCssFilter(

@@ -3936,6 +3936,7 @@ describe('ShapeRenderer', () => {
     expect(path?.getAttribute('filter')).toContain('url(#shape-shadow-');
     expect(el.innerHTML).toContain('<filter');
     expect(el.innerHTML).toContain('stdDeviation="2.10"');
+    expect(el.querySelector('filter')?.getAttribute('color-interpolation-filters')).toBeNull();
   });
 
   it('applies inner shadows to non-line SVG paths without blurring text (xcloud-solution slide 5)', () => {
@@ -6874,7 +6875,12 @@ describe('ShapeRenderer', () => {
 
     expect(projected?.getAttribute('filter')).toMatch(/^url\(#shape-shadow-/);
     expect(basePath?.getAttribute('filter')).toBeNull();
-    expect(shadowFilter?.querySelector('feDropShadow')).toBeTruthy();
+    const dropShadow = shadowFilter?.querySelector('feDropShadow');
+    expect(dropShadow).toBeTruthy();
+    expect(dropShadow?.getAttribute('dx')).toBe('0.0');
+    expect(dropShadow?.getAttribute('dy')).toBe('4.3');
+    expect(dropShadow?.getAttribute('stdDeviation')).toBe('3.74');
+    expect(shadowFilter?.getAttribute('color-interpolation-filters')).toBe('sRGB');
     expect(filterX).toBeLessThan(Math.min(...projectedX));
     expect(filterY).toBeLessThan(Math.min(...projectedY));
     expect(filterRight).toBeGreaterThan(Math.max(...projectedX));

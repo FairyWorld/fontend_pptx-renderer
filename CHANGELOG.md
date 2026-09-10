@@ -65,7 +65,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   values outside the accepted matrix retain the ordinary flat path with a diagnostic reason.
 - Preserve the scene-only solid camera row's theme `effectRef=2` outer shadow on the visible
   projected polygon, with a filter region derived from the projected four-corner bounds so wide and
-  tall planes are not clipped back to their pre-projection rectangle.
+  tall planes are not clipped back to their pre-projection rectangle. Scale its blur and distance
+  with the measured horizontal camera projection, use sRGB filter interpolation for this bounded
+  tuple, and require at least `0.70` of measurable native shadow energy in the camera-local gate.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
   `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures with a
   silhouette-aware interior

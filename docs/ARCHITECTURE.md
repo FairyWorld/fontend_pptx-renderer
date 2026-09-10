@@ -277,8 +277,10 @@ projected-plane scales. The renderer emits one replacement SVG path and hides th
 path only after that replacement exists. Perspective solid rows receive a vertical `linearRGB`
 material field; identity and rotated orthographic controls use their native-observed flat material
 responses. The scene-only solid row's theme `effectRef=2` outer shadow is transferred from the
-hidden source path to this projected path; its SVG filter uses the projected four-corner bounds to
-avoid clipping overflow. For the exact text tuples, `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
+hidden source path to this projected path. Its SVG filter uses the projected four-corner bounds to
+avoid clipping overflow, scales blur and distance by the plane's measured horizontal projection,
+and uses sRGB filter interpolation for the native-verified camera tuple. For the exact text tuples,
+`projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
 homography and applies it after text layout, while preserving the text DOM. The picture path applies
 the same homography to the existing crop-clipping stage, preserving the image pipeline and its
 source-crop semantics. This is independent planar math and does not introduce a mesh or WebGL
