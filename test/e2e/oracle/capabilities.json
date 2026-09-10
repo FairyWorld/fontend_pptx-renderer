@@ -82,6 +82,49 @@
       "issueUrls": []
     },
     {
+      "id": "drawingml.shape.3d.bottom-bevel-front-material",
+      "component": "shape",
+      "renderMode": "native",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "bevelB"
+        }
+      ],
+      "scope": {
+        "backdrop": ["absent"],
+        "bevelBottomPresets": ["relaxedInset", "circle"],
+        "bevelDimensionEncoding": ["implicit-76200-emu-per-axis", "explicit-76200-emu-per-axis"],
+        "camera": ["orthographicFront"],
+        "cameraFieldOfView": ["absent"],
+        "cameraRotation": ["absent"],
+        "cameraZoom": ["absent"],
+        "contour": ["absent-or-zero"],
+        "extrusionColor": ["absent"],
+        "extrusionHeight": ["absent-or-zero"],
+        "frontFaceResponse": ["dkEdge:#4472C4-to-#4676CB", "implicit-material:#4472C4-to-#4B7BD0"],
+        "geometry": ["rect"],
+        "light": ["threePt:t:rotation-absent", "threePt:t:lat0-lon0-rev50"],
+        "metricNegativeControls": ["restore-source-flat-fill"],
+        "nodeContainer": ["standalone-slide-non-placeholder"],
+        "presetMaterial": ["dkEdge", "absent-implicit-material"],
+        "rendering": ["uniform-front-face-without-invented-bottom-rim"],
+        "shapeAspectRatio": ["2:1-wide", "1:1-square", "3.2:5.2-tall"],
+        "shapeFill": ["explicit-opaque-srgb-4472C4"],
+        "shapeStroke": ["noFill"],
+        "shapeText": ["absent-or-empty", "single-centered-20pt-bold-white-live-run"],
+        "shapeTransform": ["rotation-0", "flipH-false", "flipV-false"],
+        "transparentFill": ["5pct-overlay-remains-diagnostic-flat-fallback-native-delta-at-or-below-one-rgb-level"],
+        "zPosition": ["absent-or-zero"]
+      },
+      "fallback": "Keep the existing flat two-dimensional shape and report the first unsupported camera, light, geometry, aspect, parent container, paint, text-body, bevel, material, contour, depth, or effect reason outside the verified front-face tuple.",
+      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/Shape3D.ts", "src/renderer/GroupRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/SlideRenderer.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_verification.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/shape3d_camera_metrics.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_shape3d_camera_metrics.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "camera-local", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
+      "issueUrls": []
+    },
+    {
       "id": "drawingml.shape.3d.camera-projected-plane",
       "component": "shape",
       "renderMode": "native",
@@ -215,6 +258,7 @@
         "cameraRotation": ["absent"],
         "coexistingEffects": ["outerShdw"],
         "contour": ["absent-or-zero", "positive-with-resolvable-color"],
+        "donutShadowGate": ["mean-negative-energy-overshoot-lte-1.05", "p05-amplitude-overshoot-lte-1.01"],
         "extrusionColor": ["absent"],
         "extrusionHeight": [0],
         "lightDirection": ["t"],

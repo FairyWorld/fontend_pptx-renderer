@@ -37,6 +37,9 @@ export interface RenderContext {
   chartInstances?: Set<EChartsType>;
   /** Fill node from parent group's grpSpPr, used to resolve `a:grpFill` in children. */
   groupFillNode?: SafeXmlNode;
+  /** Template provenance and group depth keep narrowly verified renderer lanes from overclaiming. */
+  nodeOrigin?: 'slide' | 'layout' | 'master';
+  groupDepth?: number;
   /** Connected root used for hidden text measurement while slide nodes are still detached. */
   measurementRoot?: HTMLElement;
   /** Template rendering skips placeholder descendants inside groups as well as top-level shapes. */
@@ -100,6 +103,8 @@ export function createRenderContext(
     masterPath,
     mediaUrlCache: mediaUrlCache ?? new Map(),
     colorCache: new Map(),
+    nodeOrigin: 'slide',
+    groupDepth: 0,
     usedEmbeddedFontFamilies: new Set(),
     pdfjs,
     signal,

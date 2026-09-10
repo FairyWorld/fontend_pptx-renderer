@@ -66,6 +66,19 @@ const perspectiveRightPictureCameraScene = `
     <a:lightRig rig="threePt" dir="t"/>
   </a:scene3d>`;
 
+const bottomBevelFrontScene = `
+  <a:scene3d>
+    <a:camera prst="orthographicFront"/>
+    <a:lightRig rig="threePt" dir="t">
+      <a:rot lat="0" lon="0" rev="3000000"/>
+    </a:lightRig>
+  </a:scene3d>`;
+
+const bottomRelaxedInsetDkEdge = `
+  <a:sp3d prstMaterial="dkEdge">
+    <a:bevelB prst="relaxedInset"/>
+  </a:sp3d>`;
+
 const originalImageDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
 
 afterEach(() => {
@@ -135,7 +148,7 @@ describe('buildStaticShape3DPlan', () => {
     expect(solidBevelShadowStrength(200, 200, 'rect', 8)).toBeCloseTo(0.7, 5);
     expect(solidBevelShadowStrength(200, 200, 'rect', 40 / 3)).toBeCloseTo(0.58, 5);
     expect(solidBevelShadowStrength(200, 200, 'roundrect', 8)).toBeCloseTo(0.58, 5);
-    // oracle-pypptx-shape3d-0012 slides 1/3: the generic 0.58 response makes the
+    // oracle-pypptx-shape3d-0012 slides 0/2: the generic 0.58 response makes the
     // square donut dark band 1.01-1.02x stronger than PowerPoint.
     expect(solidBevelShadowStrength(200, 200, 'donut', 8)).toBeCloseTo(0.572, 5);
   });
@@ -143,7 +156,7 @@ describe('buildStaticShape3DPlan', () => {
   it('uses the native-backed weaker shadow response for wide non-rounded surfaces', () => {
     expect(solidBevelShadowStrength(500, 200, 'rect', 40 / 3)).toBeCloseTo(0.415, 5);
     expect(solidBevelShadowStrength(500, 200, 'ellipse', 40 / 3)).toBeCloseTo(0.415, 5);
-    expect(solidBevelShadowStrength(500, 200, 'donut', 40 / 3)).toBeCloseTo(0.415, 5);
+    expect(solidBevelShadowStrength(500, 200, 'donut', 40 / 3)).toBeCloseTo(0.37, 5);
     expect(solidBevelShadowStrength(500, 200, 'roundrect', 8)).toBeCloseTo(0.45, 5);
   });
 
@@ -608,6 +621,160 @@ describe('buildStaticShape3DPlan', () => {
   });
 
   it.each([
+    [
+      'dkEdge relaxedInset with live text',
+      bottomBevelFrontScene,
+      bottomRelaxedInsetDkEdge,
+      576,
+      288,
+      true,
+      '#4676cb',
+      'dkEdge',
+    ],
+    [
+      'implicit material with explicit default dimensions',
+      bottomBevelFrontScene,
+      '<a:sp3d><a:bevelB w="76200" h="76200" prst="relaxedInset"/></a:sp3d>',
+      403.2,
+      403.2,
+      false,
+      '#4b7bd0',
+      'implicit',
+    ],
+    [
+      'dkEdge circle tall neighbor without light rotation',
+      '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>',
+      '<a:sp3d prstMaterial="dkEdge"><a:bevelB prst="circle"/></a:sp3d>',
+      307.2,
+      499.2,
+      false,
+      '#4676cb',
+      'dkEdge',
+    ],
+  ])(
+    'builds the native-backed bottom-bevel front material plan for %s',
+    (_label, scene, shape, width, height, hasVisibleText, color, material) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(scene, shape),
+        {
+          nodeType: 'shape',
+          presetGeometry: 'rect',
+          width,
+          height,
+          paintKind: 'solid',
+          baseFill: '#4472C4',
+          hasVisibleStroke: false,
+          hasVisibleText,
+          hasStyleReference: true,
+          container: 'standalone-slide',
+          textPlane: hasVisibleText
+            ? {
+                anchor: 'ctr',
+                autofit: 'none',
+              }
+            : undefined,
+        },
+        createMockRenderContext(),
+      );
+
+      expect(plan).toMatchObject({
+        mode: 'camera-projected-plane',
+        camera: { kind: 'orthographic', preset: 'orthographicFront' },
+        fill: { top: color, bottom: color },
+        frontMaterial: material,
+      });
+    },
+  );
+
+  it.each([
+    [
+      'transparent solid paint',
+      bottomBevelFrontScene,
+      bottomRelaxedInsetDkEdge,
+      { baseFill: undefined },
+      'paint-kind',
+    ],
+    [
+      'unverified source color',
+      bottomBevelFrontScene,
+      bottomRelaxedInsetDkEdge,
+      { baseFill: '#2F75B5' },
+      'paint-value',
+    ],
+    [
+      'unverified aspect ratio',
+      bottomBevelFrontScene,
+      bottomRelaxedInsetDkEdge,
+      { width: 450, height: 300 },
+      'bottom-bevel',
+    ],
+    [
+      'non-default bevel dimensions',
+      bottomBevelFrontScene,
+      '<a:sp3d prstMaterial="dkEdge"><a:bevelB w="152400" h="76200" prst="relaxedInset"/></a:sp3d>',
+      {},
+      'bottom-bevel',
+    ],
+    [
+      'different preset material',
+      bottomBevelFrontScene,
+      '<a:sp3d prstMaterial="metal"><a:bevelB prst="relaxedInset"/></a:sp3d>',
+      {},
+      'preset-material',
+    ],
+    [
+      'different light rotation',
+      '<a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"><a:rot lat="0" lon="0" rev="2940000"/></a:lightRig></a:scene3d>',
+      bottomRelaxedInsetDkEdge,
+      {},
+      'light-rotation',
+    ],
+    [
+      'different text body tuple',
+      bottomBevelFrontScene,
+      bottomRelaxedInsetDkEdge,
+      { hasVisibleText: true, textPlane: { wrap: 'square', anchor: 'ctr', autofit: 'none' } },
+      'text-body-properties',
+    ],
+    [
+      'group parent',
+      bottomBevelFrontScene,
+      bottomRelaxedInsetDkEdge,
+      { container: 'group' },
+      'parent-container',
+    ],
+    [
+      'placeholder parent',
+      bottomBevelFrontScene,
+      bottomRelaxedInsetDkEdge,
+      { container: 'placeholder' },
+      'parent-container',
+    ],
+  ])(
+    'keeps %s outside the bottom-bevel front material slice',
+    (_label, scene, shape, targetPatch, reason) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(scene, shape),
+        {
+          nodeType: 'shape',
+          presetGeometry: 'rect',
+          width: 576,
+          height: 288,
+          paintKind: 'solid',
+          baseFill: '#4472C4',
+          hasVisibleStroke: false,
+          hasVisibleText: false,
+          container: 'standalone-slide',
+          ...targetPatch,
+        },
+        createMockRenderContext(),
+      );
+
+      expect(plan).toEqual({ mode: 'flat', reason });
+    },
+  );
+
+  it.each([
     ['visible text', { hasVisibleText: true }, 'visible-text'],
     ['visible stroke', { hasVisibleStroke: true }, 'visible-stroke'],
     ['shape rotation', { rotation: 1 }, 'shape-transform'],
@@ -719,7 +886,7 @@ describe('buildStaticShape3DPlan', () => {
       faceColor: '#327ec4',
       bevel: { preset: 'circle' },
       contour: { color: '#FFFFFF' },
-      light: { rig: 'threePt', direction: 't' },
+      light: { rig: 'threePt', direction: 't', azimuth: 350 },
     });
     if (plan.mode !== 'orthographic-top-bevel') throw new Error('expected supported plan');
     expect(plan.bevel.width).toBeCloseTo(13.3333, 3);
@@ -909,10 +1076,10 @@ describe('buildStaticShape3DPlan', () => {
   });
 
   it.each([
-    [200, 200],
-    [320, 120],
-    [120, 320],
-  ])('builds the bounded ellipse plan at %sx%s', (width, height) => {
+    [200, 200, 330],
+    [320, 120, 350],
+    [120, 320, 350],
+  ])('builds the bounded ellipse plan at %sx%s', (width, height, azimuth) => {
     const plan = buildStaticShape3DPlan(
       parseShape3D(supportedScene, supportedShape),
       {
@@ -931,6 +1098,7 @@ describe('buildStaticShape3DPlan', () => {
       surface: 'shape',
       geometry: 'ellipse',
       bounds: { width, height },
+      light: { azimuth },
     });
   });
 

@@ -6962,6 +6962,67 @@ describe('ShapeRenderer', () => {
     expect(el.textContent).toContain('Keep readable');
   });
 
+  it('renders the native-backed bottom-bevel front material while preserving live text', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="851" name="Bottom bevel front material"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d>
+            <a:camera prst="orthographicFront"/>
+            <a:lightRig rig="threePt" dir="t"><a:rot lat="0" lon="0" rev="3000000"/></a:lightRig>
+          </a:scene3d>
+          <a:sp3d prstMaterial="dkEdge"><a:bevelB prst="relaxedInset"/></a:sp3d>
+        </p:spPr>
+        <p:style>
+          <a:lnRef idx="1"><a:schemeClr val="accent1"/></a:lnRef>
+          <a:fillRef idx="3"><a:schemeClr val="accent1"/></a:fillRef>
+          <a:effectRef idx="2"><a:schemeClr val="accent1"/></a:effectRef>
+          <a:fontRef idx="minor"><a:schemeClr val="lt1"/></a:fontRef>
+        </p:style>
+        <p:txBody>
+          <a:bodyPr anchor="ctr"/><a:lstStyle/>
+          <a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2000" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>底部斜面</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>`;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const projected = el.querySelector('[data-pptx-shape3d-projected-plane="orthographic"]');
+
+    expect(projected?.getAttribute('fill')).toBe('#4676cb');
+    expect(el.querySelector('[data-pptx-shape3d-front-material="dkEdge"]')).toBeTruthy();
+    expect(el.querySelector('svg > path')?.getAttribute('visibility')).toBe('hidden');
+    expect(el.textContent).toContain('底部斜面');
+  });
+
+  it('keeps the native-equivalent transparent bottom-bevel overlay on the flat composition path', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="852" name="Transparent bottom bevel"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="BDC4F0"><a:alpha val="5000"/></a:srgbClr></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"><a:rot lat="0" lon="0" rev="3000000"/></a:lightRig></a:scene3d>
+          <a:sp3d prstMaterial="dkEdge"><a:bevelB prst="relaxedInset"/></a:sp3d>
+        </p:spPr>
+        <p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p><a:r><a:t>运营管理</a:t></a:r></a:p></p:txBody>
+      </p:sp>`;
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+
+    expect(el.querySelector('[data-pptx-shape3d-projected-plane]')).toBeNull();
+    expect(el.querySelector('svg > path')?.getAttribute('fill')).toBe('rgba(189,196,240,0.050)');
+    expect(el.querySelector('svg > path')?.hasAttribute('visibility')).toBe(false);
+    expect(el.textContent).toContain('运营管理');
+  });
+
   it('projects the exact scene-only text plane while preserving live DOM text', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

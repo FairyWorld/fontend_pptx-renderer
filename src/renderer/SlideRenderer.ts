@@ -307,6 +307,7 @@ export function renderSlide(
     if (slide.showMasterSp && ctx.layout.showMasterSp) {
       const masterCtx: RenderContext = {
         ...ctx,
+        nodeOrigin: 'master',
         slide: { ...ctx.slide, rels: ctx.master.rels },
         partPath: ctx.masterPath,
         skipPlaceholderChildren: true,
@@ -331,6 +332,7 @@ export function renderSlide(
     if (slide.showMasterSp) {
       const layoutCtx: RenderContext = {
         ...ctx,
+        nodeOrigin: 'layout',
         slide: { ...ctx.slide, rels: ctx.layout.rels },
         partPath: ctx.layoutPath,
         skipPlaceholderChildren: true,

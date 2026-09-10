@@ -608,7 +608,7 @@ retains both outer and inner contours across square, wide, tall, grouped, and pi
 Other presets retain the handwritten implementation until their own layering, adjustment, and
 oracle gates pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
 
-### Static DrawingML 3D — Bounded Top Bevel and Camera Plane
+### Static DrawingML 3D — Bounded Top Bevel, Camera Plane, and Bottom Front Material
 
 The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
 parsed observations in serialized model output. A native-oracle-backed static subset renders an
@@ -637,10 +637,15 @@ face edges. Shape textures retain the resolved material hue, while picture textu
 black/white lighting so the source pixels stay visible. The supported implicit `twoPt:t` picture
 response uses its native-validated edge direction and a lower material intensity than opaque solid
 shapes; the bevel geometry remains shared. Solid highlights keep their common material mapping,
-while dark-face attenuation is interpolated across the native square, wide, and tall matrices. A
-separate wide-surface anchor keeps 2.5:1-and-wider rect, ellipse, and donut shadows within 5% of the
-native amplitude; `roundRect` retains its independently measured response. The native 6 pt
-square-rectangle row and the 10 pt tall-rectangle row also have bounded shadow anchors.
+while dark-face attenuation is interpolated across the native square, wide, and tall matrices.
+Square ellipse/donut rows use the native-fitted effective 330° light bearing; other verified
+three-point rows retain 350°, with a smooth near-square transition for those curved presets. Wide
+rect/ellipse rows keep the native-backed `0.415` dark-face response, while the wide donut uses
+`0.370`: this trades a small peak-amplitude undershoot for mean negative shadow energy of `0.997×`
+native instead of the previous `1.108×`. `roundRect` retains its independently measured response.
+The native 6 pt square-rectangle row and the 10 pt tall-rectangle row also have bounded shadow
+anchors. The bevel-local gate checks both peak shadow amplitude and aggregate shadow energy, so a
+broad dark band cannot pass merely because its 5th-percentile amplitude is correct.
 A six-slide matrix pairs each omitted/default encoding with an explicit equivalent, and the local
 gate requires both PowerPoint and renderer raster pairs to remain byte-identical.
 
@@ -682,17 +687,32 @@ projection scale; orthographic rows apply their native-calibrated `0.95` footpri
 camera-local gate requires at least `0.70` of measurable native shadow energy. Live-text rows omit
 the entire shape style.
 
+The separate bottom-bevel front-material lane covers a native-verified edge-on case without
+inventing depth. It requires a standalone, non-placeholder `rect` with an explicit opaque
+`#4472C4` fill and no visible outline; `orthographicFront`; `threePt:t` with no light rotation or
+exactly `lat=0`, `lon=0`, `rev=50°`; zero depth, contour, and `z`; a default-size 76200-EMU
+`relaxedInset` or `circle` `bevelB`; and either `dkEdge` or an absent material. The three verified
+aspect ratios are 2:1, 1:1, and 3.2:5.2. The renderer replaces only the flat SVG face with the
+native uniform response (`#4676CB` for `dkEdge`, `#4B7BD0` for absent material) and keeps live text
+outside that SVG group. Because PowerPoint shows no visible bottom rim in this view, the renderer
+does not draw one. Group, placeholder, layout, and master parents remain diagnostic flat fallbacks.
+A 5% alpha overlay remains on the ordinary transparent composition path: its exact native 3D versus
+flat control differs by at most one 8-bit RGB level, which is insufficient evidence for an opaque
+material replacement.
+
 This plane projection uses small independent SVG math rather than a mesh engine: longitude,
 latitude, and revolution rotations are followed by orthographic or perspective division. OOXML
 provides the camera properties; preset viewport scale and material response are pinned to native
 PowerPoint evidence. A dedicated gate compares normalized four-corner geometry, three material
 color bands, gradient range, gradient direction, and source-required external shadow energy and
-direction for solid planes. Schema v4 keeps raw foreground IoU and bounds for live-text diagnosis,
+direction for solid planes. Schema v5 keeps raw foreground IoU and bounds for live-text diagnosis,
 then gates on bidirectional foreground F1 and bounds after a resolution-normalized `0.25%` raster
 tolerance, plus grayscale ink-density retention. It inverse-projects picture planes to a fixed
 rectangle and gates their content with color similarity and tolerant edge F1, so a correct outer
 quadrilateral cannot hide a wrong crop. The tolerance absorbs font and image rasterization
 differences while preserving semantic failures against the same hashed native rasters.
+For bottom-front rows it additionally requires mean RGB error across three interior bands to stay
+at or below `1.0`, then restores the source flat `#4472C4` fill and requires that mutation to fail.
 For every measurable shadow row, the report erases the candidate's exterior shadow and requires the
 shadow metric to reject that mutation. Every picture row likewise injects a 12% left crop and
 rescale after rectification and requires the content metric to reject it. A gate therefore proves
@@ -705,10 +725,10 @@ gradient/pattern/group/image-filled shapes, other text-body/style combinations, 
 PowerPoint material simulation.
 Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
 claim remains limited to native-verified `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular
-pictures. Star, freeform, rotation, glow, and bottom-`relaxedInset` probes stay in an opt-in ignored
-discovery matrix until their own geometry-aware native gates pass; the bottom-bevel matrix isolates
-material, light rotation, live text, transparency, preset, default encoding, and aspect ratio before
-any runtime implementation is admitted. The original ellipse and donut probes remain preflight
+pictures. Star, freeform, rotation, and glow probes stay in an opt-in ignored discovery matrix until
+their own geometry-aware native gates pass. The eleven-slide bottom-bevel matrix now backs only the
+separately declared uniform-front-material capability above; all other bottom-bevel combinations
+remain discovery evidence. The original ellipse and donut probes remain preflight
 neighbors to their tracked multi-slide matrices.
 
 ### Text — 7-Level Style Inheritance
@@ -884,9 +904,10 @@ Dev pages at `http://127.0.0.1:5173`:
 
 ## What's Not Yet Supported
 
-DrawingML shape/picture 3D outside the bounded circular top-bevel and zero-depth camera-plane tuples
-above retains the flat 2D fallback. This includes other perspective or rotated cameras, nonzero
-extrusion, bottom or non-circular bevels, preset materials, unsupported lighting, tiled pictures,
+DrawingML shape/picture 3D outside the bounded circular top-bevel, zero-depth camera-plane, and
+edge-on bottom-bevel front-material tuples above retains the flat 2D fallback. This includes other
+perspective or rotated cameras, nonzero extrusion, other bottom or non-circular bevels, other preset
+materials, unsupported lighting, tiled pictures,
 and unsupported paint, text, stroke, transform, or effect combinations. True 3D chart
 perspective/depth/surface meshes, Office 2017 embedded 3D
 models, animations/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing

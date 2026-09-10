@@ -56,6 +56,13 @@ The broader `scene3d` selector is candidate discovery only. It does not promote 
 shape: the native capability currently admits only the exact solid-plane and live editable-text
 rows declared in `scope.modalityRows`; all other matches remain residual fallback observations.
 
+The bottom-front capability selects `a:bevelB` as a candidate marker. That element alone does not
+prove support: the registry scope and runtime planner additionally require its direct standalone
+slide rectangle, exact scene/light/depth/material tuple, opaque paint, text-body contract, and
+verified aspect ratio. Group, placeholder, layout, and master provenance is carried in
+`RenderContext` and remains a flat fallback even when the descendant `a:bevelB` matches the broad
+inventory selector.
+
 The broad `drawingml.shape.3d.scene` row deliberately overlaps bounded native rows and remains a
 fallback residual. As a result, inventory still exposes unverified camera, light, or backdrop values
 even when the same package also contains a verified top-bevel or camera-plane candidate. Only a

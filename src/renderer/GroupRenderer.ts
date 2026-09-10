@@ -159,7 +159,7 @@ export function renderGroup(
 
   // Resolve group fill from grpSpPr for children that use a:grpFill
   const grpSpPr = node.source.child('grpSpPr');
-  const childCtx: RenderContext = { ...ctx };
+  const childCtx: RenderContext = { ...ctx, groupDepth: (ctx.groupDepth ?? 0) + 1 };
   if (grpSpPr.exists()) {
     applyGroupEffects(wrapper, node, ctx, grpSpPr);
 

@@ -2609,6 +2609,13 @@ def _build_local_shape3d_cases() -> list[CaseDef]:
         )
         _add_bottom_bevel_probe(
             prs,
+            name="Flat transparent overlay control",
+            apply_3d=False,
+            text="运营管理",
+            transparent_overlay=True,
+        )
+        _add_bottom_bevel_probe(
+            prs,
             name="Bottom relaxedInset without material",
             material=None,
         )
@@ -2638,13 +2645,14 @@ def _build_local_shape3d_cases() -> list[CaseDef]:
     _add(
         "bottom-relaxed-inset-matrix",
         _build_bottom_relaxed_inset_matrix,
-        slide_count=10,
-        assertions={"equivalentSlidePairs": [[1, 2], [1, 6], [1, 7]]},
+        slide_count=11,
+        assertions={"equivalentSlidePairs": [[1, 2], [1, 7], [1, 8]]},
         features=[
             "p:sp.prstGeom=rect",
             "geometry.aspect=square|wide|tall",
             "paint=opaqueSolid|transparentOverlay",
             "text=absent|liveCjk",
+            "semantics=positive|exact-transparent-flat-control",
             "a:scene3d.camera=orthographicFront",
             "a:scene3d.lightRig=threePt:t",
             "a:scene3d.lightRig.rot=implicit|0,0,3000000",

@@ -247,13 +247,15 @@ Solid shapes map light and shadow through material-color lookup tables so highli
 source hue; pictures use relative black/white overlays so their pixels remain visible. The render
 plan carries material intensity separately from bevel geometry. Solid-shape highlights preserve the
 common material response, while shadow attenuation starts with a log-aspect curve and then applies
-native-backed geometry anchors: `0.415` at 2.5:1 for wide rect/ellipse/donut surfaces, the prior
-rounded-rectangle response for `roundRect`, and `0.646` at 0.46875:1 for a 10 pt tall rectangle. A
-separate 6 pt square-rectangle anchor corrects its native dark face, while a `0.572` square-donut
-anchor preserves the native dark-band amplitude without changing the wide or tall endpoints. The
-local metric independently caps candidate/native shadow amplitude at `1.05`, tightened to `1.01`
-for solid donut faces, so a visually over-dark edge cannot pass solely through the wider symmetric
-amplitude budget. Native
+native-backed geometry anchors: `0.415` at 2.5:1 for wide rect/ellipse surfaces, `0.370` for the
+wide donut, the prior rounded-rectangle response for `roundRect`, and `0.646` at 0.46875:1 for a
+10 pt tall rectangle. A separate 6 pt square-rectangle anchor corrects its native dark face, while
+a `0.572` square-donut anchor preserves the native peak amplitude. Square ellipse/donut rows use an
+effective 330° three-point bearing fitted from their native directional fields; non-square verified
+rows retain 350°, with a continuous transition near square. The schema-v6 local metric caps general
+candidate/native shadow amplitude at `1.05`, tightened to `1.01` for solid donut faces, and also
+caps the donut's mean negative shadow energy at `1.05`. This prevents a broad dark band from passing
+solely because its 5th-percentile amplitude is correct. Native
 evidence calibrates the implicit `twoPt:t` picture response
 independently from the solid-shape `threePt:t` response. Texture
 work is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry,
@@ -261,6 +263,19 @@ dimensions, bevel, light, intensity, surface, raster size, and algorithm version
 slide abort signal.
 Failure, insufficient raster scale, or disposal leaves the vector fallback in place and prevents
 late DOM writes or cache repopulation.
+
+The bottom-bevel front-material planner is a separate edge-on lane. It accepts only direct slide
+rectangles that are not placeholders, use explicit opaque `#4472C4` without a visible outline, and
+match the native matrix's 2:1, 1:1, or 3.2:5.2 aspect ratio. Scene requirements are
+`orthographicFront`, zero depth/contour/`z`, and `threePt:t` with absent rotation or exactly
+`lat=0`, `lon=0`, `rev=50°`. Shape requirements are a default-size 76200-EMU `relaxedInset` or
+`circle` bottom bevel and either `dkEdge` or absent preset material. The renderer reuses the
+camera-plane SVG replacement for the uniform front response (`#4676CB` or `#4B7BD0`) and does not
+invent a bottom rim that PowerPoint does not show in this view. `RenderContext.nodeOrigin` and
+`groupDepth` carry parent provenance through slide, layout, master, placeholder, and recursive group
+paths, so a matching child cannot accidentally enter the standalone-only lane. Live text stays in
+its existing overlay. A 5% alpha fill remains on the ordinary composition path because the paired
+native 3D/flat rows differ by at most one RGB level.
 
 The camera-plane plan is a separate zero-depth lane with solid SVG, live DOM text, and live picture
 modalities. All require rectangular geometry with no local rotation or flip, backdrop, nonzero `z`,
@@ -306,14 +321,16 @@ The nineteen-slide native matrix covers identity and rotated orthographic contro
 `a:sp3d`, scene-only implicit depth, square/wide/tall perspective shapes, explicit and theme paint,
 a non-identity group, two square/wide/tall live-text camera tuples, and four live-picture rows with
 absent, horizontal, vertical, and asymmetric source crops. Public solid-paint support remains
-limited to its explicit `#2F75B5` and theme `#4F81BD` rows. The schema-v4 local metric binds the
+limited to its explicit `#2F75B5` and theme `#4F81BD` rows. The schema-v5 local metric binds the
 exact native rasters and checks normalized four-corner geometry, material color, gradient response,
 and required external-shadow evidence for solid planes; resolution-tolerant foreground, bounds, and
 ink retention for live text; and inverse-projected picture color plus tolerant edge fidelity for
-picture planes, in addition to the full-page oracle gate. The report also runs deterministic
-sensitivity mutations against the same rasters: erasing a measurable exterior shadow and applying
-a 12% left crop plus rescale to rectified picture content. The derived gate fails if either mutation
-still passes its target metric.
+picture planes, in addition to the full-page oracle gate. Bottom-front rows add normalized corner
+coverage and three interior material bands with mean RGB error at most `1.0`. The report also runs
+deterministic sensitivity mutations against the same rasters: erasing a measurable exterior shadow,
+applying a 12% left crop plus rescale to rectified picture content, and restoring bottom-front rows
+to the source flat fill. The derived gate fails if any applicable mutation still passes its target
+metric.
 
 The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
 picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent
@@ -321,7 +338,8 @@ cross-slide collisions. Existing wrapper transforms, outer shadows, media owners
 remain in their owning renderers.
 
 Anything outside the registry's bounded tuples stays on the existing flat path with a stable planner reason.
-Other perspective and rotated cameras, nonzero extrusion, other materials/bevels/lights, negative
+Other perspective and rotated cameras, nonzero extrusion, materials/bevels/lights outside the
+verified top-bevel, camera-plane, and bottom-front tuples, negative
 or degenerate picture source crops, gradient/pattern/group/image-filled shapes, tiled pictures,
 chart `view3D`, and Office 2017 `model3d` are separate capability lanes. The raster lighting backend
 can consume arbitrary silhouettes, but support is still constrained by the planner and native

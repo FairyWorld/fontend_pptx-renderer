@@ -2568,6 +2568,16 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             node.textBody?.paragraphs.some((paragraph) =>
               paragraph.runs.some((run) => run.text.trim().length > 0),
             ) ?? false,
+          container:
+            (ctx.groupDepth ?? 0) > 0
+              ? 'group'
+              : ctx.nodeOrigin === 'master'
+                ? 'master'
+                : ctx.nodeOrigin === 'layout'
+                  ? 'layout'
+                  : node.placeholder
+                    ? 'placeholder'
+                    : 'standalone-slide',
           hasStyleReference: styleNode.exists(),
           hasVisibleStroke: path.getAttribute('stroke') !== 'none',
           rotation: node.rotation,

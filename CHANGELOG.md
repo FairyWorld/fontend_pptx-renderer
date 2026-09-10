@@ -25,22 +25,23 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
   omitted/explicit default top-bevel dimensions.
-- Added a schema-v5 bevel-ring fidelity metric and derived capability gate with independent dynamic
+- Added a schema-v6 bevel-ring fidelity metric and derived capability gate with independent dynamic
   range and shadow-amplitude floors, a `1.05` general directional shadow-overshoot ceiling, a
-  native-backed `1.01` ceiling for solid donut faces, plus material-specific solid/picture highlight
-  floors, alongside
+  native-backed `1.01` peak ceiling and `1.05` aggregate shadow-energy ceiling for solid donut
+  faces, plus material-specific solid/picture highlight floors, alongside
   exact native/renderer slide-equivalence assertions for alternate OOXML encodings and an opt-in
   ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, effect-bearing,
-  and bottom-bevel inputs. The bottom-bevel case isolates implicit/explicit `relaxedInset`
+  and bottom-bevel inputs. The eleven-slide bottom-bevel case isolates implicit/explicit `relaxedInset`
   dimensions, material and light rotation, live CJK text, transparency, neighboring presets, and
-  square/wide/tall geometry without widening the supported cohort.
-- Added a schema-v4 camera-plane metric and derived capability gate that bind native raster hashes
+  square/wide/tall geometry, including an exact transparent 3D/flat inverse control.
+- Added a schema-v5 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,
   projected bounds, and ink retention for live text; and rectified picture color/edge fidelity so
-  source-crop errors cannot pass on correct outer geometry alone. The report also erases each
-  measurable shadow and injects a 12% picture crop as mutation controls; promotion fails unless the
-  corresponding local metric detects both faults.
+  source-crop errors cannot pass on correct outer geometry alone. It also verifies the exact
+  bottom-bevel front-material tuple through three interior color bands and a restored-flat-fill
+  mutation. The report erases each measurable shadow and injects a 12% picture crop as the other
+  mutation controls; promotion fails unless each corresponding local metric detects its fault.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -86,14 +87,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   abort, and cleanup behavior. Picture lighting now uses its native-validated `twoPt:t` direction
   and material intensity independently from solid-shape lighting. Solid highlights retain their
   common material mapping while dark-face attenuation is interpolated across the native square,
-  wide, and tall matrices. Wide non-rounded surfaces and the tall-rectangle sentinel now use
-  dedicated native amplitude anchors, eliminating the visible 8.4% shadow overshoot in the wide
-  adjusted-donut row while preserving the independently calibrated wide `roundRect`. Missing
+  wide, and tall matrices. Square ellipse/donut rows use the native-fitted effective 330° bearing;
+  other verified three-point rows retain 350°. Wide non-rounded surfaces and the tall-rectangle
+  sentinel use dedicated native anchors. The wide donut response is now `0.370`, reducing mean
+  negative shadow energy from `1.108×` to `0.997×` native while preserving the independently
+  calibrated wide `roundRect`. Missing
   circular top-bevel preset/width/height attributes now use the
   DrawingML `circle` and 76200 EMU defaults independently. The native 6 pt square-rectangle row has
   a bounded shadow anchor, while square donuts use their own `0.572` response so the default and
-  upper-adjustment rows no longer render a 1-2% stronger dark band. Wide and tall donut anchors stay
-  unchanged. Unmatched 3D tuples stay flat.
+  upper-adjustment rows no longer render a 1-2% stronger peak. Unmatched 3D tuples stay flat.
+- Render the native-verified edge-on bottom-bevel front material for standalone, non-placeholder
+  opaque `#4472C4` rectangles with zero depth, default-size `relaxedInset`/`circle` `bevelB`,
+  `orthographicFront`, bounded `threePt:t` light rotation, and `dkEdge` or implicit material. The
+  face remains uniform (`#4676CB` or `#4B7BD0`) with no invented bottom rim; parent containers and
+  transparent paint retain the diagnostic flat path.
 - Validate ellipse bevels across square explicit paint, wide theme-reference paint, and a tall
   ellipse under a non-identity group transform; all three use the same source-silhouette distance
   field instead of a geometry-specific lighting approximation.

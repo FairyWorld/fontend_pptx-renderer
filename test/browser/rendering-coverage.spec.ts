@@ -552,6 +552,109 @@ test('bounded camera planes project in a browser and preserve text opt-out and g
   });
 });
 
+test('bottom-bevel front material stays bounded to opaque standalone slide shapes', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { parseGroupNode } = await import('/src/model/nodes/GroupNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { renderGroup } = await import('/src/renderer/GroupRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const shapeXml = ({ alpha = false, placeholder = false, text = '' } = {}) => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="31" name="Bottom bevel"/><p:cNvSpPr/><p:nvPr>${
+          placeholder ? '<p:ph type="body"/>' : ''
+        }</p:nvPr></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="${alpha ? 'BDC4F0' : '4472C4'}">${
+            alpha ? '<a:alpha val="5000"/>' : ''
+          }</a:srgbClr></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"><a:rot lat="0" lon="0" rev="3000000"/></a:lightRig></a:scene3d>
+          <a:sp3d prstMaterial="dkEdge"><a:bevelB prst="relaxedInset"/></a:sp3d>
+        </p:spPr>
+        <p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p><a:pPr algn="ctr"/>${
+          text
+            ? `<a:r><a:rPr sz="2000" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>${text}</a:t></a:r>`
+            : ''
+        }</a:p></p:txBody>
+      </p:sp>`;
+    const host = document.createElement('div');
+    host.id = 'bottom-bevel-front-host';
+    host.style.position = 'relative';
+    host.style.width = '1280px';
+    host.style.height = '720px';
+    const opaque = renderShape(
+      parseShapeNode(parseXml(shapeXml({ text: '底部斜面' }))),
+      createMockRenderContext(),
+    );
+    const transparent = renderShape(
+      parseShapeNode(parseXml(shapeXml({ alpha: true, text: '运营管理' }))),
+      createMockRenderContext(),
+    );
+    transparent.style.top = '320px';
+    const placeholder = renderShape(
+      parseShapeNode(parseXml(shapeXml({ placeholder: true }))),
+      createMockRenderContext(),
+    );
+    placeholder.style.left = '620px';
+    const groupXml = `
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="30" name="Bottom group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="2743200"/><a:chOff x="0" y="0"/><a:chExt cx="5486400" cy="2743200"/></a:xfrm></p:grpSpPr>
+        ${shapeXml()}
+      </p:grpSp>`;
+    const grouped = renderGroup(
+      parseGroupNode(parseXml(groupXml)),
+      createMockRenderContext(),
+      (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
+    );
+    grouped.style.left = '620px';
+    grouped.style.top = '320px';
+    host.append(opaque, transparent, placeholder, grouped);
+    document.body.append(host);
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    return {
+      opaqueFill: opaque
+        .querySelector('[data-pptx-shape3d-projected-plane="orthographic"]')
+        ?.getAttribute('fill'),
+      opaqueMaterial: !!opaque.querySelector('[data-pptx-shape3d-front-material="dkEdge"]'),
+      opaqueText: opaque.textContent,
+      transparentProjected: !!transparent.querySelector('[data-pptx-shape3d-projected-plane]'),
+      transparentFill: transparent.querySelector('svg > path')?.getAttribute('fill'),
+      placeholderProjected: !!placeholder.querySelector('[data-pptx-shape3d-projected-plane]'),
+      groupProjected: !!grouped.querySelector('[data-pptx-shape3d-projected-plane]'),
+    };
+  });
+
+  expect(result).toEqual({
+    opaqueFill: '#4676cb',
+    opaqueMaterial: true,
+    opaqueText: expect.stringContaining('底部斜面'),
+    transparentProjected: false,
+    transparentFill: 'rgba(189,196,240,0.050)',
+    placeholderProjected: false,
+    groupProjected: false,
+  });
+  const host = page.locator('#bottom-bevel-front-host');
+  const first = await host.screenshot();
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  const second = await host.screenshot();
+  expect(first.equals(second)).toBe(true);
+});
+
 test('scene-only camera projection preserves live text and rejects styled text planes', async ({
   page,
 }) => {

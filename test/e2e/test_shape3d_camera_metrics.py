@@ -11,11 +11,13 @@ from PIL import Image
 
 from scripts.shape3d_camera_metrics import (
     build_camera_report,
+    compute_bottom_bevel_front_metrics,
     compute_camera_plane_metrics,
     compute_picture_camera_metrics,
     compute_text_camera_metrics,
     extract_camera_shadow_slide_indices,
     extract_camera_slide_indices,
+    extract_bottom_bevel_front_slide_indices,
     extract_picture_camera_slide_indices,
     extract_text_camera_slide_indices,
 )
@@ -156,6 +158,36 @@ def test_camera_metric_does_not_require_a_gradient_for_a_native_flat_control():
 
     assert metrics["gradientRequired"] is False
     assert metrics["passed"] is True
+
+
+def test_bottom_bevel_front_metric_accepts_native_material_color_and_detects_flat_mutation():
+    corners = ((0.28, 0.28), (0.72, 0.28), (0.72, 0.72), (0.28, 0.72))
+    reference = _plane_specimen(600, 360, corners, (70, 118, 203), (70, 118, 203))
+    candidate = _plane_specimen(300, 180, corners, (70, 118, 203), (70, 118, 203))
+
+    metrics = compute_bottom_bevel_front_metrics(reference, candidate)
+
+    assert metrics["passed"] is True
+    assert metrics["cornerScore"] > 0.995
+    assert metrics["meanBandColorError"] < 0.1
+    assert metrics["flatFillSensitivity"]["mutation"] == "restore-source-flat-fill"
+    assert metrics["flatFillSensitivity"]["mutatedPassed"] is False
+    assert metrics["flatFillSensitivity"]["detected"] is True
+
+
+def test_bottom_bevel_front_metric_rejects_flat_fill_and_an_invented_bottom_rim():
+    corners = ((0.28, 0.28), (0.72, 0.28), (0.72, 0.72), (0.28, 0.72))
+    reference = _plane_specimen(600, 360, corners, (70, 118, 203), (70, 118, 203))
+    flat = _plane_specimen(300, 180, corners, (68, 114, 196), (68, 114, 196))
+    rim = _plane_specimen(300, 180, corners, (70, 118, 203), (50, 80, 140))
+
+    flat_metrics = compute_bottom_bevel_front_metrics(reference, flat)
+    rim_metrics = compute_bottom_bevel_front_metrics(reference, rim)
+
+    assert flat_metrics["meanBandColorError"] > flat_metrics["thresholds"]["meanBandColorError"]
+    assert flat_metrics["passed"] is False
+    assert rim_metrics["meanBandColorError"] > rim_metrics["thresholds"]["meanBandColorError"]
+    assert rim_metrics["passed"] is False
 
 
 def test_camera_metric_requires_native_shadow_energy_outside_the_projected_plane():
@@ -406,6 +438,47 @@ def test_extracts_exact_theme_shadow_contract_for_solid_camera_planes(tmp_path):
             target.writestr(name, data)
     assert extract_camera_slide_indices(wrong_theme) == {1}
     assert extract_camera_shadow_slide_indices(wrong_theme) == set()
+
+
+def test_extracts_only_native_backed_bottom_bevel_front_material_rows(tmp_path):
+    source = tmp_path / "bottom-bevel-front.pptx"
+    positive = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="Bottom"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="2743200"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill><a:ln><a:noFill/></a:ln>
+          <a:scene3d><a:camera prst="orthographicFront"/><a:lightRig rig="threePt" dir="t"><a:rot lat="0" lon="0" rev="3000000"/></a:lightRig></a:scene3d>
+          <a:sp3d prstMaterial="dkEdge"><a:bevelB prst="relaxedInset"/></a:sp3d>
+        </p:spPr><p:style><a:effectRef idx="2"><a:schemeClr val="accent1"/></a:effectRef></p:style><p:txBody><a:bodyPr anchor="ctr"/><a:lstStyle/><a:p/></p:txBody></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    implicit_material = positive.replace(' prstMaterial="dkEdge"', '')
+    circle_no_rotation = positive.replace(' prst="relaxedInset"', ' prst="circle"').replace(
+        '<a:rot lat="0" lon="0" rev="3000000"/>', ''
+    )
+    live_text = positive.replace(
+        '<a:p/>',
+        '<a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2000" b="1"><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:rPr><a:t>底部斜面</a:t></a:r></a:p>',
+    )
+    negatives = [
+        positive.replace('<a:srgbClr val="4472C4"/>', '<a:srgbClr val="4472C4"><a:alpha val="5000"/></a:srgbClr>'),
+        positive.replace('prstMaterial="dkEdge"', 'prstMaterial="metal"'),
+        positive.replace('<a:bevelB prst="relaxedInset"/>', '<a:bevelB w="152400" prst="relaxedInset"/>'),
+        positive.replace('prst="relaxedInset"', 'prst="angle"'),
+        positive.replace('rev="3000000"', 'rev="2940000"'),
+        positive.replace('cx="5486400" cy="2743200"', 'cx="4114800" cy="2743200"'),
+        live_text.replace('<a:bodyPr anchor="ctr"/>', '<a:bodyPr wrap="square" anchor="ctr"/>'),
+    ]
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/slides/slide1.xml", positive)
+        archive.writestr("ppt/slides/slide2.xml", implicit_material)
+        archive.writestr("ppt/slides/slide3.xml", circle_no_rotation)
+        archive.writestr("ppt/slides/slide4.xml", live_text)
+        for index, negative in enumerate(negatives, start=5):
+            archive.writestr(f"ppt/slides/slide{index}.xml", negative)
+
+    assert extract_bottom_bevel_front_slide_indices(source) == {0, 1, 2, 3}
 
 
 def test_extracts_only_exact_perspective_right_picture_plane_tuple(tmp_path):

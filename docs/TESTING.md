@@ -255,15 +255,17 @@ the exact tuple in
 `drawingml.shape.3d.top-bevel-contour`; a high aggregate score cannot broaden that registry scope.
 An opt-in eight-case local matrix retains the original ellipse discovery probe and adds adjusted
 donut, adjusted star, concave freeform, rotation, nested non-identity groups, glow interaction, and
-a ten-slide bottom-`relaxedInset` isolation matrix. The bottom-bevel rows compare flat versus full
+an eleven-slide bottom-`relaxedInset` isolation matrix. The bottom-bevel rows compare flat versus full
 scene tuples, implicit versus explicit 76200 EMU dimensions, material and light-rotation opt-outs,
 live CJK text, a 5% alpha overlay, a `circle` neighbor, and square/wide/tall extents. Those cases use
 the `oracle-local-shape3d-*` prefix, write metadata only below the ignored `oracle-runtime` directory,
-and remain discovery evidence until a separately bounded capability and native gate promote them.
+and remain local evidence. Only the exact opaque bottom-front rows are consumed by the separately
+bounded capability and native gate; the other local rows remain discovery evidence.
 For the current macOS PowerPoint oracle, the implicit/explicit dimension rows, the explicit/omitted
-light-rotation rows, and the `relaxedInset`/`circle` rows are byte-identical pairs. The material
-opt-out remains intentionally distinct; this isolates the visible front-face response from an
-invented bottom-edge geometry effect.
+light-rotation rows, and the `relaxedInset`/`circle` rows are byte-identical pairs. A matching
+transparent flat control differs from the 5% alpha 3D row by at most one RGB level. The opaque
+material opt-out remains intentionally distinct; this isolates the visible front-face response
+from an invented bottom-edge geometry effect.
 The CJK text matrix at IDs 0040-0055 covers square/no-wrap behavior, omitted and explicit autofit
 modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, centered text
 inside a parent shape, and square/wide/tall `spAutoFit` growth. IDs 0052-0054 require native
@@ -337,9 +339,11 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_bevel_metrics.py \
 The metric extracts shape bounds, group transforms, ellipse contours, round-rectangle corners, and
 donut inner/outer radii independently from source OOXML, then compares luminance only in the inward
 bevel ring. Unknown silhouettes and rotated shapes fail as unevaluable instead of being scored with
-a rectangular mask. The schema-v5 gate requires a general field score of at least `0.60`, dynamic
+a rectangular mask. The schema-v6 gate requires a general field score of at least `0.60`, dynamic
 range ratio `0.85`, shadow-amplitude ratio `0.85`, and candidate/native shadow overshoot no greater
-than `1.05`; solid donut faces use the tighter native-backed `1.01` ceiling. Solid-shape highlight
+than `1.05`; solid donut faces use the tighter native-backed `1.01` peak ceiling and a `1.05`
+ceiling for mean negative shadow energy. The energy check catches a wider/heavier dark band even
+when its 5th-percentile amplitude is correct. Solid-shape highlight
 amplitude requires `0.80`; picture lighting uses its separately verified `0.70` floor. Verified
 `roundRect` corners also require `0.78`. The symmetric amplitude
 ratios catch large weak or excessive lighting, while the directional ceiling rejects a smaller but
@@ -350,7 +354,7 @@ resolution-limited and remains covered by full-slide and manual gates rather tha
 few pixels. The flat control has no applicable region. This local metric complements the full-page
 SSIM/color-histogram gate; it does not replace it. Each native API slide row fingerprints the exact
 reference and HTML rasters. The metric generator rejects a stale or replaced raster before scoring.
-Case 0017 additionally declares three implicit/explicit slide pairs. Schema v4 requires exact
+Case 0017 additionally declares three implicit/explicit slide pairs. The same report requires exact
 reference-raster equality and exact candidate-raster equality for every pair, so a parser-default
 regression cannot hide behind a high full-slide score.
 It is also sensitive to material-specific lighting: the tracked picture case must retain the native
@@ -368,7 +372,15 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_camera_metrics.py \
   --out test/e2e/reports/capability-loop/shape3d-camera-local-<revision>.json
 ```
 
-This schema-v4 gate derives each applicable modality from source OOXML and binds both raster hashes
+Run the bounded bottom-front capability against its own clean native report:
+
+```bash
+test/e2e/.venv/bin/python test/e2e/scripts/shape3d_camera_metrics.py \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-local-shape3d-0008-bottom-relaxed-inset-matrix.json \
+  --out test/e2e/reports/capability-loop/shape3d-bottom-front-local-<revision>.json
+```
+
+This schema-v5 gate derives each applicable modality from source OOXML and binds both raster hashes
 to the native API report. Solid rows extract the largest saturated four-corner plane independently
 from renderer DOM bounds: normalized corner score must be at least `0.98`, material-band color
 score at least `0.97`, and a measurable native gradient requires at least `0.65` range ratio and
@@ -383,7 +395,9 @@ tolerant edge F1 `0.90`; this makes crop/content errors visible even when the ou
 correct. Raw IoU and raw bounds stay in the report for diagnosis. The verifier recomputes pass
 status and derived ratios from fixed thresholds. It also requires deterministic mutation controls
 to fail: exterior-shadow erasure on every measurable shadow row and a 12% left crop plus rescale on
-every rectified picture row. A corpus row whose local metric cannot detect its matching mutation is
+every rectified picture row. Bottom-front rows require normalized corner score `0.98`, mean RGB
+error no greater than `1.0` across three interior material bands, and rejection after restoring the
+source flat `#4472C4` fill. A corpus row whose local metric cannot detect its matching mutation is
 not promotable. Callers cannot self-attest any modality.
 
 PowerPoint automation on macOS needs an available interactive session. Error `-9074` can mean the
@@ -653,12 +667,20 @@ local body properties outside the registry's `wrap`, anchor, and autofit tuples.
 aspect ratios, container rows, and implicit-depth semantics are declared in the registry. The
 picture row additionally excludes visible outlines, non-rectangular geometry, `a:fillRect`, tiles,
 style references, picture background fills, blip effects, and degenerate crops. Verification uses
-all earlier/current report pairs plus the derived schema-v4 `camera-local` plane/text/picture report
+all earlier/current report pairs plus the derived schema-v5 `camera-local` plane/text/picture report
 and the same caller-run gate classes. The broad
 `drawingml.shape.3d.scene` fallback remains in inventory as a conservative residual, so observing a
 verified narrow tuple cannot hide unimplemented scene values.
 
-Other perspective and arbitrary rotations, nonzero extrusion, materials, bottom bevels, tiled pictures,
+The separate `drawingml.shape.3d.bottom-bevel-front-material` cohort promotes only the exact
+standalone opaque rectangle rows declared in the registry: default-size `relaxedInset`/`circle`
+bottom bevel, `orthographicFront`, bounded `threePt:t` rotation, zero depth, `dkEdge` or implicit
+material, and the three verified aspect ratios. It retains live centered text, emits a uniform
+native front-face color, draws no bottom rim, and requires the schema-v5 bottom-material modality
+plus its restored-flat-fill mutation.
+
+Other perspective and arbitrary rotations, nonzero extrusion, materials and bottom bevels outside
+that exact cohort, tiled pictures,
 negative or degenerate source crops, other paint/effect combinations, and other shape or picture
 presets remain flat fallbacks. Opt-in local probes for these contexts do not promote the public
 support boundary.

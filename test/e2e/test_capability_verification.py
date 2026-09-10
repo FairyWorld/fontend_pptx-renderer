@@ -112,7 +112,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
         {"slideIdx": 0, "hidden": False, "renderArtifacts": native_artifacts}
     ]
     return {
-        "schemaVersion": 5,
+        "schemaVersion": 6,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": {
             "score": 0.6,
@@ -123,6 +123,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
             "shadowAmplitudeRatio": 0.85,
             "shadowOvershootRatio": 1.05,
             "solidDonutShadowOvershootRatio": 1.01,
+            "solidDonutShadowEnergyOvershootRatio": 1.05,
         },
         "applicableCaseCount": 1,
         "passed": passed,
@@ -162,6 +163,9 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                                     "shadowOvershootRatio": 1.0,
                                     "referenceShadowAmplitude": 45.0,
                                     "candidateShadowAmplitude": 45.0,
+                                    "referenceShadowEnergy": 12.0,
+                                    "candidateShadowEnergy": 12.0,
+                                    "shadowEnergyOvershootRatio": 1.0,
                                     "thresholds": {
                                         "score": 0.6,
                                         "cornerScore": 0.78,
@@ -171,6 +175,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                                         "shadowAmplitudeRatio": 0.85,
                                         "shadowOvershootRatio": 1.05,
                                         "solidDonutShadowOvershootRatio": 1.01,
+                                        "solidDonutShadowEnergyOvershootRatio": 1.05,
                                     },
                                     "passed": passed,
                                 },
@@ -239,10 +244,16 @@ def camera_report(
         "edgeToleranceRatio": 0.008,
         "cropMutationRatio": 0.12,
     }
+    bottom_material_thresholds = {
+        "cornerScore": 0.98,
+        "meanBandColorError": 1.0,
+        "sourceFlatFill": [68, 114, 196],
+    }
     thresholds = {
         "plane": plane_thresholds,
         "text": text_thresholds,
         "picture": picture_thresholds,
+        "bottom-material": bottom_material_thresholds,
     }
     if modality == "plane":
         metrics = {
@@ -278,6 +289,25 @@ def camera_report(
                 "detected": True,
             },
             "thresholds": plane_thresholds,
+            "passed": passed,
+        }
+    elif modality == "bottom-material":
+        metrics = {
+            "evaluable": True,
+            "cornerScore": 0.995 if passed else 0.9,
+            "meanCornerErrorRatio": 0.005 if passed else 0.1,
+            "referenceBands": [[70, 118, 203]] * 3,
+            "candidateBands": ([[70, 118, 203]] * 3 if passed else [[68, 114, 196]] * 3),
+            "meanBandColorError": 0.0 if passed else 13 / 3,
+            "flatFillSensitivity": {
+                "mutation": "restore-source-flat-fill",
+                "sourceFlatFill": [68, 114, 196],
+                "mutatedBands": [[68, 114, 196]] * 3,
+                "mutatedMeanBandColorError": 13 / 3,
+                "mutatedPassed": False,
+                "detected": True,
+            },
+            "thresholds": bottom_material_thresholds,
             "passed": passed,
         }
     elif modality == "text":
@@ -346,7 +376,7 @@ def camera_report(
             "passed": passed,
         }
     return {
-        "schemaVersion": 4,
+        "schemaVersion": 5,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": thresholds,
         "applicableCaseCount": 1,
@@ -629,6 +659,53 @@ def test_derives_camera_local_gate_from_live_picture_projection_evidence(tmp_pat
     )
 
     assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_derives_camera_local_gate_from_bottom_bevel_front_material_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("bottom-material")
+    baseline = native_report("bottom-material", revision="b" * 40)
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        camera_report=camera_report(current, repo, modality="bottom-material"),
+    )
+
+    assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_rejects_undetected_bottom_bevel_flat_fill_mutation(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("bottom-material")
+    baseline = native_report("bottom-material", revision="b" * 40)
+    report = camera_report(current, repo, modality="bottom-material")
+    report["caseResults"][0]["slides"][0]["metrics"]["flatFillSensitivity"][
+        "detected"
+    ] = False
+
+    with pytest.raises(CapabilityVerificationError, match="flat fill sensitivity"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=report,
+        )
 
 
 def test_rejects_failed_or_tampered_camera_local_evidence(tmp_path: Path):
@@ -940,6 +1017,27 @@ def test_rejects_tampered_bevel_artifacts_and_inconsistent_metric_results(tmp_pa
             baseline_reports=[baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             bevel_report=donut_overshoot,
+        )
+
+    donut_energy_overshoot = bevel_report(current, repo)
+    region = donut_energy_overshoot["caseResults"][0]["slides"][0]["regions"][0]
+    region["region"]["preset"] = "donut"
+    metrics = region["metrics"]
+    metrics.update(
+        referenceShadowEnergy=12.0,
+        candidateShadowEnergy=12.72,
+        shadowEnergyOvershootRatio=1.06,
+    )
+
+    with pytest.raises(CapabilityVerificationError, match="metric pass status"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            bevel_report=donut_energy_overshoot,
         )
 
 

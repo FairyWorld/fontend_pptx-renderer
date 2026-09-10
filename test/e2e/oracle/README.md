@@ -38,8 +38,9 @@ work packet records the override instead of silently hiding the global ordering.
 `verify` consumes raw `/api/evaluate` JSON reports from one clean committed renderer revision. It
 derives native-PowerPoint, manual-review, and regression status, including a matching baseline case
 set, identical input/runtime fingerprints from an earlier revision, and the 0.02 SSIM budget. The
-bounded top-bevel capability additionally requires a `--bevel-report`; the camera-plane capability
-requires a `--camera-report`. Their derived `bevel-local` and `camera-local` gates bind the exact
+bounded top-bevel capability additionally requires a `--bevel-report`; the camera-plane and bounded
+bottom-front capabilities require a `--camera-report`. Their derived `bevel-local` and
+`camera-local` gates bind the exact
 case set, source/ground-truth hashes, and per-slide raster hashes to the same clean revision and
 current files. Other `--passed-gate` values only record checks already executed by the caller; they
 are not run by the command. The API promotes any visible per-slide review flag to the case level, so
@@ -66,7 +67,7 @@ a strong average cannot hide a local mismatch. Review rows require an explicit c
 - `../scripts/shape3d_bevel_metrics.py`: source-OOXML-derived bevel-ring and round-corner lighting
   gate for the bounded static 3D cohort.
 - `../scripts/shape3d_camera_metrics.py`: source-OOXML-derived projection, material, external-shadow,
-  live-text, and rectified-picture gate for the bounded zero-depth camera-plane cohort.
+  live-text, rectified-picture, and bottom-front material gate for the bounded zero-depth cohorts.
 - `shape` nodes support `shapeTypeId` (numeric `MsoAutoShapeType`) for forward-compatible shape coverage.
 
 4. VBA probe module
@@ -243,15 +244,18 @@ coverage and font requirements. The generation report includes the selected patt
 fingerprints.
 
 The opt-in `oracle-local-shape3d-*` matrix explores ellipse, adjusted donut/star, concave freeform,
-shape rotation, nested group scaling, glow interaction, and a ten-slide bottom-`relaxedInset`
+shape rotation, nested group scaling, glow interaction, and an eleven-slide bottom-`relaxedInset`
 matrix. The bottom-bevel rows isolate default encoding, material, light rotation, live CJK text,
-transparent overlay composition, a neighboring `circle` preset, and aspect ratio. Its definition files
+transparent overlay composition plus an exact transparent flat control, a neighboring `circle`
+preset, and aspect ratio. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
 ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 176-case matrix.
 The current macOS PowerPoint oracle produces byte-identical native rasters for the implicit/explicit
 dimension pair, the explicit/omitted light-rotation pair, and the `relaxedInset`/`circle` pair. The
-material opt-out is deliberately distinct, so future support must model the front-face material
-response without inventing a visible bottom edge for this orthographic tuple.
+opaque material opt-out is deliberately distinct. The exact standalone rectangle rows now back
+`drawingml.shape.3d.bottom-bevel-front-material`, which models the uniform front response without
+inventing a visible bottom edge. Other parent, paint, scene, and bottom-bevel combinations remain
+discovery evidence.
 The original one-slide ellipse and donut probes remain useful for preflight comparisons, while the
 tracked three-slide ellipse and five-slide donut matrices bound the public
 `drawingml.shape.3d.top-bevel-contour` claim. That tuple also requires an absent scene backdrop,
@@ -262,9 +266,10 @@ After evaluating top-bevel cases 0001-0012 and 0017, run `../scripts/shape3d_bev
 rect, roundRect, ellipse, and donut masks before comparing the native and HTML luminance fields only
 inside the bevel ring. Unknown silhouettes and rotations fail as unevaluable instead of borrowing a
 rectangular mask. It requires a general score of `0.60` and applies an additional `0.78` corner score
-to `roundRect`. Schema v5 additionally requires dynamic-range ratio `0.85`, shadow-amplitude ratio
+to `roundRect`. Schema v6 additionally requires dynamic-range ratio `0.85`, shadow-amplitude ratio
 `0.85`, a directional candidate/native shadow ceiling of `1.05`, a tighter `1.01` ceiling for solid
-donut faces, solid-shape highlight-amplitude ratio `0.80`, and the separately verified picture-
+donut peak amplitude, a `1.05` ceiling for solid-donut mean negative shadow energy, solid-shape
+highlight-amplitude ratio `0.80`, and the separately verified picture-
 highlight ratio `0.70`. The symmetric ratios catch
 large weak or excessive responses; the directional ceiling catches a smaller but visible over-dark
 edge even when the composite correlation score remains high. Zero-thickness
@@ -287,8 +292,10 @@ use a `0.25%` resolution-normalized raster tolerance and require bidirectional f
 tolerant projected-bounds score `0.98`, and grayscale ink-density retention `0.90`; raw IoU and raw
 bounds remain diagnostic. Picture rows are inverse-projected to `384×384` and require corner score
 `0.98`, rectified color score `0.95`, and tolerant edge F1 `0.90`, which detects wrong image content
-or crop behind a correct outer plane. Pass the schema-v4 report to
-`run_capability_loop.py verify --camera-report ...`; callers cannot self-attest `camera-local`.
+or crop behind a correct outer plane. Bottom-front rows require normalized corner score `0.98`,
+mean RGB band error no greater than `1.0`, and rejection of a restored source-flat-fill mutation.
+Pass the schema-v5 report to `run_capability_loop.py verify --camera-report ...`; callers cannot
+self-attest `camera-local`.
 The same report erases every measurable candidate shadow and applies a 12% left crop plus rescale to
 each rectified picture. Both mutations must be rejected by their target metric, so the gate also
 proves that the selected corpus remains sensitive to the failure it claims to cover.

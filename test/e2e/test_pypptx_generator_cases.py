@@ -1430,16 +1430,16 @@ def test_local_bottom_relaxed_inset_matrix_serializes_real_tuple_and_isolation_r
         if case["name"] == "oracle-local-shape3d-0008-bottom-relaxed-inset-matrix"
     )
 
-    assert case["slide_count"] == 10
+    assert case["slide_count"] == 11
     assert case["assertions"] == {
-        "equivalentSlidePairs": [[1, 2], [1, 6], [1, 7]]
+        "equivalentSlidePairs": [[1, 2], [1, 7], [1, 8]]
     }
     pptx_path = tmp_path / "source.pptx"
     generator._generate_pptx(case, pptx_path)
     with ZipFile(pptx_path) as archive:
         roots = [
             etree.fromstring(archive.read(f"ppt/slides/slide{index}.xml"))
-            for index in range(1, 11)
+            for index in range(1, 12)
         ]
 
     ns = {
@@ -1480,9 +1480,17 @@ def test_local_bottom_relaxed_inset_matrix_serializes_real_tuple_and_isolation_r
         namespaces=ns,
     )
     assert len(roots[4].xpath(".//p:sp", namespaces=ns)) == 2
-    assert not roots[5].xpath(".//a:sp3d/@prstMaterial", namespaces=ns)
-    assert not roots[6].xpath(".//a:lightRig/a:rot", namespaces=ns)
-    assert roots[7].xpath(
+    transparent_flat = roots[5].xpath(".//p:sp[not(p:spPr/a:scene3d)]", namespaces=ns)
+    assert len(transparent_flat) == 2
+    assert transparent_flat[-1].xpath(
+        "boolean(p:spPr/a:solidFill/a:srgbClr[@val='BDC4F0']/a:alpha[@val='5000'])",
+        namespaces=ns,
+    )
+    assert transparent_flat[-1].xpath("string(.//a:t)", namespaces=ns) == "运营管理"
+    assert not roots[5].xpath(".//a:scene3d | .//a:sp3d", namespaces=ns)
+    assert not roots[6].xpath(".//a:sp3d/@prstMaterial", namespaces=ns)
+    assert not roots[7].xpath(".//a:lightRig/a:rot", namespaces=ns)
+    assert roots[8].xpath(
         "boolean(.//a:sp3d/a:bevelB[@prst='circle'])",
         namespaces=ns,
     )
@@ -1502,7 +1510,7 @@ def test_local_bottom_relaxed_inset_matrix_serializes_real_tuple_and_isolation_r
                 )
             ),
         )
-        for root in roots[8:10]
+        for root in roots[9:11]
     ]
     assert extents[0][0] == extents[0][1]
     assert extents[1][0] < extents[1][1]

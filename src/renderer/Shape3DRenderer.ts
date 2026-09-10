@@ -62,6 +62,7 @@ type StaticShape3DFallbackReason =
   | 'tiled-picture'
   | 'visible-text'
   | 'text-body-properties'
+  | 'parent-container'
   | 'style-reference'
   | 'visible-stroke'
   | 'shape-transform'
@@ -85,6 +86,8 @@ interface StaticShape3DTarget {
   height: number;
   isLineLike?: boolean;
   hasVisibleText?: boolean;
+  /** Provenance of the rendered node; bounded lanes may require a standalone slide shape. */
+  container?: 'standalone-slide' | 'group' | 'placeholder' | 'layout' | 'master';
   /** Presence of p:style can add unverified text/effect inheritance to a live text plane. */
   hasStyleReference?: boolean;
   hasVisibleStroke?: boolean;
@@ -151,6 +154,8 @@ export interface StaticShape3DCameraPlan {
   mode: 'camera-projected-plane';
   surface: 'shape';
   geometry: 'rect';
+  /** Exact native front-face material lane used when a bottom bevel is edge-on. */
+  frontMaterial?: 'dkEdge' | 'implicit';
   bounds: { width: number; height: number };
   corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint];
   camera: {
@@ -262,7 +267,7 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
-const SHAPE3D_LIGHTING_VERSION = 'distance-field-v5';
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v6';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
@@ -281,8 +286,8 @@ const SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS = [
 
 // The square rows in oracle-pypptx-shape3d-0012 measure 42.649/43.393 and
 // 43.154/43.616 native/candidate shadow amplitudes at the generic 0.58 response.
-// Applying their mean native/candidate ratio gives 0.57196; keep the neighboring
-// aspect anchors unchanged so wide and tall donut evidence stays stable.
+// Applying their mean native/candidate ratio gives 0.57196. The later wide endpoint is handled
+// separately because peak amplitude alone hid excess mean shadow energy in that row.
 const DONUT_BEVEL_SHADOW_STRENGTH_ANCHORS = [
   { aspect: 0.55, strength: 0.72 },
   { aspect: 1, strength: 0.572 },
@@ -314,12 +319,14 @@ export function solidBevelShadowStrength(
   const ratio = clamp((Math.log(aspect) - lowerLog) / Math.max(upperLog - lowerLog, 1e-9), 0, 1);
   let aspectStrength = lower.strength + (upper.strength - lower.strength) * ratio;
 
-  // The 10 pt native matrices for wide rect, ellipse, and donut surfaces converge on a weaker
-  // dark-face response at 2.5:1 and above. Rounded rectangles retain the earlier response: their
-  // rounded corners contribute less to the measured dark band and need the stronger material map.
+  // The 10 pt native matrices for wide non-rounded surfaces need a weaker dark-face response at
+  // 2.5:1 and above. The donut endpoint is lower because its two contours produced native-matched
+  // peak darkness but 1.108x aggregate shadow energy at the shared 0.415 response. Rounded
+  // rectangles retain the earlier response: their corners contribute less to the measured band.
   if (geometry !== 'roundrect' && aspect > 1.6) {
     const wideWeight = clamp((aspect - 1.6) / (2.5 - 1.6), 0, 1);
-    aspectStrength += (0.415 - aspectStrength) * wideWeight;
+    const wideStrength = geometry === 'donut' ? 0.37 : 0.415;
+    aspectStrength += (wideStrength - aspectStrength) * wideWeight;
   }
   if (geometry === 'rect' && aspect < 0.55) {
     const tallWeight = clamp((0.55 - aspect) / (0.55 - 0.46875), 0, 1);
@@ -338,6 +345,20 @@ export function solidBevelShadowStrength(
     1,
   );
   return aspectStrength + (0.7 - aspectStrength) * smallBevelWeight;
+}
+
+function solidBevelLightAzimuth(
+  width: number,
+  height: number,
+  geometry: StaticShape3DGeometry,
+): number {
+  // The circular square matrices fit an effective 330-degree 2D field. Moving away from square
+  // returns to the established 350-degree response before the verified wide/tall anchors, avoiding
+  // the highlight loss observed when one global bearing was applied to stretched silhouettes.
+  if (geometry !== 'ellipse' && geometry !== 'donut') return 350;
+  const logAspectDistance = Math.abs(Math.log(width / height));
+  const nonSquareWeight = clamp(logAspectDistance / Math.log(1.6), 0, 1);
+  return 330 + 20 * nonSquareWeight;
 }
 
 function flat(
@@ -492,6 +513,104 @@ function sceneOnlyCameraMaterialFill(
   };
 }
 
+const BOTTOM_BEVEL_FRONT_ASPECTS = [3.2 / 5.2, 1, 2] as const;
+const DEFAULT_BOTTOM_BEVEL_DIMENSION_PX = 8;
+
+function isNativeBackedBottomBevelAspect(width: number, height: number): boolean {
+  const aspect = width / height;
+  return BOTTOM_BEVEL_FRONT_ASPECTS.some(
+    (expected) => Math.abs(Math.log(aspect / expected)) <= 1e-4,
+  );
+}
+
+function buildBottomBevelFrontMaterialPlan(
+  properties: Shape3DProperties,
+  target: StaticShape3DTarget,
+  ctx: RenderContext,
+): StaticShape3DPlan {
+  const scene = properties.scene!;
+  const shape = properties.shape!;
+  const bevel = shape.bevelBottom!;
+  if (scene.cameraPreset !== 'orthographicFront') return flat('camera-preset');
+  if (scene.cameraRotation) return flat('camera-rotation');
+  if (scene.fieldOfView !== undefined) return flat('camera-field-of-view');
+  if (scene.cameraZoom !== undefined) return flat('camera-zoom');
+  if (!scene.lightRig) return flat('missing-light-rig');
+  if (scene.lightRig !== 'threePt') return flat('light-rig');
+  if (scene.lightDirection !== 't') return flat('light-direction');
+  if (
+    scene.lightRotation &&
+    !rotationEquals(scene.lightRotation, { latitude: 0, longitude: 0, revolution: 50 })
+  ) {
+    return flat('light-rotation');
+  }
+  if ((shape.contourWidth ?? 0) > 0 || shape.contourColorSource?.exists()) {
+    return flat('contour-paint');
+  }
+  if (normalizedPreset(target) !== 'rect') return flat('geometry-preset');
+  if (
+    (bevel.preset !== 'relaxedInset' && bevel.preset !== 'circle') ||
+    Math.abs((bevel.width ?? 0) - DEFAULT_BOTTOM_BEVEL_DIMENSION_PX) > 1e-6 ||
+    Math.abs((bevel.height ?? 0) - DEFAULT_BOTTOM_BEVEL_DIMENSION_PX) > 1e-6 ||
+    !isNativeBackedBottomBevelAspect(target.width, target.height)
+  ) {
+    return flat('bottom-bevel');
+  }
+  if (shape.presetMaterial !== undefined && shape.presetMaterial !== 'dkEdge') {
+    return flat('preset-material');
+  }
+  if (
+    target.paintKind !== 'solid' ||
+    !target.baseFill ||
+    !/^#[0-9a-f]{6}$/i.test(target.baseFill)
+  ) {
+    return flat('paint-kind');
+  }
+  if (target.baseFill.toLowerCase() !== '#4472c4') return flat('paint-value');
+  if (target.container !== 'standalone-slide') return flat('parent-container');
+  if (target.hasVisibleText) {
+    const textPlane = target.textPlane;
+    if (
+      !textPlane ||
+      textPlane.wrap !== undefined ||
+      textPlane.anchor !== 'ctr' ||
+      textPlane.autofit !== 'none' ||
+      textPlane.vertical !== undefined ||
+      textPlane.hasIndependentBounds
+    ) {
+      return flat('text-body-properties');
+    }
+  }
+
+  const projection = projectFlatPlane({
+    kind: 'orthographic',
+    width: target.width,
+    height: target.height,
+    presentationWidth: ctx.presentation.width,
+    rotation: { latitude: 0, longitude: 0, revolution: 0 },
+  });
+  if (!projection) return flat('projection-out-of-range');
+  const frontMaterial = shape.presetMaterial === 'dkEdge' ? 'dkEdge' : 'implicit';
+  // These uniform face colors are native PowerPoint anchors from the square, wide, tall,
+  // implicit/explicit-dimension, live-text, light-rotation and circle-neighbor matrix. The
+  // bottom bevel itself is edge-on in this exact orthographic tuple and must not create a rim.
+  const color = frontMaterial === 'dkEdge' ? '#4676cb' : '#4b7bd0';
+  return {
+    mode: 'camera-projected-plane',
+    surface: 'shape',
+    geometry: 'rect',
+    frontMaterial,
+    bounds: { width: target.width, height: target.height },
+    corners: projection.corners,
+    camera: {
+      kind: 'orthographic',
+      preset: 'orthographicFront',
+      rotation: { latitude: 0, longitude: 0, revolution: 0 },
+    },
+    fill: { top: color, bottom: color },
+  };
+}
+
 function buildCameraProjectionPlan(
   properties: Shape3DProperties,
   target: StaticShape3DTarget,
@@ -503,7 +622,7 @@ function buildCameraProjectionPlan(
   if ((target.rotation ?? 0) !== 0 || target.flipH || target.flipV) return flat('shape-transform');
   if (properties.effectKinds.length > 0) return flat('effect-list-conflict');
   if ((shape?.extrusionHeight ?? 0) > 0) return flat('extrusion-height');
-  if (shape?.bevelBottom) return flat('bottom-bevel');
+  if (shape?.bevelBottom) return buildBottomBevelFrontMaterialPlan(properties, target, ctx);
   if (shape?.presetMaterial !== undefined) return flat('preset-material');
   if ((shape?.contourWidth ?? 0) > 0 || shape?.contourColorSource?.exists()) {
     return flat('contour-paint');
@@ -803,11 +922,16 @@ export function buildStaticShape3DPlan(
   const rig = scene.lightRig;
   const rotation = scene.lightRotation;
   // Native evidence gives each bounded rig a distinct response. The implicit two-point picture
-  // light is lower-left dominant and more elevated; three-point is top-dominant with a small
-  // leftward component. Keep the separately observed 120-degree sentinel explicit instead of
+  // light is lower-left dominant and more elevated; three-point uses the bounded geometry/aspect
+  // calibration above. Keep the separately observed 120-degree sentinel explicit instead of
   // broadening support to arbitrary rotations.
   const rotatedPictureSentinel = rig === 'twoPt' && rotation?.revolution === 120;
-  const azimuth = rig === 'threePt' ? 350 : rotatedPictureSentinel ? 285 : 225;
+  const azimuth =
+    rig === 'threePt'
+      ? solidBevelLightAzimuth(target.width, target.height, preset as StaticShape3DGeometry)
+      : rotatedPictureSentinel
+        ? 285
+        : 225;
   const elevation = rig === 'threePt' ? 50 : rotatedPictureSentinel ? 45 : 60;
 
   return {
@@ -1204,6 +1328,7 @@ function appendCameraProjectedPlane(
   const id = ++shape3dIdCounter;
   const group = document.createElementNS(ns, 'g');
   group.dataset.pptxShape3dCamera = plan.camera.preset;
+  if (plan.frontMaterial) group.dataset.pptxShape3dFrontMaterial = plan.frontMaterial;
   group.setAttribute('pointer-events', 'none');
 
   const projectedPath = document.createElementNS(ns, 'path');

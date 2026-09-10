@@ -128,7 +128,10 @@ Three-step: `schemeClr` → master `colorMap` remap (e.g. "tx1"→"dk1") → the
 
 ### What's NOT Supported
 
-General DrawingML 3D outside the verified static top-bevel and zero-depth camera-plane tuples, true 3D chart perspective/depth/surface meshes, animations/transitions, equations, full EMF/WMF vector rendering, shadow/reflection/glow, executing/editing embedded OLE objects, and slide notes rendering.
+General DrawingML 3D outside the verified static top-bevel, zero-depth camera-plane, and edge-on
+bottom-front-material tuples, true 3D chart perspective/depth/surface meshes,
+animations/transitions, equations, full EMF/WMF vector rendering, shadow/reflection/glow,
+executing/editing embedded OLE objects, and slide notes rendering.
 
 Notes:
 
@@ -512,9 +515,11 @@ Rules that have proven robust:
 If a line/connector looks too thick or “filled in”, inspect `isLineLike` handling in `ShapeRenderer.ts` before changing preset geometry.
 
 For static 3D bevels, do not rely on a symmetric amplitude ratio alone: the `0.85` floor still
-permits a candidate shadow to exceed native by about 17.6%. Schema-v4 bevel evidence also requires
-`candidateShadowAmplitude / referenceShadowAmplitude <= 1.05`; keep that directional ceiling when
-changing material or aspect-response curves.
+permits a candidate shadow to exceed native by about 17.6%. Schema-v6 bevel evidence also requires
+`candidateShadowAmplitude / referenceShadowAmplitude <= 1.05`, tightened to `1.01` for solid
+donuts. Solid donuts additionally require mean negative shadow-energy overshoot `<= 1.05`; keep
+both checks when changing material, light-bearing, or aspect-response curves because a broad dark
+band can look too heavy while its 5th-percentile amplitude remains correct.
 
 #### 4. Curved arrows and similar presets are layering problems as much as geometry problems
 

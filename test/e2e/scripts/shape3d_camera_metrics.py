@@ -45,6 +45,9 @@ PICTURE_RECTIFIED_EDGE_F1_THRESHOLD = 0.90
 PICTURE_RECTIFIED_SIZE = 384
 PICTURE_EDGE_TOLERANCE_RATIO = 0.008
 PICTURE_CROP_MUTATION_RATIO = 0.12
+BOTTOM_FRONT_CORNER_SCORE_THRESHOLD = 0.98
+BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD = 1.0
+BOTTOM_FRONT_SOURCE_FLAT_FILL = (68, 114, 196)
 
 
 def _slide_number(path: str) -> int:
@@ -293,6 +296,148 @@ def extract_camera_shadow_slide_indices(source_pptx: Path) -> set[int]:
                 if shape.xpath("boolean(p:style/a:effectRef[@idx='2'])", namespaces=NS):
                     indices.add(slide_index)
                     break
+    return indices
+
+
+def _native_backed_bottom_aspect(shape_properties) -> bool:
+    extent = shape_properties.find("a:xfrm/a:ext", NS)
+    if extent is None:
+        return False
+    try:
+        width = float(extent.get("cx", "nan"))
+        height = float(extent.get("cy", "nan"))
+    except ValueError:
+        return False
+    if not math.isfinite(width) or not math.isfinite(height) or width <= 0 or height <= 0:
+        return False
+    aspect = width / height
+    return any(
+        abs(math.log(aspect / expected)) <= 1e-4
+        for expected in (3.2 / 5.2, 1.0, 2.0)
+    )
+
+
+def _is_supported_bottom_bevel_front_shape(shape) -> bool:
+    parent = shape.getparent()
+    grandparent = parent.getparent() if parent is not None else None
+    if (
+        parent is None
+        or grandparent is None
+        or etree.QName(parent).localname != "spTree"
+        or etree.QName(grandparent).localname != "cSld"
+        or shape.find("p:nvSpPr/p:nvPr/p:ph", NS) is not None
+    ):
+        return False
+    shape_properties = shape.find("p:spPr", NS)
+    if shape_properties is None or not _native_backed_bottom_aspect(shape_properties):
+        return False
+    transform = shape_properties.find("a:xfrm", NS)
+    if transform is not None and any(
+        not _zero_or_absent(transform.get(name)) for name in ("rot", "flipH", "flipV")
+    ):
+        return False
+    geometry = shape_properties.find("a:prstGeom", NS)
+    color = shape_properties.find("a:solidFill/a:srgbClr", NS)
+    if (
+        geometry is None
+        or geometry.get("prst") != "rect"
+        or color is None
+        or color.get("val", "").upper() != "4472C4"
+        or len(color) != 0
+        or shape_properties.find("a:ln/a:noFill", NS) is None
+        or shape_properties.find("a:effectLst", NS) is not None
+        or shape_properties.find("a:effectDag", NS) is not None
+    ):
+        return False
+    scene = shape_properties.find("a:scene3d", NS)
+    shape3d = shape_properties.find("a:sp3d", NS)
+    if scene is None or shape3d is None or scene.find("a:backdrop", NS) is not None:
+        return False
+    camera = scene.find("a:camera", NS)
+    light = scene.find("a:lightRig", NS)
+    if (
+        camera is None
+        or camera.get("prst") != "orthographicFront"
+        or camera.get("fov") is not None
+        or camera.get("zoom") is not None
+        or camera.find("a:rot", NS) is not None
+        or light is None
+        or light.get("rig") != "threePt"
+        or light.get("dir") != "t"
+    ):
+        return False
+    light_rotation = light.find("a:rot", NS)
+    if light_rotation is not None and not _rotation_matches(
+        light_rotation, (0, 0, 3000000)
+    ):
+        return False
+    if any(
+        not _zero_or_absent(shape3d.get(name)) for name in ("z", "extrusionH", "contourW")
+    ) or (
+        shape3d.get("prstMaterial") not in {None, "dkEdge"}
+        or shape3d.find("a:bevelT", NS) is not None
+        or shape3d.find("a:extrusionClr", NS) is not None
+        or shape3d.find("a:contourClr", NS) is not None
+    ):
+        return False
+    bevel = shape3d.find("a:bevelB", NS)
+    if (
+        bevel is None
+        or bevel.get("prst", "circle") not in {"relaxedInset", "circle"}
+        or bevel.get("w", "76200") != "76200"
+        or bevel.get("h", "76200") != "76200"
+        or len(bevel) != 0
+    ):
+        return False
+    visible_text = shape.xpath("p:txBody//a:t[normalize-space(.) != '']", namespaces=NS)
+    if visible_text:
+        body = shape.find("p:txBody/a:bodyPr", NS)
+        paragraphs = shape.xpath("p:txBody/a:p[a:t or a:r/a:t]", namespaces=NS)
+        runs = shape.xpath("p:txBody/a:p/a:r[a:t]", namespaces=NS)
+        if (
+            body is None
+            or body.get("anchor") != "ctr"
+            or body.get("wrap") is not None
+            or body.get("vert") is not None
+            or len(body) != 0
+            or len(paragraphs) != 1
+            or paragraphs[0].find("a:pPr", NS) is None
+            or paragraphs[0].find("a:pPr", NS).get("algn") != "ctr"
+            or len(runs) != 1
+        ):
+            return False
+        run_properties = runs[0].find("a:rPr", NS)
+        run_color = runs[0].find("a:rPr/a:solidFill/a:srgbClr", NS)
+        if (
+            run_properties is None
+            or run_properties.get("sz") != "2000"
+            or run_properties.get("b") != "1"
+            or run_color is None
+            or run_color.get("val", "").upper() != "FFFFFF"
+        ):
+            return False
+    return True
+
+
+def extract_bottom_bevel_front_slide_indices(source_pptx: Path) -> set[int]:
+    """Return standalone slides in the bounded edge-on bottom-bevel material matrix."""
+    indices: set[int] = set()
+    with ZipFile(source_pptx) as archive:
+        slide_paths = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            ),
+            key=_slide_number,
+        )
+        for slide_index, slide_path in enumerate(slide_paths):
+            slide = etree.fromstring(archive.read(slide_path))
+            if any(
+                _is_supported_bottom_bevel_front_shape(shape)
+                for shape in slide.xpath(".//p:sp", namespaces=NS)
+            ):
+                indices.add(slide_index)
     return indices
 
 
@@ -791,6 +936,68 @@ def compute_camera_plane_metrics(
     }
 
 
+def compute_bottom_bevel_front_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    corner_score_threshold: float = BOTTOM_FRONT_CORNER_SCORE_THRESHOLD,
+    mean_band_color_error_threshold: float = BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD,
+    source_flat_fill: tuple[int, int, int] = BOTTOM_FRONT_SOURCE_FLAT_FILL,
+) -> dict[str, Any]:
+    """Measure the uniform native front-face response without rewarding an invented bevel rim."""
+    reference_corners, reference_mask = _ordered_normalized_corners(reference)
+    candidate_corners, candidate_mask = _ordered_normalized_corners(candidate)
+    left, top = reference_corners.min(axis=0)
+    right, bottom = reference_corners.max(axis=0)
+    diagonal = math.hypot(right - left, bottom - top)
+    if diagonal <= 0:
+        raise ValueError("bottom-bevel front reference bounds are degenerate")
+    mean_corner_error = float(
+        np.linalg.norm(reference_corners - candidate_corners, axis=1).mean() / diagonal
+    )
+    corner_score = max(0.0, 1.0 - mean_corner_error)
+    reference_bands = _material_bands(reference, reference_mask)
+    candidate_bands = _material_bands(candidate, candidate_mask)
+    mean_band_color_error = float(np.abs(reference_bands - candidate_bands).mean())
+
+    mutated_candidate = candidate.copy()
+    mutated_candidate[candidate_mask] = np.asarray(source_flat_fill, dtype=np.uint8)
+    mutated_bands = _material_bands(mutated_candidate, candidate_mask)
+    mutated_mean_band_color_error = float(np.abs(reference_bands - mutated_bands).mean())
+    mutated_passed = (
+        corner_score >= corner_score_threshold
+        and mutated_mean_band_color_error <= mean_band_color_error_threshold
+    )
+    detected = not mutated_passed
+    passed = (
+        corner_score >= corner_score_threshold
+        and mean_band_color_error <= mean_band_color_error_threshold
+        and detected
+    )
+    return {
+        "evaluable": True,
+        "cornerScore": corner_score,
+        "meanCornerErrorRatio": mean_corner_error,
+        "referenceBands": reference_bands.round(3).tolist(),
+        "candidateBands": candidate_bands.round(3).tolist(),
+        "meanBandColorError": mean_band_color_error,
+        "flatFillSensitivity": {
+            "mutation": "restore-source-flat-fill",
+            "sourceFlatFill": list(source_flat_fill),
+            "mutatedBands": mutated_bands.round(3).tolist(),
+            "mutatedMeanBandColorError": mutated_mean_band_color_error,
+            "mutatedPassed": mutated_passed,
+            "detected": detected,
+        },
+        "thresholds": {
+            "cornerScore": corner_score_threshold,
+            "meanBandColorError": mean_band_color_error_threshold,
+            "sourceFlatFill": list(source_flat_fill),
+        },
+        "passed": passed,
+    }
+
+
 def _rectify_camera_plane(
     image: np.ndarray,
     corners: np.ndarray,
@@ -1125,10 +1332,11 @@ def build_camera_report(
             raise ValueError(f"case report is missing source path: {case_id}")
         source_path = repo / source_value
         plane_slides = extract_camera_slide_indices(source_path)
+        bottom_front_slides = extract_bottom_bevel_front_slide_indices(source_path)
         shadow_slides = extract_camera_shadow_slide_indices(source_path)
         text_slides = extract_text_camera_slide_indices(source_path)
         picture_slides = extract_picture_camera_slide_indices(source_path)
-        applicable_slides = plane_slides | text_slides | picture_slides
+        applicable_slides = plane_slides | bottom_front_slides | text_slides | picture_slides
         slide_results: list[dict[str, Any]] = []
         for slide in case_report.get("perSlide", []):
             if not isinstance(slide, Mapping) or slide.get("hidden") is True:
@@ -1166,7 +1374,10 @@ def build_camera_report(
             candidate = np.asarray(
                 Image.open(reports_dir / f"{case_id}_slide{slide_index}_html.png").convert("RGB")
             )
-            if slide_index in plane_slides:
+            if slide_index in bottom_front_slides:
+                modality = "bottom-material"
+                metrics = compute_bottom_bevel_front_metrics(reference, candidate)
+            elif slide_index in plane_slides:
                 modality = "plane"
                 metrics = compute_camera_plane_metrics(
                     reference,
@@ -1207,7 +1418,7 @@ def build_camera_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 4,
+        "schemaVersion": 5,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "plane": {
@@ -1236,6 +1447,11 @@ def build_camera_report(
                 "rectifiedSize": PICTURE_RECTIFIED_SIZE,
                 "edgeToleranceRatio": PICTURE_EDGE_TOLERANCE_RATIO,
                 "cropMutationRatio": PICTURE_CROP_MUTATION_RATIO,
+            },
+            "bottom-material": {
+                "cornerScore": BOTTOM_FRONT_CORNER_SCORE_THRESHOLD,
+                "meanBandColorError": BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD,
+                "sourceFlatFill": list(BOTTOM_FRONT_SOURCE_FLAT_FILL),
             },
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),

@@ -25,6 +25,7 @@ BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
 BEVEL_SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.01
+BEVEL_SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD = 1.05
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 CAMERA_CORNER_SCORE_THRESHOLD = 0.98
 CAMERA_COLOR_SCORE_THRESHOLD = 0.97
@@ -47,6 +48,9 @@ CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD = 0.90
 CAMERA_PICTURE_RECTIFIED_SIZE = 384
 CAMERA_PICTURE_EDGE_TOLERANCE_RATIO = 0.008
 CAMERA_PICTURE_CROP_MUTATION_RATIO = 0.12
+CAMERA_BOTTOM_FRONT_CORNER_SCORE_THRESHOLD = 0.98
+CAMERA_BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD = 1.0
+CAMERA_BOTTOM_FRONT_SOURCE_FLAT_FILL = [68, 114, 196]
 
 
 class CapabilityVerificationError(ValueError):
@@ -73,6 +77,22 @@ def _finite_metric(value: Any, context: str) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
         raise CapabilityVerificationError(f"{context} must be finite")
     return float(value)
+
+
+def _color_bands(value: Any, context: str) -> list[list[float]]:
+    if (
+        not isinstance(value, list)
+        or len(value) != 3
+        or any(not isinstance(row, list) or len(row) != 3 for row in value)
+    ):
+        raise CapabilityVerificationError(f"{context} must contain three RGB bands")
+    bands: list[list[float]] = []
+    for row in value:
+        parsed = [_finite_metric(channel, context) for channel in row]
+        if any(channel < 0 or channel > 255 for channel in parsed):
+            raise CapabilityVerificationError(f"{context} is outside the RGB domain")
+        bands.append(parsed)
+    return bands
 
 
 def _runtime_environment(report: Mapping[str, Any], case_id: str) -> Mapping[str, Any]:
@@ -221,8 +241,8 @@ def _validate_bevel_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 5:
-        raise CapabilityVerificationError("bevel-local report requires schemaVersion=5")
+    if report.get("schemaVersion") != 6:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=6")
     renderer = _mapping(report.get("renderer"), "bevel-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -239,6 +259,9 @@ def _validate_bevel_local(
         "shadowOvershootRatio": BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD,
         "solidDonutShadowOvershootRatio": (
             BEVEL_SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD
+        ),
+        "solidDonutShadowEnergyOvershootRatio": (
+            BEVEL_SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD
         ),
     }:
         raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
@@ -393,6 +416,18 @@ def _validate_bevel_local(
                         metrics.get("shadowOvershootRatio"),
                         f"{metric_context} shadow overshoot ratio",
                     )
+                    reference_shadow_energy = _finite_metric(
+                        metrics.get("referenceShadowEnergy"),
+                        f"{metric_context} reference shadow energy",
+                    )
+                    candidate_shadow_energy = _finite_metric(
+                        metrics.get("candidateShadowEnergy"),
+                        f"{metric_context} candidate shadow energy",
+                    )
+                    shadow_energy_overshoot_ratio = _finite_metric(
+                        metrics.get("shadowEnergyOvershootRatio"),
+                        f"{metric_context} shadow energy overshoot ratio",
+                    )
                     if (
                         reference_range < 0
                         or candidate_range < 0
@@ -400,10 +435,13 @@ def _validate_bevel_local(
                         or candidate_highlight < 0
                         or reference_shadow < 0
                         or candidate_shadow < 0
+                        or reference_shadow_energy < 0
+                        or candidate_shadow_energy < 0
                         or not 0 <= range_ratio <= 1
                         or not 0 <= highlight_ratio <= 1
                         or not 0 <= shadow_ratio <= 1
                         or shadow_overshoot_ratio < 0
+                        or shadow_energy_overshoot_ratio < 0
                     ):
                         raise CapabilityVerificationError(
                             f"{metric_context} metrics are outside their domains"
@@ -430,11 +468,21 @@ def _validate_bevel_local(
                         if reference_shadow > 1e-6
                         else 1.0 + candidate_shadow
                     )
+                    expected_shadow_energy_overshoot_ratio = (
+                        candidate_shadow_energy / reference_shadow_energy
+                        if reference_shadow_energy > 1e-6
+                        else 1.0 + candidate_shadow_energy
+                    )
                     if (
                         abs(range_ratio - expected_range_ratio) > 1e-9
                         or abs(highlight_ratio - expected_highlight_ratio) > 1e-9
                         or abs(shadow_ratio - expected_shadow_ratio) > 1e-9
                         or abs(shadow_overshoot_ratio - expected_shadow_overshoot_ratio) > 1e-9
+                        or abs(
+                            shadow_energy_overshoot_ratio
+                            - expected_shadow_energy_overshoot_ratio
+                        )
+                        > 1e-9
                     ):
                         raise CapabilityVerificationError(
                             f"{metric_context} amplitude metrics are inconsistent"
@@ -448,6 +496,11 @@ def _validate_bevel_local(
                         if surface == "shape" and geometry.get("preset") == "donut"
                         else BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD
                     )
+                    shadow_energy_overshoot_threshold = (
+                        BEVEL_SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD
+                        if surface == "shape" and geometry.get("preset") == "donut"
+                        else math.inf
+                    )
                     expected_pass = (
                         score >= BEVEL_SCORE_THRESHOLD
                         and range_ratio >= BEVEL_RANGE_RATIO_THRESHOLD
@@ -459,6 +512,8 @@ def _validate_bevel_local(
                         )
                         and shadow_ratio >= BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD
                         and shadow_overshoot_ratio <= shadow_overshoot_threshold
+                        and shadow_energy_overshoot_ratio
+                        <= shadow_energy_overshoot_threshold
                         and (
                             not corner_required
                             or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD
@@ -562,8 +617,8 @@ def _validate_camera_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 4:
-        raise CapabilityVerificationError("camera-local report requires schemaVersion=4")
+    if report.get("schemaVersion") != 5:
+        raise CapabilityVerificationError("camera-local report requires schemaVersion=5")
     renderer = _mapping(report.get("renderer"), "camera-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -596,6 +651,11 @@ def _validate_camera_local(
             "rectifiedSize": CAMERA_PICTURE_RECTIFIED_SIZE,
             "edgeToleranceRatio": CAMERA_PICTURE_EDGE_TOLERANCE_RATIO,
             "cropMutationRatio": CAMERA_PICTURE_CROP_MUTATION_RATIO,
+        },
+        "bottom-material": {
+            "cornerScore": CAMERA_BOTTOM_FRONT_CORNER_SCORE_THRESHOLD,
+            "meanBandColorError": CAMERA_BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD,
+            "sourceFlatFill": CAMERA_BOTTOM_FRONT_SOURCE_FLAT_FILL,
         },
     }
     thresholds = _mapping(report.get("thresholds"), "camera-local thresholds")
@@ -908,6 +968,89 @@ def _validate_camera_local(
                         )
                     )
                     and expected_shadow_passed
+                )
+            elif modality == "bottom-material":
+                corner_score = _finite_metric(
+                    metrics.get("cornerScore"), f"{context} corner score"
+                )
+                mean_corner_error = _finite_metric(
+                    metrics.get("meanCornerErrorRatio"), f"{context} corner error"
+                )
+                mean_color_error = _finite_metric(
+                    metrics.get("meanBandColorError"), f"{context} material color error"
+                )
+                if (
+                    not 0 <= corner_score <= 1
+                    or mean_corner_error < 0
+                    or mean_color_error < 0
+                    or abs(corner_score - max(0.0, 1.0 - mean_corner_error)) > 1e-9
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} bottom material metrics are outside their domains"
+                    )
+                reference_bands = _color_bands(
+                    metrics.get("referenceBands"), f"{context} reference bands"
+                )
+                candidate_bands = _color_bands(
+                    metrics.get("candidateBands"), f"{context} candidate bands"
+                )
+                expected_color_error = sum(
+                    abs(reference_bands[row][channel] - candidate_bands[row][channel])
+                    for row in range(3)
+                    for channel in range(3)
+                ) / 9
+                if abs(mean_color_error - expected_color_error) > 1e-9:
+                    raise CapabilityVerificationError(
+                        f"{context} bottom material color metrics are inconsistent"
+                    )
+                sensitivity = _mapping(
+                    metrics.get("flatFillSensitivity"),
+                    f"{context} flat fill sensitivity",
+                )
+                if (
+                    sensitivity.get("mutation") != "restore-source-flat-fill"
+                    or sensitivity.get("sourceFlatFill")
+                    != CAMERA_BOTTOM_FRONT_SOURCE_FLAT_FILL
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} flat fill sensitivity is inconsistent"
+                    )
+                mutated_bands = _color_bands(
+                    sensitivity.get("mutatedBands"), f"{context} mutated bands"
+                )
+                mutated_error = _finite_metric(
+                    sensitivity.get("mutatedMeanBandColorError"),
+                    f"{context} mutated material color error",
+                )
+                expected_mutated_error = sum(
+                    abs(reference_bands[row][channel] - mutated_bands[row][channel])
+                    for row in range(3)
+                    for channel in range(3)
+                ) / 9
+                mutated_passed = sensitivity.get("mutatedPassed")
+                detected = sensitivity.get("detected")
+                expected_mutated_passed = (
+                    corner_score >= CAMERA_BOTTOM_FRONT_CORNER_SCORE_THRESHOLD
+                    and mutated_error
+                    <= CAMERA_BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD
+                )
+                if (
+                    mutated_error < 0
+                    or abs(mutated_error - expected_mutated_error) > 1e-9
+                    or not isinstance(mutated_passed, bool)
+                    or mutated_passed is not expected_mutated_passed
+                    or not isinstance(detected, bool)
+                    or detected is not (not expected_mutated_passed)
+                    or detected is not True
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} flat fill sensitivity is inconsistent"
+                    )
+                expected_pass = (
+                    corner_score >= CAMERA_BOTTOM_FRONT_CORNER_SCORE_THRESHOLD
+                    and mean_color_error
+                    <= CAMERA_BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD
+                    and detected
                 )
             elif modality == "text":
                 foreground_iou = _finite_metric(

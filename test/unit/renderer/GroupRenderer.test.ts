@@ -569,6 +569,18 @@ function makeCtxWithDiagram(): RenderContext {
 // ---------------------------------------------------------------------------
 
 describe('renderGroup — wrapper element', () => {
+  it('marks child render contexts as grouped for bounded renderer lanes', () => {
+    const group = makeGroup([makeSpXml()]);
+    let observedDepth: number | undefined;
+
+    renderGroup(group, createMockRenderContext(), (_childNode, childCtx) => {
+      observedDepth = childCtx.groupDepth;
+      return document.createElement('div');
+    });
+
+    expect(observedDepth).toBe(1);
+  });
+
   it('returns an absolutely positioned div with correct position and size', () => {
     const group = makeGroup([], { x: 50, y: 30, w: 300, h: 150 });
     const el = renderGroup(group, createMockRenderContext(), (childNode, childCtx) =>
