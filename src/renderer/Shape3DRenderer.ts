@@ -145,6 +145,8 @@ export interface StaticShape3DSupportedPlan {
     direction: 't';
     rotation?: Shape3DRotation;
     azimuth: number;
+    shadowFloor?: number;
+    shadowScale?: number;
     elevation: number;
     intensity: number;
   };
@@ -267,7 +269,7 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
-const SHAPE3D_LIGHTING_VERSION = 'distance-field-v6';
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v7';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
@@ -293,6 +295,37 @@ const DONUT_BEVEL_SHADOW_STRENGTH_ANCHORS = [
   { aspect: 1, strength: 0.572 },
   { aspect: 1.6, strength: 0.45 },
 ] as const;
+
+const DONUT_BEVEL_SHADOW_PROFILE_ANCHORS = [
+  { aspect: 0.55, floor: 0, scale: 0.9 },
+  { aspect: 1, floor: 0.6, scale: 0.25 },
+  { aspect: 1.6, floor: 0.7, scale: 0.4 },
+] as const;
+
+function solidDonutShadowProfile(width: number, height: number): { floor: number; scale: number } {
+  const aspect = width / height;
+  let lower: (typeof DONUT_BEVEL_SHADOW_PROFILE_ANCHORS)[number] =
+    DONUT_BEVEL_SHADOW_PROFILE_ANCHORS[0];
+  let upper: (typeof DONUT_BEVEL_SHADOW_PROFILE_ANCHORS)[number] =
+    DONUT_BEVEL_SHADOW_PROFILE_ANCHORS[DONUT_BEVEL_SHADOW_PROFILE_ANCHORS.length - 1];
+  for (let index = 1; index < DONUT_BEVEL_SHADOW_PROFILE_ANCHORS.length; index += 1) {
+    if (aspect <= DONUT_BEVEL_SHADOW_PROFILE_ANCHORS[index].aspect) {
+      lower = DONUT_BEVEL_SHADOW_PROFILE_ANCHORS[index - 1];
+      upper = DONUT_BEVEL_SHADOW_PROFILE_ANCHORS[index];
+      break;
+    }
+  }
+  const ratio = clamp(
+    (Math.log(aspect) - Math.log(lower.aspect)) /
+      Math.max(Math.log(upper.aspect) - Math.log(lower.aspect), 1e-9),
+    0,
+    1,
+  );
+  return {
+    floor: lower.floor + (upper.floor - lower.floor) * ratio,
+    scale: lower.scale + (upper.scale - lower.scale) * ratio,
+  };
+}
 
 export function solidBevelShadowStrength(
   width: number,
@@ -933,6 +966,10 @@ export function buildStaticShape3DPlan(
         ? 285
         : 225;
   const elevation = rig === 'threePt' ? 50 : rotatedPictureSentinel ? 45 : 60;
+  const donutShadowProfile =
+    rig === 'threePt' && preset === 'donut'
+      ? solidDonutShadowProfile(target.width, target.height)
+      : undefined;
 
   return {
     mode: 'orthographic-top-bevel',
@@ -950,6 +987,8 @@ export function buildStaticShape3DPlan(
       direction: 't',
       rotation,
       azimuth,
+      shadowFloor: donutShadowProfile?.floor,
+      shadowScale: donutShadowProfile?.scale,
       elevation,
       intensity: target.nodeType === 'picture' ? 0.8 : 1.75,
     },
@@ -1090,7 +1129,7 @@ function shape3DLightingCacheKey(
     `${plan.bounds.width}x${plan.bounds.height}`,
     `${rasterWidth}x${rasterHeight}`,
     `${plan.bevel.width}:${plan.bevel.height}`,
-    `${plan.light.rig}:${plan.light.azimuth}:${plan.light.elevation}:${plan.light.intensity}`,
+    `${plan.light.rig}:${plan.light.azimuth}:${plan.light.shadowFloor ?? 0}:${plan.light.shadowScale ?? 1}:${plan.light.elevation}:${plan.light.intensity}`,
     pathD,
   ].join('|');
 }
@@ -1248,6 +1287,8 @@ async function renderDistanceFieldLighting(
     bandPx: plan.bevel.width * effectiveScale,
     heightPx: plan.bevel.height * effectiveScale,
     lightAzimuthDeg: plan.light.azimuth,
+    shadowFloor: plan.light.shadowFloor,
+    shadowScale: plan.light.shadowScale,
     lightElevationDeg: plan.light.elevation,
     intensity: plan.light.intensity,
   });

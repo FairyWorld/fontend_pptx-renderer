@@ -25,10 +25,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
   omitted/explicit default top-bevel dimensions.
-- Added a schema-v6 bevel-ring fidelity metric and derived capability gate with independent dynamic
+- Added a schema-v7 bevel-ring fidelity metric and derived capability gate with independent dynamic
   range and shadow-amplitude floors, a `1.05` general directional shadow-overshoot ceiling, a
   native-backed `1.01` peak ceiling and `1.05` aggregate shadow-energy ceiling for solid donut
-  faces, plus material-specific solid/picture highlight floors, alongside
+  faces, a `0.30` non-cancelling local-shadow-excess ceiling, plus material-specific solid/picture
+  highlight floors, alongside
   exact native/renderer slide-equivalence assertions for alternate OOXML encodings and an opt-in
   ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, effect-bearing,
   and bottom-bevel inputs. The eleven-slide bottom-bevel case isolates implicit/explicit `relaxedInset`
@@ -89,9 +90,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   common material mapping while dark-face attenuation is interpolated across the native square,
   wide, and tall matrices. Square ellipse/donut rows use the native-fitted effective 330° bearing;
   other verified three-point rows retain 350°. Wide non-rounded surfaces and the tall-rectangle
-  sentinel use dedicated native anchors. The wide donut response is now `0.370`, reducing mean
-  negative shadow energy from `1.108×` to `0.997×` native while preserving the independently
-  calibrated wide `roundRect`. Missing
+  sentinel use dedicated native anchors. Solid donuts now combine their bounded aspect response
+  with an aspect-interpolated broad shadow floor and compressed directional lobe, reducing locally
+  over-dark sectors while preserving the independently calibrated highlight and `roundRect` paths.
+  Schema-v7 bevel evidence adds a non-cancelling local-shadow-excess gate so equal total shadow
+  energy cannot hide a wrong angular distribution. Missing
   circular top-bevel preset/width/height attributes now use the
   DrawingML `circle` and 76200 EMU defaults independently. The native 6 pt square-rectangle row has
   a bounded shadow anchor, while square donuts use their own `0.572` response so the default and

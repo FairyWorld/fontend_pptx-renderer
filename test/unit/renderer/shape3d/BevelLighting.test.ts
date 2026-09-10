@@ -86,13 +86,38 @@ describe('renderCircleBevelOverlay', () => {
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const firstValue = signedLighting(first, y * width + x);
-        const mirrorValue = signedLighting(
-          opposite,
-          (height - 1 - y) * width + (width - 1 - x),
-        );
+        const mirrorValue = signedLighting(opposite, (height - 1 - y) * width + (width - 1 - x));
         expect(Math.abs(firstValue - mirrorValue)).toBeLessThanOrEqual(2);
       }
     }
+  });
+
+  it('broadens a three-point shadow rim without moving its key highlight', () => {
+    const size = 101;
+    const center = 50;
+    const alpha = diskMask(size, 40);
+    const coupled = renderCircleBevelOverlay(alpha, size, size, {
+      ...defaultOptions,
+      lightAzimuthDeg: 330,
+    });
+    const broadened = renderCircleBevelOverlay(alpha, size, size, {
+      ...defaultOptions,
+      lightAzimuthDeg: 330,
+      shadowFloor: 0.22,
+      shadowScale: 0.25,
+    });
+    const sample = (rgba: Uint8ClampedArray, degrees: number) => {
+      const angle = (degrees * Math.PI) / 180;
+      const x = Math.round(center + Math.cos(angle) * 36);
+      const y = Math.round(center + Math.sin(angle) * 36);
+      return signedLighting(rgba, y * size + x);
+    };
+
+    // The native three-point donut keeps its upper-left key highlight, but its shadow is a broad
+    // material rim instead of one concentrated Lambert lobe.
+    expect(sample(broadened, 240)).toBe(sample(coupled, 240));
+    expect(sample(broadened, 60)).toBeGreaterThan(sample(coupled, 60));
+    expect(sample(broadened, 150)).toBeLessThan(sample(coupled, 150));
   });
 
   it('uses bevel width for band extent and bevel height for lighting contrast', () => {

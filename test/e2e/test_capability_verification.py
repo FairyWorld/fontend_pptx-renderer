@@ -112,7 +112,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
         {"slideIdx": 0, "hidden": False, "renderArtifacts": native_artifacts}
     ]
     return {
-        "schemaVersion": 6,
+        "schemaVersion": 7,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": {
             "score": 0.6,
@@ -124,6 +124,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
             "shadowOvershootRatio": 1.05,
             "solidDonutShadowOvershootRatio": 1.01,
             "solidDonutShadowEnergyOvershootRatio": 1.05,
+            "solidDonutShadowLocalExcessRatio": 0.30,
         },
         "applicableCaseCount": 1,
         "passed": passed,
@@ -166,6 +167,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                                     "referenceShadowEnergy": 12.0,
                                     "candidateShadowEnergy": 12.0,
                                     "shadowEnergyOvershootRatio": 1.0,
+                                    "shadowLocalExcessRatio": 0.0,
                                     "thresholds": {
                                         "score": 0.6,
                                         "cornerScore": 0.78,
@@ -176,6 +178,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                                         "shadowOvershootRatio": 1.05,
                                         "solidDonutShadowOvershootRatio": 1.01,
                                         "solidDonutShadowEnergyOvershootRatio": 1.05,
+                                        "solidDonutShadowLocalExcessRatio": 0.30,
                                     },
                                     "passed": passed,
                                 },
@@ -1038,6 +1041,22 @@ def test_rejects_tampered_bevel_artifacts_and_inconsistent_metric_results(tmp_pa
             baseline_reports=[baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             bevel_report=donut_energy_overshoot,
+        )
+
+    donut_local_excess = bevel_report(current, repo)
+    region = donut_local_excess["caseResults"][0]["slides"][0]["regions"][0]
+    region["region"]["preset"] = "donut"
+    region["metrics"]["shadowLocalExcessRatio"] = 0.31
+
+    with pytest.raises(CapabilityVerificationError, match="metric pass status"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            bevel_report=donut_local_excess,
         )
 
 

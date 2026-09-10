@@ -640,12 +640,13 @@ shapes; the bevel geometry remains shared. Solid highlights keep their common ma
 while dark-face attenuation is interpolated across the native square, wide, and tall matrices.
 Square ellipse/donut rows use the native-fitted effective 330° light bearing; other verified
 three-point rows retain 350°, with a smooth near-square transition for those curved presets. Wide
-rect/ellipse rows keep the native-backed `0.415` dark-face response, while the wide donut uses
-`0.370`: this trades a small peak-amplitude undershoot for mean negative shadow energy of `0.997×`
-native instead of the previous `1.108×`. `roundRect` retains its independently measured response.
+rect/ellipse rows keep the native-backed `0.415` dark-face response, while solid donuts additionally
+interpolate a native-backed broad shadow floor and a compressed directional shadow lobe across the
+tall, square, and wide matrices. This better matches PowerPoint's three-point material rim without
+moving the key highlight. `roundRect` retains its independently measured response.
 The native 6 pt square-rectangle row and the 10 pt tall-rectangle row also have bounded shadow
-anchors. The bevel-local gate checks both peak shadow amplitude and aggregate shadow energy, so a
-broad dark band cannot pass merely because its 5th-percentile amplitude is correct.
+anchors. The bevel-local gate checks peak amplitude, aggregate energy, and non-cancelling per-pixel
+local shadow excess, so an over-dark sector cannot be hidden by an under-dark sector elsewhere.
 A six-slide matrix pairs each omitted/default encoding with an explicit equivalent, and the local
 gate requires both PowerPoint and renderer raster pairs to remain byte-identical.
 

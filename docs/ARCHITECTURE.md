@@ -252,10 +252,14 @@ wide donut, the prior rounded-rectangle response for `roundRect`, and `0.646` at
 10 pt tall rectangle. A separate 6 pt square-rectangle anchor corrects its native dark face, while
 a `0.572` square-donut anchor preserves the native peak amplitude. Square ellipse/donut rows use an
 effective 330° three-point bearing fitted from their native directional fields; non-square verified
-rows retain 350°, with a continuous transition near square. The schema-v6 local metric caps general
+rows retain 350°, with a continuous transition near square. Solid donuts also use a log-aspect
+profile that combines a broad edge-opacity floor with a compressed directional shadow lobe. The
+profile is bounded by the native tall, square, and wide matrices and leaves positive key highlights
+on the common material response. The schema-v7 local metric caps general
 candidate/native shadow amplitude at `1.05`, tightened to `1.01` for solid donut faces, and also
-caps the donut's mean negative shadow energy at `1.05`. This prevents a broad dark band from passing
-solely because its 5th-percentile amplitude is correct. Native
+caps the donut's mean negative shadow energy at `1.05` and non-cancelling per-pixel local shadow
+excess at `0.30` of native mean shadow energy. This prevents a locally over-dark sector from passing
+because its peak or total energy is offset by a lighter sector elsewhere. Native
 evidence calibrates the implicit `twoPt:t` picture response
 independently from the solid-shape `threePt:t` response. Texture
 work is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry,

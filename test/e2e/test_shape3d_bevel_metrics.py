@@ -11,10 +11,30 @@ from PIL import Image
 
 from scripts.shape3d_bevel_metrics import (
     BevelRegion,
+    _field_score,
     build_bevel_report,
     compute_bevel_ring_metrics,
     extract_shape3d_regions,
 )
+
+
+def test_shadow_local_excess_detects_spatial_overdarkening_hidden_by_equal_total_energy():
+    reference = np.linspace(-50, 50, 100, dtype=np.float32)
+    candidate = reference.copy()
+    first = candidate[:20].copy()
+    candidate[:20] = candidate[20:40]
+    candidate[20:40] = first
+
+    result = _field_score(
+        reference.reshape(10, 10),
+        candidate.reshape(10, 10),
+        np.ones((10, 10), dtype=bool),
+    )
+
+    assert result["score"] > 0.9
+    assert result["shadowOvershootRatio"] == pytest.approx(1.0)
+    assert result["shadowEnergyOvershootRatio"] == pytest.approx(1.0)
+    assert result["shadowLocalExcessRatio"] > 0.30
 
 
 def _rounded_mask(height: int, width: int, bounds: tuple[int, int, int, int], radius: int):
@@ -298,6 +318,7 @@ def test_bevel_ring_reports_resolution_limited_instead_of_guessing():
                 "shadowOvershootRatio": 1.05,
                 "solidDonutShadowOvershootRatio": 1.01,
                 "solidDonutShadowEnergyOvershootRatio": 1.05,
+                "solidDonutShadowLocalExcessRatio": 0.30,
         },
     }
 
@@ -642,7 +663,7 @@ def test_bevel_report_enforces_declared_implicit_explicit_slide_equivalence(tmp_
 
     matched = build_bevel_report([native_path], repo, reports_dir)
 
-    assert matched["schemaVersion"] == 6
+    assert matched["schemaVersion"] == 7
     assert matched["caseResults"][0]["equivalencePairs"] == [
         {
             "leftSlideIdx": 0,

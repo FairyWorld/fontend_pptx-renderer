@@ -266,13 +266,13 @@ After evaluating top-bevel cases 0001-0012 and 0017, run `../scripts/shape3d_bev
 rect, roundRect, ellipse, and donut masks before comparing the native and HTML luminance fields only
 inside the bevel ring. Unknown silhouettes and rotations fail as unevaluable instead of borrowing a
 rectangular mask. It requires a general score of `0.60` and applies an additional `0.78` corner score
-to `roundRect`. Schema v6 additionally requires dynamic-range ratio `0.85`, shadow-amplitude ratio
+to `roundRect`. Schema v7 additionally requires dynamic-range ratio `0.85`, shadow-amplitude ratio
 `0.85`, a directional candidate/native shadow ceiling of `1.05`, a tighter `1.01` ceiling for solid
-donut peak amplitude, a `1.05` ceiling for solid-donut mean negative shadow energy, solid-shape
+donut peak amplitude, a `1.05` ceiling for solid-donut mean negative shadow energy, a `0.30` ceiling
+for its non-cancelling per-pixel local shadow excess relative to native mean shadow energy, solid-shape
 highlight-amplitude ratio `0.80`, and the separately verified picture-
-highlight ratio `0.70`. The symmetric ratios catch
-large weak or excessive responses; the directional ceiling catches a smaller but visible over-dark
-edge even when the composite correlation score remains high. Zero-thickness
+highlight ratio `0.70`. The local excess ceiling catches an over-dark sector even when a lighter
+sector keeps total energy and the composite correlation score high. Zero-thickness
 donuts remain covered by the full-slide gate; bands below four pixels are reported as
 resolution-limited and remain subject to full-slide and manual checks. Pass the resulting JSON to
 `run_capability_loop.py verify --bevel-report ...`; both commands verify the API and on-disk raster

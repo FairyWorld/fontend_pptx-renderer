@@ -7,6 +7,10 @@ interface CircleBevelLightingOptions {
   heightPx: number;
   /** Clockwise compass bearing: 0 is up and 90 is right. */
   lightAzimuthDeg: number;
+  /** Optional edge-opacity floor used to approximate the broad shadow rim of a multi-light rig. */
+  shadowFloor?: number;
+  /** Optional multiplier that compresses the directional shadow lobe above the floor. */
+  shadowScale?: number;
   /** Light elevation above the slide plane. */
   lightElevationDeg: number;
   /** Material-specific response strength applied to the signed Lambert delta. */
@@ -84,6 +88,16 @@ function assertLightingOptions(options: CircleBevelLightingOptions): void {
   if (!Number.isFinite(options.intensity) || options.intensity < 0) {
     throw new RangeError('intensity must be a non-negative finite number');
   }
+  if (
+    (options.shadowFloor !== undefined &&
+      (!Number.isFinite(options.shadowFloor) ||
+        options.shadowFloor < 0 ||
+        options.shadowFloor > 0.72)) ||
+    (options.shadowScale !== undefined &&
+      (!Number.isFinite(options.shadowScale) || options.shadowScale < 0 || options.shadowScale > 1))
+  ) {
+    throw new RangeError('shadow floor and scale must be finite normalized values');
+  }
 }
 
 /**
@@ -147,9 +161,13 @@ export function renderCircleBevelOverlay(
 
       const bevelResponse = Math.max(0, normalX * lightX + normalY * lightY + normalZ * lightZ);
       const lightingDelta = bevelResponse - Math.max(0, lightZ);
-      const opacity = Math.round(
-        clamp(Math.abs(lightingDelta) * options.intensity * coverage, 0, 0.72) * 255,
-      );
+      const directionalOpacity = Math.abs(lightingDelta) * options.intensity;
+      const materialOpacity =
+        lightingDelta > 0
+          ? directionalOpacity
+          : directionalOpacity * (options.shadowScale ?? 1) +
+            (options.shadowFloor ?? 0) * remainingRadius;
+      const opacity = Math.round(clamp(materialOpacity * coverage, 0, 0.72) * 255);
       if (opacity <= 0) continue;
 
       const outputOffset = pixelIndex * 4;

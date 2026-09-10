@@ -1098,7 +1098,7 @@ describe('buildStaticShape3DPlan', () => {
       surface: 'shape',
       geometry: 'ellipse',
       bounds: { width, height },
-      light: { azimuth },
+      light: { azimuth, shadowFloor: undefined, shadowScale: undefined },
     });
   });
 
@@ -1123,6 +1123,33 @@ describe('buildStaticShape3DPlan', () => {
       bounds: { width: 240, height: 160 },
     });
   });
+
+  it.each([
+    [110, 200, 0, 0.9],
+    [200, 200, 0.6, 0.25],
+    [500, 200, 0.7, 0.4],
+  ])(
+    'uses the native-backed broad donut shadow profile at %sx%s',
+    (width, height, shadowFloor, shadowScale) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(supportedScene, supportedShape),
+        {
+          nodeType: 'shape',
+          presetGeometry: 'donut',
+          width,
+          height,
+          paintKind: 'solid',
+          baseFill: '#2F75B5',
+        },
+        createMockRenderContext(),
+      );
+
+      expect(plan).toMatchObject({
+        mode: 'orthographic-top-bevel',
+        light: { shadowFloor, shadowScale },
+      });
+    },
+  );
 
   it('keeps rounded pictures outside the bounded geometry cohort', () => {
     const plan = buildStaticShape3DPlan(

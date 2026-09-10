@@ -32,6 +32,7 @@ SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
 SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.01
 SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD = 1.05
+SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD = 0.30
 MIN_EVALUABLE_BAND_PX = 4.0
 DEFAULT_BEVEL_DIMENSION_EMU = 76200.0
 
@@ -348,6 +349,19 @@ def _field_score(
         if reference_shadow_energy > 1e-6
         else 1.0 + candidate_shadow_energy
     )
+    shadow_local_excess = float(
+        np.mean(
+            np.maximum(
+                np.maximum(-candidate_values, 0.0) - np.maximum(-reference_values, 0.0),
+                0.0,
+            )
+        )
+    )
+    shadow_local_excess_ratio = (
+        shadow_local_excess / reference_shadow_energy
+        if reference_shadow_energy > 1e-6
+        else shadow_local_excess
+    )
     salient = np.abs(reference_values) >= max(3.0, reference_range * 0.15)
     sign_agreement = (
         float(np.mean(np.sign(reference_values[salient]) == np.sign(candidate_values[salient])))
@@ -378,6 +392,7 @@ def _field_score(
         "referenceShadowEnergy": reference_shadow_energy,
         "candidateShadowEnergy": candidate_shadow_energy,
         "shadowEnergyOvershootRatio": float(shadow_energy_overshoot_ratio),
+        "shadowLocalExcessRatio": float(shadow_local_excess_ratio),
         "meanAbsoluteError": mean_absolute_error,
     }
 
@@ -401,6 +416,9 @@ def compute_bevel_ring_metrics(
     ),
     solid_donut_shadow_energy_overshoot_ratio_threshold: float = (
         SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD
+    ),
+    solid_donut_shadow_local_excess_ratio_threshold: float = (
+        SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD
     ),
 ) -> dict[str, Any]:
     reference, candidate = _common_images(reference, candidate)
@@ -438,6 +456,9 @@ def compute_bevel_ring_metrics(
                 "solidDonutShadowEnergyOvershootRatio": (
                     solid_donut_shadow_energy_overshoot_ratio_threshold
                 ),
+                "solidDonutShadowLocalExcessRatio": (
+                    solid_donut_shadow_local_excess_ratio_threshold
+                ),
             },
         }
     unsupported_reason = None
@@ -466,6 +487,9 @@ def compute_bevel_ring_metrics(
                 ),
                 "solidDonutShadowEnergyOvershootRatio": (
                     solid_donut_shadow_energy_overshoot_ratio_threshold
+                ),
+                "solidDonutShadowLocalExcessRatio": (
+                    solid_donut_shadow_local_excess_ratio_threshold
                 ),
             },
         }
@@ -510,6 +534,11 @@ def compute_bevel_ring_metrics(
         if region.surface == "shape" and region.preset == "donut"
         else math.inf
     )
+    shadow_local_excess_threshold = (
+        solid_donut_shadow_local_excess_ratio_threshold
+        if region.surface == "shape" and region.preset == "donut"
+        else math.inf
+    )
     passed = (
         overall["score"] >= score_threshold
         and overall["rangeRatio"] >= range_ratio_threshold
@@ -517,6 +546,7 @@ def compute_bevel_ring_metrics(
         and overall["shadowAmplitudeRatio"] >= shadow_amplitude_ratio_threshold
         and overall["shadowOvershootRatio"] <= shadow_overshoot_threshold
         and overall["shadowEnergyOvershootRatio"] <= shadow_energy_overshoot_threshold
+        and overall["shadowLocalExcessRatio"] <= shadow_local_excess_threshold
         and (not corner_required or corner["score"] >= corner_score_threshold)
     )
     return {
@@ -540,6 +570,9 @@ def compute_bevel_ring_metrics(
             "solidDonutShadowOvershootRatio": solid_donut_shadow_overshoot_ratio_threshold,
             "solidDonutShadowEnergyOvershootRatio": (
                 solid_donut_shadow_energy_overshoot_ratio_threshold
+            ),
+            "solidDonutShadowLocalExcessRatio": (
+                solid_donut_shadow_local_excess_ratio_threshold
             ),
         },
         "passed": passed,
@@ -731,7 +764,7 @@ def build_bevel_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 6,
+        "schemaVersion": 7,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "score": SCORE_THRESHOLD,
@@ -746,6 +779,9 @@ def build_bevel_report(
             ),
             "solidDonutShadowEnergyOvershootRatio": (
                 SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD
+            ),
+            "solidDonutShadowLocalExcessRatio": (
+                SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD
             ),
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),

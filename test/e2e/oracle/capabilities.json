@@ -258,7 +258,7 @@
         "cameraRotation": ["absent"],
         "coexistingEffects": ["outerShdw"],
         "contour": ["absent-or-zero", "positive-with-resolvable-color"],
-        "donutShadowGate": ["mean-negative-energy-overshoot-lte-1.05", "p05-amplitude-overshoot-lte-1.01"],
+        "donutShadowGate": ["mean-negative-energy-overshoot-lte-1.05", "p05-amplitude-overshoot-lte-1.01", "local-excess-relative-to-native-mean-shadow-energy-lte-0.30"],
         "extrusionColor": ["absent"],
         "extrusionHeight": [0],
         "lightDirection": ["t"],

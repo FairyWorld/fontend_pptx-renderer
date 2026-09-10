@@ -26,6 +26,7 @@ BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
 BEVEL_SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.01
 BEVEL_SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD = 1.05
+BEVEL_SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD = 0.30
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 CAMERA_CORNER_SCORE_THRESHOLD = 0.98
 CAMERA_COLOR_SCORE_THRESHOLD = 0.97
@@ -241,8 +242,8 @@ def _validate_bevel_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 6:
-        raise CapabilityVerificationError("bevel-local report requires schemaVersion=6")
+    if report.get("schemaVersion") != 7:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=7")
     renderer = _mapping(report.get("renderer"), "bevel-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -262,6 +263,9 @@ def _validate_bevel_local(
         ),
         "solidDonutShadowEnergyOvershootRatio": (
             BEVEL_SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD
+        ),
+        "solidDonutShadowLocalExcessRatio": (
+            BEVEL_SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD
         ),
     }:
         raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
@@ -428,6 +432,10 @@ def _validate_bevel_local(
                         metrics.get("shadowEnergyOvershootRatio"),
                         f"{metric_context} shadow energy overshoot ratio",
                     )
+                    shadow_local_excess_ratio = _finite_metric(
+                        metrics.get("shadowLocalExcessRatio"),
+                        f"{metric_context} shadow local excess ratio",
+                    )
                     if (
                         reference_range < 0
                         or candidate_range < 0
@@ -442,6 +450,7 @@ def _validate_bevel_local(
                         or not 0 <= shadow_ratio <= 1
                         or shadow_overshoot_ratio < 0
                         or shadow_energy_overshoot_ratio < 0
+                        or shadow_local_excess_ratio < 0
                     ):
                         raise CapabilityVerificationError(
                             f"{metric_context} metrics are outside their domains"
@@ -501,6 +510,11 @@ def _validate_bevel_local(
                         if surface == "shape" and geometry.get("preset") == "donut"
                         else math.inf
                     )
+                    shadow_local_excess_threshold = (
+                        BEVEL_SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD
+                        if surface == "shape" and geometry.get("preset") == "donut"
+                        else math.inf
+                    )
                     expected_pass = (
                         score >= BEVEL_SCORE_THRESHOLD
                         and range_ratio >= BEVEL_RANGE_RATIO_THRESHOLD
@@ -514,6 +528,7 @@ def _validate_bevel_local(
                         and shadow_overshoot_ratio <= shadow_overshoot_threshold
                         and shadow_energy_overshoot_ratio
                         <= shadow_energy_overshoot_threshold
+                        and shadow_local_excess_ratio <= shadow_local_excess_threshold
                         and (
                             not corner_required
                             or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD
