@@ -217,8 +217,8 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, zero-adjustment flowchart, bounded static DrawingML 3D, composite, and
-chart interaction cases, use the python-pptx generator. It currently defines 174 cases: 59 text,
-31 shape-adjustment, 28 flowchart, 15 static 3D, 20 composite, and 21 chart cases. Each flowchart
+chart interaction cases, use the python-pptx generator. It currently defines 175 cases: 59 text,
+31 shape-adjustment, 28 flowchart, 16 static 3D, 20 composite, and 21 chart cases. Each flowchart
 case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
 square explicit paint, wide theme-reference paint, and grouped tall explicit paint. The group uses
 a non-identity child coordinate space, and every source keeps an empty `a:avLst` with no adjustment
@@ -300,7 +300,7 @@ per-slide PNG. The generator refreshes tracked case metadata even when cached lo
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
 The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
-into tracked `oracle/cases-pypptx/` and do not change the 174-case default matrix.
+into tracked `oracle/cases-pypptx/` and do not change the 175-case default matrix.
 
 The top-bevel capability also has a region-level lighting gate. After the first twelve clean native
 API reports have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:

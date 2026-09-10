@@ -556,6 +556,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0013-camera-projection-matrix",
         "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
         "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix",
+        "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
     }
 
 
@@ -586,6 +587,7 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         "oracle-pypptx-shape3d-0013-camera-projection-matrix",
         "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
         "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix",
+        "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
     }
     for name in positive_names:
         root = roots[name]
@@ -844,6 +846,92 @@ def test_static_shape3d_perspective_left_text_matrix_serializes_implicit_camera_
     assert extents[0][0] == extents[0][1]
     assert extents[1][0] > extents[1][1]
     assert extents[2][1] > extents[2][0]
+
+
+def test_static_shape3d_perspective_right_picture_matrix_serializes_crop_interactions(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"]
+        == "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix"
+    )
+    assert case["slide_count"] == 4
+    assert case["coverage"]["features"] == [
+        "p:pic.prstGeom=rect",
+        "geometry.aspect=square|wide|tall",
+        "surface=stretchPngPicture",
+        "a:srcRect=absent|horizontal|vertical|real-asymmetric",
+        "a:scene3d.camera=perspectiveRight",
+        "a:scene3d.camera.rot=absent",
+        "a:scene3d.camera.fov=5700000",
+        "a:scene3d.lightRig=threePt:t",
+        "a:sp3d=absent",
+        "effects=absent",
+    ]
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    with ZipFile(pptx_path) as archive:
+        roots = [
+            etree.fromstring(archive.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 5)
+        ]
+
+    expected_crops = (
+        {},
+        {"l": "22000", "r": "8000"},
+        {"t": "18000", "b": "12000"},
+        {"l": "1705", "t": "3350", "r": "1323", "b": "3350"},
+    )
+    extents: list[tuple[int, int]] = []
+    for root, expected_crop in zip(roots, expected_crops, strict=True):
+        targets = root.xpath(".//p:pic[p:spPr/a:scene3d]", namespaces=ns)
+        assert len(targets) == 1
+        target = targets[0]
+        assert target.xpath("boolean(p:spPr/a:prstGeom[@prst='rect'])", namespaces=ns)
+        assert target.xpath(
+            "boolean(p:blipFill/a:blip[@r:embed])",
+            namespaces={
+                **ns,
+                "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            },
+        )
+        assert target.xpath("boolean(p:blipFill/a:stretch[not(a:fillRect)])", namespaces=ns)
+        assert not target.xpath(
+            "p:blipFill/a:tile | p:spPr/a:ln | p:spPr/a:sp3d"
+            " | p:spPr/a:effectLst | p:spPr/a:effectDag",
+            namespaces=ns,
+        )
+        assert target.xpath(
+            "boolean(p:spPr/a:scene3d/a:camera"
+            "[@prst='perspectiveRight'][@fov='5700000'][not(a:rot)])",
+            namespaces=ns,
+        )
+        assert target.xpath(
+            "boolean(p:spPr/a:scene3d/a:lightRig"
+            "[@rig='threePt'][@dir='t'][not(a:rot)])",
+            namespaces=ns,
+        )
+        crops = target.xpath("p:blipFill/a:srcRect", namespaces=ns)
+        if expected_crop:
+            assert len(crops) == 1
+            assert crops[0].attrib == expected_crop
+        else:
+            assert crops == []
+        cx, cy = target.xpath("p:spPr/a:xfrm/a:ext", namespaces=ns)[0].attrib.values()
+        extents.append((int(cx), int(cy)))
+
+    assert extents[0][0] == extents[0][1]
+    assert extents[1][0] > extents[1][1]
+    assert extents[2][1] > extents[2][0]
+    assert extents[3][0] > extents[3][1]
 
 
 def test_static_shape3d_ellipse_matrix_serializes_aspects_paints_and_group(tmp_path: Path):

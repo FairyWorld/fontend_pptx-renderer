@@ -185,7 +185,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 174 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 175 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -195,7 +195,7 @@ ground-truth export. It defines 174 cases under `oracle/cases-pypptx/` with the
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Zero-adjustment flowcharts** (28 cases, 84 slides): presets in shape IDs 61-88, each with
   square explicit paint, wide theme-reference paint, and grouped-tall rendering
-- **Static DrawingML 3D** (15 cases, 33 slides): flat picture opt-out plus a bounded
+- **Static DrawingML 3D** (16 cases, 37 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
   `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
@@ -206,7 +206,9 @@ ground-truth export. It defines 174 cases under `oracle/cases-pypptx/` with the
   grouped perspective zero-depth planes; case 14 adds scene-only square/wide/tall solid planes and
   square/wide/tall editable text planes for the exact contrasting-right camera tuple; case 15 adds
   square/wide/tall editable CJK/mixed-text planes for the observed `perspectiveLeft`, 120-degree
-  field-of-view tuple with implicit camera rotation and default top anchoring
+  field-of-view tuple with implicit camera rotation and default top anchoring; case 16 adds
+  square/wide/tall PNG picture planes for the observed `perspectiveRight`, 95-degree field of view,
+  including absent, horizontal, vertical, and real-corpus asymmetric source crops
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -242,7 +244,7 @@ fingerprints.
 The opt-in `oracle-local-shape3d-*` matrix explores ellipse, adjusted donut/star, concave freeform,
 shape rotation, nested group scaling, and glow interaction. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
-ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 174-case matrix.
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 175-case matrix.
 The original one-slide ellipse and donut probes remain useful for preflight comparisons, while the
 tracked three-slide ellipse and five-slide donut matrices bound the public
 `drawingml.shape.3d.top-bevel-contour` claim. That tuple also requires an absent scene backdrop,

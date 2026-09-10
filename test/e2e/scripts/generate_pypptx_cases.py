@@ -2111,6 +2111,72 @@ def _build_shape3d_cases() -> list[CaseDef]:
         ],
     )
 
+    def _add_perspective_right_picture_probe(
+        prs,
+        *,
+        width: float,
+        height: float,
+        crop: dict[str, float],
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        picture = slide.shapes.add_picture(
+            _shape3d_fixture_image(),
+            _emu((13.333 - width) / 2),
+            _emu((7.5 - height) / 2),
+            _emu(width),
+            _emu(height),
+        )
+        picture.name = "Perspective-right editable picture plane"
+        for edge, value in crop.items():
+            setattr(picture, f"crop_{edge}", value)
+        stretch = picture._element.find(qn("p:blipFill")).find(qn("a:stretch"))
+        if stretch is None:
+            raise RuntimeError("perspective-right picture plane has no a:stretch")
+        _remove_children(stretch, ("fillRect",))
+        _apply_flat_shape3d_scene(
+            picture,
+            camera_preset="perspectiveRight",
+            camera_rotation=None,
+            field_of_view=5700000,
+            include_shape_format=False,
+        )
+
+    def _build_perspective_right_picture_plane_matrix(prs) -> None:
+        for width, height, crop in (
+            (4.2, 4.2, {}),
+            (8.0, 3.2, {"left": 0.22, "right": 0.08}),
+            (3.2, 5.4, {"top": 0.18, "bottom": 0.12}),
+            (
+                5.6,
+                2.0,
+                {"left": 0.01705, "top": 0.0335, "right": 0.01323, "bottom": 0.0335},
+            ),
+        ):
+            _add_perspective_right_picture_probe(
+                prs,
+                width=width,
+                height=height,
+                crop=crop,
+            )
+
+    _add(
+        "perspective-right-picture-plane-matrix",
+        _build_perspective_right_picture_plane_matrix,
+        slide_count=4,
+        features=[
+            "p:pic.prstGeom=rect",
+            "geometry.aspect=square|wide|tall",
+            "surface=stretchPngPicture",
+            "a:srcRect=absent|horizontal|vertical|real-asymmetric",
+            "a:scene3d.camera=perspectiveRight",
+            "a:scene3d.camera.rot=absent",
+            "a:scene3d.camera.fov=5700000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d=absent",
+            "effects=absent",
+        ],
+    )
+
     return cases
 
 

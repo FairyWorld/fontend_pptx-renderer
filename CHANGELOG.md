@@ -18,11 +18,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus a fifteen-case, thirty-three-slide
+  shapes and pictures, with stable renderer fallback reasons, plus a sixteen-case, thirty-seven-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
   ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
-  vertical and combined source crops, plus explicit- and implicit-depth camera planes and a live
-  editable-text projection matrices, including an implicit-rotation `perspectiveLeft` CJK row.
+  vertical and combined source crops, plus explicit- and implicit-depth camera planes, editable-text
+  projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
+  implicit-rotation `perspectiveRight` picture matrix with source-crop interactions.
 - Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored eight-case
   3D discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
 - Added a schema-v3 camera-plane metric and derived capability gate that bind native raster hashes
