@@ -55,6 +55,10 @@ type StaticShape3DFallbackReason =
   | 'paint-kind'
   | 'contour-paint'
   | 'picture-source-crop'
+  | 'picture-fill-rect'
+  | 'picture-blip-effect'
+  | 'picture-shape-format'
+  | 'picture-stretch-mode'
   | 'tiled-picture'
   | 'visible-text'
   | 'text-body-properties'
@@ -92,6 +96,13 @@ interface StaticShape3DTarget {
   /** Resolved opaque solid paint used for the native-material face adjustment. */
   baseFill?: string;
   isTiledPicture?: boolean;
+  /** A non-default a:stretch/a:fillRect changes the picture destination rectangle. */
+  hasStretchFillRect?: boolean;
+  hasStretchMode?: boolean;
+  /** Direct a:blip effects are outside the native-backed picture-plane tuple. */
+  hasBlipEffects?: boolean;
+  hasPictureBackgroundFill?: boolean;
+  hasCustomGeometry?: boolean;
   /** Parsed a:srcRect fractions removed from each source-image edge. */
   sourceCrop?: StaticShape3DSourceCrop;
   /** Exact live-text layout tuple covered by the scene-only native matrix. */
@@ -169,11 +180,31 @@ export interface StaticShape3DTextCameraPlan {
   };
 }
 
+export interface StaticShape3DPictureCameraPlan {
+  mode: 'camera-projected-picture-plane';
+  surface: 'picture';
+  geometry: 'rect';
+  bounds: { width: number; height: number };
+  corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint];
+  camera: {
+    kind: 'perspective';
+    preset: 'perspectiveRight';
+    rotation: Shape3DRotation;
+    fieldOfView: number;
+  };
+  lighting: {
+    brightness: number;
+    color: '#FFFFFF';
+    opacity: number;
+  };
+}
+
 export type StaticShape3DPlan =
   | StaticShape3DFlatPlan
   | StaticShape3DSupportedPlan
   | StaticShape3DCameraPlan
-  | StaticShape3DTextCameraPlan;
+  | StaticShape3DTextCameraPlan
+  | StaticShape3DPictureCameraPlan;
 
 /** Apply the supported camera homography to live text without rasterizing its DOM content. */
 export function applyStaticShape3DTextPlane(
@@ -190,6 +221,24 @@ export function applyStaticShape3DTextPlane(
   textContainer.dataset.pptxShape3dProjectedTextPlane = plan.camera.kind;
   textContainer.style.transformOrigin = '0px 0px';
   textContainer.style.transform = transform;
+  return true;
+}
+
+/** Apply the native-backed camera homography to a live, crop-clipping picture stage. */
+export function applyStaticShape3DPicturePlane(
+  pictureStage: HTMLElement,
+  plan: StaticShape3DPlan | undefined,
+): boolean {
+  if (plan?.mode !== 'camera-projected-picture-plane' || pictureStage.style.transform) return false;
+  const transform = projectiveTransformToCssMatrix3d(
+    plan.bounds.width,
+    plan.bounds.height,
+    plan.corners,
+  );
+  if (!transform) return false;
+  pictureStage.dataset.pptxShape3dProjectedPicturePlane = plan.camera.kind;
+  pictureStage.style.transformOrigin = '0px 0px';
+  pictureStage.style.transform = transform;
   return true;
 }
 
@@ -220,6 +269,7 @@ const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_RELAXED_MODERATELY_PROJECTION_SCALE = 0.996;
 const PERSPECTIVE_CONTRASTING_RIGHT_FACING_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_LEFT_VIEWPORT_SCALE = 0.95;
+const PERSPECTIVE_RIGHT_VIEWPORT_SCALE = 0.95;
 const shape3dTaskTails = new WeakMap<Promise<void>[], Promise<void>>();
 let shape3dIdCounter = 0;
 
@@ -382,7 +432,6 @@ function buildCameraProjectionPlan(
 ): StaticShape3DPlan {
   const scene = properties.scene!;
   const shape = properties.shape;
-  if (target.nodeType !== 'shape') return flat('missing-top-bevel');
   if (target.hasVisibleStroke) return flat('visible-stroke');
   if ((target.rotation ?? 0) !== 0 || target.flipH || target.flipV) return flat('shape-transform');
   if (properties.effectKinds.length > 0) return flat('effect-list-conflict');
@@ -398,6 +447,52 @@ function buildCameraProjectionPlan(
   if (scene.lightDirection !== 't') return flat('light-direction');
   if (scene.lightRotation) return flat('light-rotation');
   if (scene.cameraZoom !== undefined) return flat('camera-zoom');
+
+  if (target.nodeType === 'picture') {
+    if (shape) return flat('picture-shape-format');
+    if (target.paintKind !== 'picture') return flat('paint-kind');
+    if (target.hasStyleReference) return flat('style-reference');
+    if (target.presetGeometry?.toLowerCase() !== 'rect' || target.hasCustomGeometry) {
+      return flat('geometry-preset');
+    }
+    if (!target.hasStretchMode) return flat('picture-stretch-mode');
+    if (target.hasStretchFillRect) return flat('picture-fill-rect');
+    if (target.hasBlipEffects) return flat('picture-blip-effect');
+    if (target.hasPictureBackgroundFill) return flat('paint-kind');
+    if (scene.cameraPreset !== 'perspectiveRight') return flat('camera-preset');
+    if (scene.fieldOfView === undefined || Math.abs(scene.fieldOfView - 95) > 1e-6) {
+      return flat('camera-field-of-view');
+    }
+    if (scene.cameraRotation) return flat('camera-rotation');
+    // The Office preset supplies a -20-degree longitude when a:rot is absent.
+    const rotation = { latitude: 0, longitude: -20, revolution: 0 };
+    const projection = projectFlatPlane({
+      kind: 'perspective',
+      width: target.width,
+      height: target.height,
+      presentationWidth: ctx.presentation.width,
+      rotation,
+      fieldOfView: scene.fieldOfView,
+      presetViewportScale: PERSPECTIVE_RIGHT_VIEWPORT_SCALE,
+    });
+    if (!projection) return flat('projection-out-of-range');
+    return {
+      mode: 'camera-projected-picture-plane',
+      surface: 'picture',
+      geometry: 'rect',
+      bounds: { width: target.width, height: target.height },
+      corners: projection.corners,
+      camera: {
+        kind: 'perspective',
+        preset: 'perspectiveRight',
+        rotation,
+        fieldOfView: scene.fieldOfView,
+      },
+      // The native matrix consistently brightens this zero-depth picture material under
+      // threePt:t. These constants are fitted across all four aspect/crop probes, not one slide.
+      lighting: { brightness: 1.01, color: '#FFFFFF', opacity: 0.09 },
+    };
+  }
 
   if (target.hasVisibleText) {
     if (shape) return flat('visible-text');

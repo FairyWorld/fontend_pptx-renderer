@@ -59,6 +59,12 @@ const perspectiveLeftTextCameraScene = `
     <a:lightRig rig="threePt" dir="t"/>
   </a:scene3d>`;
 
+const perspectiveRightPictureCameraScene = `
+  <a:scene3d>
+    <a:camera prst="perspectiveRight" fov="5700000"/>
+    <a:lightRig rig="threePt" dir="t"/>
+  </a:scene3d>`;
+
 const originalImageDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
 
 afterEach(() => {
@@ -288,6 +294,163 @@ describe('buildStaticShape3DPlan', () => {
     expect(plan.corners[0].y).toBeGreaterThan(plan.corners[1].y);
   });
 
+  it('builds the exact perspective-right picture plane with the preset implicit rotation', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveRightPictureCameraScene, ''),
+      {
+        nodeType: 'picture',
+        presetGeometry: 'rect',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'picture',
+        hasStretchMode: true,
+        hasVisibleStroke: false,
+        rotation: 0,
+        flipH: false,
+        flipV: false,
+        sourceCrop: { left: 0.22, top: 0.18, right: 0.08, bottom: 0.12 },
+      },
+      createMockRenderContext({
+        presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+      }),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'camera-projected-picture-plane',
+      surface: 'picture',
+      geometry: 'rect',
+      camera: {
+        kind: 'perspective',
+        preset: 'perspectiveRight',
+        rotation: { latitude: 0, longitude: -20, revolution: 0 },
+        fieldOfView: 95,
+      },
+      lighting: { brightness: 1.01, color: '#FFFFFF', opacity: 0.09 },
+    });
+    if (plan.mode !== 'camera-projected-picture-plane') throw new Error('expected picture plan');
+    expect(plan.corners[0]).toEqual({ x: expect.closeTo(-14.6, 1), y: expect.closeTo(-28.5, 1) });
+    expect(plan.corners[2]).toEqual({ x: expect.closeTo(370.2, 1), y: expect.closeTo(381, 1) });
+  });
+
+  it.each([
+    [
+      'explicit camera rotation',
+      perspectiveRightPictureCameraScene.replace(
+        '<a:camera prst="perspectiveRight" fov="5700000"/>',
+        '<a:camera prst="perspectiveRight" fov="5700000"><a:rot lat="0" lon="-1200000" rev="0"/></a:camera>',
+      ),
+      '',
+      { presetGeometry: 'rect' },
+      'camera-rotation',
+    ],
+    [
+      'different field of view',
+      perspectiveRightPictureCameraScene.replace('5700000', '6000000'),
+      '',
+      { presetGeometry: 'rect' },
+      'camera-field-of-view',
+    ],
+    [
+      'shape format',
+      perspectiveRightPictureCameraScene,
+      '<a:sp3d extrusionH="0"/>',
+      { presetGeometry: 'rect' },
+      'picture-shape-format',
+    ],
+    [
+      'nonrectangular geometry',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'roundRect' },
+      'geometry-preset',
+    ],
+    [
+      'visible outline',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', hasVisibleStroke: true },
+      'visible-stroke',
+    ],
+    [
+      'picture transform',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', rotation: 1 },
+      'shape-transform',
+    ],
+    [
+      'tile fill',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', isTiledPicture: true },
+      'tiled-picture',
+    ],
+    [
+      'missing stretch mode',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', hasStretchMode: false },
+      'picture-stretch-mode',
+    ],
+    [
+      'stretch fill rectangle',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', hasStretchFillRect: true },
+      'picture-fill-rect',
+    ],
+    [
+      'blip effect',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', hasBlipEffects: true },
+      'picture-blip-effect',
+    ],
+    [
+      'picture background fill',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', hasPictureBackgroundFill: true },
+      'paint-kind',
+    ],
+    [
+      'custom geometry',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', hasCustomGeometry: true },
+      'geometry-preset',
+    ],
+    [
+      'style reference',
+      perspectiveRightPictureCameraScene,
+      '',
+      { presetGeometry: 'rect', hasStyleReference: true },
+      'style-reference',
+    ],
+  ])(
+    'keeps perspective-right picture planes with %s on a diagnostic flat fallback',
+    (_label, scene, shape, targetPatch, reason) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(scene, shape),
+        {
+          nodeType: 'picture',
+          width: 403.2,
+          height: 403.2,
+          paintKind: 'picture',
+          hasStretchMode: true,
+          hasVisibleStroke: false,
+          rotation: 0,
+          flipH: false,
+          flipV: false,
+          ...targetPatch,
+        },
+        createMockRenderContext(),
+      );
+
+      expect(plan).toEqual({ mode: 'flat', reason });
+    },
+  );
+
   it.each([
     [
       'explicit camera rotation',
@@ -299,24 +462,27 @@ describe('buildStaticShape3DPlan', () => {
       'camera-rotation',
     ],
     ['explicit center anchor', perspectiveLeftTextCameraScene, 'ctr', 'text-body-properties'],
-  ])('keeps perspective-left text with %s on the flat fallback', (_label, scene, anchor, reason) => {
-    const plan = buildStaticShape3DPlan(
-      parseShape3D(scene, ''),
-      {
-        nodeType: 'shape',
-        presetGeometry: 'rect',
-        width: 403.2,
-        height: 403.2,
-        paintKind: 'none',
-        hasVisibleStroke: false,
-        hasVisibleText: true,
-        textPlane: { wrap: 'none', anchor, autofit: 'spAutoFit' },
-      },
-      createMockRenderContext(),
-    );
+  ])(
+    'keeps perspective-left text with %s on the flat fallback',
+    (_label, scene, anchor, reason) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(scene, ''),
+        {
+          nodeType: 'shape',
+          presetGeometry: 'rect',
+          width: 403.2,
+          height: 403.2,
+          paintKind: 'none',
+          hasVisibleStroke: false,
+          hasVisibleText: true,
+          textPlane: { wrap: 'none', anchor, autofit: 'spAutoFit' },
+        },
+        createMockRenderContext(),
+      );
 
-    expect(plan).toEqual({ mode: 'flat', reason });
-  });
+      expect(plan).toEqual({ mode: 'flat', reason });
+    },
+  );
 
   it('keeps unverified scene-only text-body modes on the flat fallback', () => {
     const plan = buildStaticShape3DPlan(

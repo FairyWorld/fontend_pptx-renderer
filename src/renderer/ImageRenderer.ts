@@ -23,6 +23,7 @@ import { renderCustomGeometry } from '../shapes/customGeometry';
 import { getPresetShapeClipPath } from '../shapes/presets';
 import { splitTiledPatternFillCss } from './cssValues';
 import {
+  applyStaticShape3DPicturePlane,
   appendStaticShape3DEffects,
   buildStaticShape3DPlan,
   type StaticShape3DPlan,
@@ -243,6 +244,10 @@ function renderImageUrl(
   const blipOpacity = resolveBlipOpacity(blip);
 
   const tile = blipFill.child('tile');
+  const stretch = blipFill.child('stretch');
+  const fillRect = stretch.child('fillRect');
+  const pictureOutline = resolvePictureOutlineStyle(node, ctx);
+  const spPr = node.source.child('spPr');
   const shape3dPlan = buildStaticShape3DPlan(
     node.shape3d,
     {
@@ -252,6 +257,18 @@ function renderImageUrl(
       height: node.size.h,
       paintKind: 'picture',
       isTiledPicture: tile.exists(),
+      hasStretchMode: stretch.exists(),
+      hasStretchFillRect: fillRect.exists(),
+      hasBlipEffects: blip.allChildren().length > 0,
+      hasPictureBackgroundFill: ['solidFill', 'gradFill', 'pattFill', 'blipFill', 'grpFill'].some(
+        (name) => spPr.child(name).exists(),
+      ),
+      hasCustomGeometry: node.customGeometry?.exists() ?? false,
+      hasStyleReference: node.source.child('style').exists(),
+      hasVisibleStroke: pictureOutline !== undefined,
+      rotation: node.rotation,
+      flipH: node.flipH,
+      flipV: node.flipV,
       sourceCrop: node.crop,
     },
     ctx,
@@ -266,7 +283,6 @@ function renderImageUrl(
     return;
   }
 
-  const fillRect = node.source.child('blipFill').child('stretch').child('fillRect');
   const fillRectBox = fillRect.exists() ? getFillRectBox(fillRect) : undefined;
   const geometryClipPath = getPictureGeometryClipPath(node);
   const shape3dClipPath =
@@ -275,13 +291,11 @@ function renderImageUrl(
         `M0,0 L${node.size.w},0 L${node.size.w},${node.size.h} L0,${node.size.h} Z`)
       : geometryClipPath;
   if (shape3dClipPath) {
-    const pictureOutline =
-      shape3dPlan.mode === 'orthographic-top-bevel'
-        ? resolvePictureOutlineStyle(node, ctx)
-        : undefined;
+    const clippedPictureOutline =
+      shape3dPlan.mode === 'orthographic-top-bevel' ? pictureOutline : undefined;
     if (shape3dPlan.mode === 'orthographic-top-bevel') {
       wrapper.style.overflow = 'visible';
-      if (pictureOutline) {
+      if (clippedPictureOutline) {
         wrapper.style.border = '';
         wrapper.style.boxSizing = '';
       }
@@ -295,7 +309,7 @@ function renderImageUrl(
       ctx,
       fillRectBox,
       shape3dPlan,
-      pictureOutline,
+      clippedPictureOutline,
     );
     if (blipOpacity < 1) {
       wrapper.style.opacity = `${Number(blipOpacity.toFixed(4))}`;
@@ -372,6 +386,30 @@ function renderImageUrl(
   const biLevel = blip.child('biLevel');
   if (biLevel.exists()) {
     applyBiLevelEffect(biLevel, img, ctx.signal);
+  }
+
+  if (shape3dPlan.mode === 'camera-projected-picture-plane') {
+    const pictureStage = document.createElement('div');
+    pictureStage.style.position = 'absolute';
+    pictureStage.style.left = '0';
+    pictureStage.style.top = '0';
+    pictureStage.style.width = '100%';
+    pictureStage.style.height = '100%';
+    pictureStage.style.overflow = 'hidden';
+    if (applyStaticShape3DPicturePlane(pictureStage, shape3dPlan)) {
+      wrapper.style.overflow = 'visible';
+      img.style.filter = `brightness(${shape3dPlan.lighting.brightness})`;
+      pictureStage.appendChild(img);
+      const lighting = document.createElement('div');
+      lighting.dataset.pptxShape3dPictureLighting = 'threePt:t';
+      lighting.style.position = 'absolute';
+      lighting.style.inset = '0';
+      lighting.style.pointerEvents = 'none';
+      lighting.style.backgroundColor = `rgba(255, 255, 255, ${shape3dPlan.lighting.opacity})`;
+      pictureStage.appendChild(lighting);
+      wrapper.appendChild(pictureStage);
+      return;
+    }
   }
 
   wrapper.appendChild(img);

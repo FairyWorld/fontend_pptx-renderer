@@ -648,6 +648,118 @@ test('perspective-left preset projects top-anchored live text and rejects explic
   expect(result.explicitRotationProjected).toBe(false);
 });
 
+test('perspective-right picture projection preserves live image crop and bounded opt-outs', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parsePicNode } = await import('/src/model/nodes/PicNode.ts');
+    const { renderImage } = await import('/src/renderer/ImageRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const pictureXml = (explicitRotation: boolean, fillRect: boolean) => `
+      <p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <p:nvPicPr><p:cNvPr id="1" name="Perspective-right picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+        <p:blipFill><a:blip r:embed="rId1"/><a:srcRect l="22000" t="18000" r="8000" b="12000"/>
+          <a:stretch>${fillRect ? '<a:fillRect/>' : ''}</a:stretch>
+        </p:blipFill>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:scene3d><a:camera prst="perspectiveRight" fov="5700000">
+            ${explicitRotation ? '<a:rot lat="0" lon="-1200000" rev="0"/>' : ''}
+          </a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+        </p:spPr>
+      </p:pic>`;
+    const png = Uint8Array.from(
+      atob(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII=',
+      ),
+      (char) => char.charCodeAt(0),
+    );
+    const presentation = {
+      ...createMockRenderContext().presentation,
+      width: 1280,
+      height: 720,
+    };
+    const render = (explicitRotation: boolean, fillRect: boolean) => {
+      const context = createMockRenderContext({ presentation });
+      context.slide.rels.set('rId1', { type: 'image', target: 'ppt/media/image1.png' });
+      context.presentation.media.set('ppt/media/image1.png', png);
+      return renderImage(parsePicNode(parseXml(pictureXml(explicitRotation, fillRect))), context);
+    };
+
+    document.body.style.margin = '0';
+    const projectedPicture = render(false, false);
+    const explicitRotationPicture = render(true, false);
+    const fillRectPicture = render(false, true);
+    explicitRotationPicture.style.left = '600px';
+    fillRectPicture.style.left = '1000px';
+    document.body.append(projectedPicture, explicitRotationPicture, fillRectPicture);
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+
+    const stage = projectedPicture.querySelector<HTMLElement>(
+      '[data-pptx-shape3d-projected-picture-plane="perspective"]',
+    );
+    const image = stage?.querySelector<HTMLImageElement>('img');
+    const bounds = stage?.getBoundingClientRect();
+    return {
+      projected: !!stage,
+      transform: stage ? getComputedStyle(stage).transform : '',
+      wrapperOverflow: projectedPicture.style.overflow,
+      stageOverflow: stage?.style.overflow,
+      liveImage: !!image,
+      imageFilter: image?.style.filter,
+      lighting: stage?.querySelector<HTMLElement>(
+        '[data-pptx-shape3d-picture-lighting="threePt:t"]',
+      )?.style.backgroundColor,
+      crop: image
+        ? {
+            width: image.style.width,
+            height: image.style.height,
+            marginLeft: image.style.marginLeft,
+            marginTop: image.style.marginTop,
+          }
+        : null,
+      bounds: bounds
+        ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+        : null,
+      explicitRotationProjected: !!explicitRotationPicture.querySelector(
+        '[data-pptx-shape3d-projected-picture-plane]',
+      ),
+      fillRectProjected: !!fillRectPicture.querySelector(
+        '[data-pptx-shape3d-projected-picture-plane]',
+      ),
+    };
+  });
+
+  expect(result.projected).toBe(true);
+  expect(result.transform).toMatch(/^matrix3d\(/);
+  expect(result.wrapperOverflow).toBe('visible');
+  expect(result.stageOverflow).toBe('hidden');
+  expect(result.liveImage).toBe(true);
+  expect(result.imageFilter).toBe('brightness(1.01)');
+  expect(result.lighting).toBe('rgba(255, 255, 255, 0.09)');
+  expect(result.crop).toEqual({
+    width: '576px',
+    height: '576px',
+    marginLeft: '-126.72px',
+    marginTop: '-103.68px',
+  });
+  expect(result.bounds).toEqual({
+    x: expect.closeTo(-14.6, 1),
+    y: expect.closeTo(-28.5, 1),
+    width: expect.closeTo(384.8, 1),
+    height: expect.closeTo(460.1, 1),
+  });
+  expect(result.explicitRotationProjected).toBe(false);
+  expect(result.fillRectProjected).toBe(false);
+});
+
 test('static 3D donut composes with its upper adjustment bound and a solid theme fill', async ({
   page,
 }) => {
