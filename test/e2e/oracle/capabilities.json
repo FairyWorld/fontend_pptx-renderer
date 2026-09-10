@@ -119,6 +119,7 @@
         "cameraZoom": ["absent"],
         "coexistingEffects": ["no-explicit-effect-list", "solid-plane:theme-effectRef-idx2:exact-outer-shadow", "live-text:no-style-reference", "picture:no-style-reference:no-blip-effects"],
         "light": ["threePt:t:no-rotation"],
+        "metricNegativeControls": ["solid-plane:erase-exterior-shadow", "picture-plane:left-crop-12pct-and-rescale"],
         "modalityRows": ["solid-plane:standalone-or-nonidentity-group:resolved-opaque-solid:no-visible-text", "live-text-plane:standalone:noFill:no-style-reference:local-wrap-none:local-anchor-ctr:local-spAutoFit", "live-text-plane:standalone:noFill:no-style-reference:local-wrap-none:local-anchor-absent:local-spAutoFit", "live-picture-plane:standalone:rect:stretch:no-fillRect:no-style-reference:no-blip-effects:finite-nonnegative-source-crop"],
         "nodeKinds": ["shape", "picture"],
         "pictureSourceCrop": ["absent", "horizontal-nonnegative", "vertical-nonnegative", "asymmetric-nonnegative-positive-visible-extent"],

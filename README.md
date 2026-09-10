@@ -682,6 +682,11 @@ tolerance, plus grayscale ink-density retention. It inverse-projects picture pla
 rectangle and gates their content with color similarity and tolerant edge F1, so a correct outer
 quadrilateral cannot hide a wrong crop. The tolerance absorbs font and image rasterization
 differences while preserving semantic failures against the same hashed native rasters.
+For every measurable shadow row, the report erases the candidate's exterior shadow and requires the
+shadow metric to reject that mutation. Every picture row likewise injects a 12% left crop and
+rescale after rectification and requires the content metric to reject it. A gate therefore proves
+both that the current rendering passes and that its local assertions still detect the targeted
+failure modes.
 
 This support does not include camera values outside that exact plane matrix, nonzero extrusion,
 arbitrary light rotation, other bevel presets, tiled pictures, negative or degenerate source crops,

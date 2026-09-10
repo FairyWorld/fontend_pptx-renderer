@@ -166,6 +166,10 @@ def test_camera_metric_requires_native_shadow_energy_outside_the_projected_plane
     assert present["shadowRequired"] is True
     assert present["shadowMeasurable"] is True
     assert present["shadowPassed"] is True
+    assert present["shadowSensitivity"]["mutation"] == "erase-exterior-shadow"
+    assert present["shadowSensitivity"]["applicable"] is True
+    assert present["shadowSensitivity"]["mutatedShadowPassed"] is False
+    assert present["shadowSensitivity"]["detected"] is True
     assert present["passed"] is True
     assert missing["cornerScore"] > 0.995
     assert missing["colorScore"] > 0.995
@@ -187,6 +191,10 @@ def test_picture_camera_metric_rectifies_projection_and_rejects_wrong_source_cro
     assert matching["cornerScore"] > 0.995
     assert matching["rectifiedColorScore"] > 0.98
     assert matching["rectifiedEdgeF1"] > 0.95
+    assert matching["cropSensitivity"]["mutation"] == "left-crop-and-rescale"
+    assert matching["cropSensitivity"]["cropRatio"] == 0.12
+    assert matching["cropSensitivity"]["mutatedPassed"] is False
+    assert matching["cropSensitivity"]["detected"] is True
     assert mismatched["cornerScore"] > 0.995
     assert mismatched["rectifiedEdgeF1"] < matching["thresholds"]["rectifiedEdgeF1"]
     assert mismatched["passed"] is False

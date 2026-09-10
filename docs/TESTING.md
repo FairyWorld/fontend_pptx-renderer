@@ -363,7 +363,10 @@ tolerant projected-bounds score `0.98`, and grayscale ink-density retention `0.9
 inverse-projected to `384×384` and require corner score `0.98`, rectified color score `0.95`, and
 tolerant edge F1 `0.90`; this makes crop/content errors visible even when the outer quadrilateral is
 correct. Raw IoU and raw bounds stay in the report for diagnosis. The verifier recomputes pass
-status and derived ratios from fixed thresholds; callers cannot self-attest any modality.
+status and derived ratios from fixed thresholds. It also requires deterministic mutation controls
+to fail: exterior-shadow erasure on every measurable shadow row and a 12% left crop plus rescale on
+every rectified picture row. A corpus row whose local metric cannot detect its matching mutation is
+not promotable. Callers cannot self-attest any modality.
 
 PowerPoint automation on macOS needs an available interactive session. Error `-9074` can mean the
 session is locked, PowerPoint is waiting for a dialog, or the fixed staged input is still open from

@@ -44,6 +44,7 @@ PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD = 0.95
 PICTURE_RECTIFIED_EDGE_F1_THRESHOLD = 0.90
 PICTURE_RECTIFIED_SIZE = 384
 PICTURE_EDGE_TOLERANCE_RATIO = 0.008
+PICTURE_CROP_MUTATION_RATIO = 0.12
 
 
 def _slide_number(path: str) -> int:
@@ -649,6 +650,54 @@ def _camera_shadow_metrics(
     }
 
 
+def _erase_exterior_shadow(image: np.ndarray) -> np.ndarray:
+    mask = _foreground_mask(image)
+    radius = max(2, round(max(image.shape[:2]) * SHADOW_RING_OUTER_RATIO))
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (radius * 2 + 1, radius * 2 + 1),
+    )
+    exterior = (cv2.dilate(mask.astype(np.uint8), kernel) > 0) & ~mask
+    mutated = image.copy()
+    mutated[exterior] = 255
+    return mutated
+
+
+def _shadow_sensitivity(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    shadow: Mapping[str, Any],
+) -> dict[str, Any]:
+    if not shadow["shadowMeasurable"]:
+        return {
+            "mutation": "erase-exterior-shadow",
+            "applicable": False,
+            "detected": None,
+        }
+    normalized_candidate = candidate
+    if candidate.shape[:2] != reference.shape[:2]:
+        normalized_candidate = cv2.resize(
+            candidate,
+            (reference.shape[1], reference.shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
+    mutated = _camera_shadow_metrics(
+        reference,
+        _erase_exterior_shadow(normalized_candidate),
+        required=True,
+    )
+    detected = not mutated["shadowPassed"]
+    return {
+        "mutation": "erase-exterior-shadow",
+        "applicable": True,
+        "mutatedCandidateShadowDensity": mutated["candidateShadowDensity"],
+        "mutatedShadowEnergyRatio": mutated["shadowEnergyRatio"],
+        "mutatedShadowDirectionCosine": mutated["shadowDirectionCosine"],
+        "mutatedShadowPassed": mutated["shadowPassed"],
+        "detected": detected,
+    }
+
+
 def compute_camera_plane_metrics(
     reference: np.ndarray,
     candidate: np.ndarray,
@@ -694,6 +743,7 @@ def compute_camera_plane_metrics(
     else:
         gradient_direction = 0.0
     shadow = _camera_shadow_metrics(reference, candidate, required=shadow_required)
+    shadow_sensitivity = _shadow_sensitivity(reference, candidate, shadow)
     passed = (
         corner_score >= corner_score_threshold
         and color_score >= color_score_threshold
@@ -705,6 +755,10 @@ def compute_camera_plane_metrics(
             )
         )
         and shadow["shadowPassed"]
+        and (
+            not shadow_sensitivity["applicable"]
+            or shadow_sensitivity["detected"] is True
+        )
     )
     return {
         "evaluable": True,
@@ -719,6 +773,7 @@ def compute_camera_plane_metrics(
         "referenceBands": reference_bands.round(3).tolist(),
         "candidateBands": candidate_bands.round(3).tolist(),
         **shadow,
+        "shadowSensitivity": shadow_sensitivity,
         "thresholds": {
             "cornerScore": corner_score_threshold,
             "colorScore": color_score_threshold,
@@ -788,6 +843,42 @@ def _edge_coverage(reference: np.ndarray, candidate: np.ndarray) -> tuple[float,
     return reference_coverage, candidate_coverage, float(edge_f1), tolerance_px
 
 
+def _picture_crop_sensitivity(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    color_score_threshold: float,
+    edge_f1_threshold: float,
+) -> dict[str, Any]:
+    crop_pixels = max(1, round(candidate.shape[1] * PICTURE_CROP_MUTATION_RATIO))
+    mutated = cv2.resize(
+        candidate[:, crop_pixels:],
+        (candidate.shape[1], candidate.shape[0]),
+        interpolation=cv2.INTER_LINEAR,
+    )
+    color_score = max(
+        0.0,
+        1.0
+        - float(np.abs(reference.astype(np.float64) - mutated.astype(np.float64)).mean())
+        / 255,
+    )
+    reference_coverage, candidate_coverage, edge_f1, _ = _edge_coverage(
+        reference,
+        mutated,
+    )
+    mutated_passed = color_score >= color_score_threshold and edge_f1 >= edge_f1_threshold
+    return {
+        "mutation": "left-crop-and-rescale",
+        "cropRatio": PICTURE_CROP_MUTATION_RATIO,
+        "mutatedRectifiedColorScore": color_score,
+        "mutatedRectifiedEdgeF1": edge_f1,
+        "mutatedReferenceEdgeCoverageAtTolerance": reference_coverage,
+        "mutatedCandidateEdgeCoverageAtTolerance": candidate_coverage,
+        "mutatedPassed": mutated_passed,
+        "detected": not mutated_passed,
+    }
+
+
 def compute_picture_camera_metrics(
     reference: np.ndarray,
     candidate: np.ndarray,
@@ -824,10 +915,17 @@ def compute_picture_camera_metrics(
         reference_rectified,
         candidate_rectified,
     )
+    crop_sensitivity = _picture_crop_sensitivity(
+        reference_rectified,
+        candidate_rectified,
+        color_score_threshold=rectified_color_score_threshold,
+        edge_f1_threshold=rectified_edge_f1_threshold,
+    )
     passed = (
         corner_score >= corner_score_threshold
         and rectified_color_score >= rectified_color_score_threshold
         and edge_f1 >= rectified_edge_f1_threshold
+        and crop_sensitivity["detected"] is True
     )
     return {
         "evaluable": True,
@@ -839,12 +937,14 @@ def compute_picture_camera_metrics(
         "candidateEdgeCoverageAtTolerance": candidate_coverage,
         "edgeTolerancePx": tolerance_px,
         "rectifiedSize": PICTURE_RECTIFIED_SIZE,
+        "cropSensitivity": crop_sensitivity,
         "thresholds": {
             "cornerScore": corner_score_threshold,
             "rectifiedColorScore": rectified_color_score_threshold,
             "rectifiedEdgeF1": rectified_edge_f1_threshold,
             "rectifiedSize": PICTURE_RECTIFIED_SIZE,
             "edgeToleranceRatio": PICTURE_EDGE_TOLERANCE_RATIO,
+            "cropMutationRatio": PICTURE_CROP_MUTATION_RATIO,
         },
         "passed": passed,
     }
@@ -1135,6 +1235,7 @@ def build_camera_report(
                 "rectifiedEdgeF1": PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
                 "rectifiedSize": PICTURE_RECTIFIED_SIZE,
                 "edgeToleranceRatio": PICTURE_EDGE_TOLERANCE_RATIO,
+                "cropMutationRatio": PICTURE_CROP_MUTATION_RATIO,
             },
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),

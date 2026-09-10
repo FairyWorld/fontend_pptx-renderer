@@ -292,7 +292,10 @@ limited to its explicit `#2F75B5` and theme `#4F81BD` rows. The schema-v4 local 
 exact native rasters and checks normalized four-corner geometry, material color, gradient response,
 and required external-shadow evidence for solid planes; resolution-tolerant foreground, bounds, and
 ink retention for live text; and inverse-projected picture color plus tolerant edge fidelity for
-picture planes, in addition to the full-page oracle gate.
+picture planes, in addition to the full-page oracle gate. The report also runs deterministic
+sensitivity mutations against the same rasters: erasing a measurable exterior shadow and applying
+a 12% left crop plus rescale to rectified picture content. The derived gate fails if either mutation
+still passes its target metric.
 
 The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
 picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent

@@ -272,6 +272,9 @@ bounds remain diagnostic. Picture rows are inverse-projected to `384×384` and r
 `0.98`, rectified color score `0.95`, and tolerant edge F1 `0.90`, which detects wrong image content
 or crop behind a correct outer plane. Pass the schema-v4 report to
 `run_capability_loop.py verify --camera-report ...`; callers cannot self-attest `camera-local`.
+The same report erases every measurable candidate shadow and applies a 12% left crop plus rescale to
+each rectified picture. Both mutations must be rejected by their target metric, so the gate also
+proves that the selected corpus remains sensitive to the failure it claims to cover.
 
 On macOS the PowerPoint interactive session must remain available. Error `-9074` can come from a
 locked session, a pending dialog, or a staged `_pptx-input.pptx` left open by an interrupted run.

@@ -40,6 +40,7 @@ CAMERA_PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD = 0.95
 CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD = 0.90
 CAMERA_PICTURE_RECTIFIED_SIZE = 384
 CAMERA_PICTURE_EDGE_TOLERANCE_RATIO = 0.008
+CAMERA_PICTURE_CROP_MUTATION_RATIO = 0.12
 
 
 class CapabilityVerificationError(ValueError):
@@ -426,6 +427,7 @@ def _validate_camera_local(
             "rectifiedEdgeF1": CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
             "rectifiedSize": CAMERA_PICTURE_RECTIFIED_SIZE,
             "edgeToleranceRatio": CAMERA_PICTURE_EDGE_TOLERANCE_RATIO,
+            "cropMutationRatio": CAMERA_PICTURE_CROP_MUTATION_RATIO,
         },
     }
     thresholds = _mapping(report.get("thresholds"), "camera-local thresholds")
@@ -657,12 +659,75 @@ def _validate_camera_local(
                 )
                 if (
                     abs(shadow_energy_ratio - expected_shadow_energy_ratio) > 1e-9
-                    or
-                    shadow_measurable is not expected_shadow_measurable
+                    or shadow_measurable is not expected_shadow_measurable
                     or shadow_passed is not expected_shadow_passed
                 ):
                     raise CapabilityVerificationError(
                         f"{context} shadow metrics are inconsistent"
+                    )
+                shadow_sensitivity = _mapping(
+                    metrics.get("shadowSensitivity"),
+                    f"{context} shadow sensitivity",
+                )
+                if (
+                    shadow_sensitivity.get("mutation") != "erase-exterior-shadow"
+                    or shadow_sensitivity.get("applicable")
+                    is not expected_shadow_measurable
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} shadow sensitivity is inconsistent"
+                    )
+                if expected_shadow_measurable:
+                    mutated_density = _finite_metric(
+                        shadow_sensitivity.get("mutatedCandidateShadowDensity"),
+                        f"{context} mutated shadow density",
+                    )
+                    mutated_energy_ratio = _finite_metric(
+                        shadow_sensitivity.get("mutatedShadowEnergyRatio"),
+                        f"{context} mutated shadow energy ratio",
+                    )
+                    mutated_direction = _finite_metric(
+                        shadow_sensitivity.get("mutatedShadowDirectionCosine"),
+                        f"{context} mutated shadow direction",
+                    )
+                    mutated_passed = shadow_sensitivity.get("mutatedShadowPassed")
+                    detected = shadow_sensitivity.get("detected")
+                    if (
+                        mutated_density < 0
+                        or not 0 <= mutated_energy_ratio <= 1
+                        or not -1 <= mutated_direction <= 1
+                        or not isinstance(mutated_passed, bool)
+                        or not isinstance(detected, bool)
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{context} shadow sensitivity is outside its domain"
+                        )
+                    mutated_maximum_density = max(
+                        reference_shadow_density,
+                        mutated_density,
+                    )
+                    expected_mutated_energy_ratio = (
+                        min(reference_shadow_density, mutated_density)
+                        / mutated_maximum_density
+                        if mutated_maximum_density > 1e-9
+                        else 1.0
+                    )
+                    expected_mutated_passed = (
+                        mutated_energy_ratio >= CAMERA_SHADOW_ENERGY_RATIO_THRESHOLD
+                        and mutated_direction >= CAMERA_SHADOW_DIRECTION_THRESHOLD
+                    )
+                    if (
+                        abs(mutated_energy_ratio - expected_mutated_energy_ratio) > 1e-9
+                        or mutated_passed is not expected_mutated_passed
+                        or detected is not (not expected_mutated_passed)
+                        or detected is not True
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{context} shadow sensitivity is inconsistent"
+                        )
+                elif shadow_sensitivity.get("detected") is not None:
+                    raise CapabilityVerificationError(
+                        f"{context} shadow sensitivity is inconsistent"
                     )
                 expected_pass = (
                     corner_score >= CAMERA_CORNER_SCORE_THRESHOLD
@@ -854,12 +919,76 @@ def _validate_camera_local(
                     raise CapabilityVerificationError(
                         f"{context} picture edge metrics are inconsistent"
                     )
+                crop_sensitivity = _mapping(
+                    metrics.get("cropSensitivity"),
+                    f"{context} crop sensitivity",
+                )
+                if (
+                    crop_sensitivity.get("mutation") != "left-crop-and-rescale"
+                    or crop_sensitivity.get("cropRatio")
+                    != CAMERA_PICTURE_CROP_MUTATION_RATIO
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} crop sensitivity is inconsistent"
+                    )
+                mutated_color_score = _finite_metric(
+                    crop_sensitivity.get("mutatedRectifiedColorScore"),
+                    f"{context} mutated picture color score",
+                )
+                mutated_edge_f1 = _finite_metric(
+                    crop_sensitivity.get("mutatedRectifiedEdgeF1"),
+                    f"{context} mutated picture edge F1",
+                )
+                mutated_reference_coverage = _finite_metric(
+                    crop_sensitivity.get("mutatedReferenceEdgeCoverageAtTolerance"),
+                    f"{context} mutated reference picture edge coverage",
+                )
+                mutated_candidate_coverage = _finite_metric(
+                    crop_sensitivity.get("mutatedCandidateEdgeCoverageAtTolerance"),
+                    f"{context} mutated candidate picture edge coverage",
+                )
+                mutated_passed = crop_sensitivity.get("mutatedPassed")
+                detected = crop_sensitivity.get("detected")
+                if (
+                    not 0 <= mutated_color_score <= 1
+                    or not 0 <= mutated_edge_f1 <= 1
+                    or not 0 <= mutated_reference_coverage <= 1
+                    or not 0 <= mutated_candidate_coverage <= 1
+                    or not isinstance(mutated_passed, bool)
+                    or not isinstance(detected, bool)
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} crop sensitivity is outside its domain"
+                    )
+                expected_mutated_edge_f1 = (
+                    2
+                    * mutated_reference_coverage
+                    * mutated_candidate_coverage
+                    / (mutated_reference_coverage + mutated_candidate_coverage)
+                    if mutated_reference_coverage + mutated_candidate_coverage > 0
+                    else 0.0
+                )
+                expected_mutated_passed = (
+                    mutated_color_score
+                    >= CAMERA_PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD
+                    and mutated_edge_f1 >= CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD
+                )
+                if (
+                    abs(mutated_edge_f1 - expected_mutated_edge_f1) > 1e-9
+                    or mutated_passed is not expected_mutated_passed
+                    or detected is not (not expected_mutated_passed)
+                    or detected is not True
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} crop sensitivity is inconsistent"
+                    )
                 expected_pass = (
                     corner_score >= CAMERA_PICTURE_CORNER_SCORE_THRESHOLD
                     and rectified_color_score
                     >= CAMERA_PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD
                     and rectified_edge_f1
                     >= CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD
+                    and detected
                 )
             if (
                 metrics.get("passed") is not expected_pass

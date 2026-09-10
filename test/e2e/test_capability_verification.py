@@ -208,6 +208,7 @@ def camera_report(
         "rectifiedEdgeF1": 0.90,
         "rectifiedSize": 384,
         "edgeToleranceRatio": 0.008,
+        "cropMutationRatio": 0.12,
     }
     thresholds = {
         "plane": plane_thresholds,
@@ -238,6 +239,15 @@ def camera_report(
             "shadowRingInnerPx": 3,
             "shadowRingOuterPx": 24,
             "shadowPassed": passed,
+            "shadowSensitivity": {
+                "mutation": "erase-exterior-shadow",
+                "applicable": True,
+                "mutatedCandidateShadowDensity": 0.0,
+                "mutatedShadowEnergyRatio": 0.0,
+                "mutatedShadowDirectionCosine": 0.0,
+                "mutatedShadowPassed": False,
+                "detected": True,
+            },
             "thresholds": plane_thresholds,
             "passed": passed,
         }
@@ -264,6 +274,8 @@ def camera_report(
     else:
         reference_edge_coverage = 0.96
         candidate_edge_coverage = 0.94
+        mutated_reference_edge_coverage = 0.52
+        mutated_candidate_edge_coverage = 0.61
         metrics = {
             "evaluable": True,
             "cornerScore": 0.995 if passed else 0.9,
@@ -279,6 +291,28 @@ def camera_report(
             "candidateEdgeCoverageAtTolerance": candidate_edge_coverage,
             "edgeTolerancePx": 3,
             "rectifiedSize": 384,
+            "cropSensitivity": {
+                "mutation": "left-crop-and-rescale",
+                "cropRatio": 0.12,
+                "mutatedRectifiedColorScore": 0.91,
+                "mutatedRectifiedEdgeF1": (
+                    2
+                    * mutated_reference_edge_coverage
+                    * mutated_candidate_edge_coverage
+                    / (
+                        mutated_reference_edge_coverage
+                        + mutated_candidate_edge_coverage
+                    )
+                ),
+                "mutatedReferenceEdgeCoverageAtTolerance": (
+                    mutated_reference_edge_coverage
+                ),
+                "mutatedCandidateEdgeCoverageAtTolerance": (
+                    mutated_candidate_edge_coverage
+                ),
+                "mutatedPassed": False,
+                "detected": True,
+            },
             "thresholds": picture_thresholds,
             "passed": passed,
         }
@@ -626,6 +660,21 @@ def test_rejects_inconsistent_camera_shadow_or_picture_metrics(tmp_path: Path):
             camera_report=inconsistent_shadow,
         )
 
+    undetected_shadow = camera_report(plane, repo)
+    undetected_shadow["caseResults"][0]["slides"][0]["metrics"][
+        "shadowSensitivity"
+    ]["detected"] = False
+    with pytest.raises(CapabilityVerificationError, match="shadow sensitivity is inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [plane],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[plane_baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=undetected_shadow,
+        )
+
     picture = native_report("camera-picture")
     picture_baseline = native_report("camera-picture", revision="b" * 40)
     inconsistent_picture = camera_report(picture, repo, modality="picture")
@@ -641,6 +690,21 @@ def test_rejects_inconsistent_camera_shadow_or_picture_metrics(tmp_path: Path):
             baseline_reports=[picture_baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             camera_report=inconsistent_picture,
+        )
+
+    undetected_crop = camera_report(picture, repo, modality="picture")
+    undetected_crop["caseResults"][0]["slides"][0]["metrics"]["cropSensitivity"][
+        "detected"
+    ] = False
+    with pytest.raises(CapabilityVerificationError, match="crop sensitivity is inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [picture],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[picture_baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=undetected_crop,
         )
 
 

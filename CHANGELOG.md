@@ -30,7 +30,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,
   projected bounds, and ink retention for live text; and rectified picture color/edge fidelity so
-  source-crop errors cannot pass on correct outer geometry alone.
+  source-crop errors cannot pass on correct outer geometry alone. The report also erases each
+  measurable shadow and injects a 12% picture crop as mutation controls; promotion fails unless the
+  corresponding local metric detects both faults.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
