@@ -25,8 +25,9 @@ CAMERA_COLOR_SCORE_THRESHOLD = 0.97
 CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD = 0.65
 CAMERA_GRADIENT_DIRECTION_THRESHOLD = 0.95
 CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE = 4.0
-CAMERA_TEXT_FOREGROUND_IOU_THRESHOLD = 0.72
-CAMERA_TEXT_BOUNDS_SCORE_THRESHOLD = 0.98
+CAMERA_TEXT_RASTER_TOLERANCE_RATIO = 0.0025
+CAMERA_TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD = 0.90
+CAMERA_TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD = 0.98
 CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD = 0.90
 
 
@@ -381,8 +382,8 @@ def _validate_camera_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 2:
-        raise CapabilityVerificationError("camera-local report requires schemaVersion=2")
+    if report.get("schemaVersion") != 3:
+        raise CapabilityVerificationError("camera-local report requires schemaVersion=3")
     renderer = _mapping(report.get("renderer"), "camera-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -397,8 +398,9 @@ def _validate_camera_local(
             "minimumReferenceGradientRange": CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE,
         },
         "text": {
-            "foregroundIou": CAMERA_TEXT_FOREGROUND_IOU_THRESHOLD,
-            "boundsScore": CAMERA_TEXT_BOUNDS_SCORE_THRESHOLD,
+            "rasterToleranceRatio": CAMERA_TEXT_RASTER_TOLERANCE_RATIO,
+            "tolerantForegroundF1": CAMERA_TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD,
+            "tolerantBoundsScore": CAMERA_TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD,
             "inkCoverageRatio": CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD,
         },
     }
@@ -568,6 +570,35 @@ def _validate_camera_local(
                 mean_bounds_error = _finite_metric(
                     metrics.get("meanBoundsErrorRatio"), f"{context} bounds error"
                 )
+                raster_tolerance_px = metrics.get("rasterTolerancePx")
+                if (
+                    not isinstance(raster_tolerance_px, int)
+                    or isinstance(raster_tolerance_px, bool)
+                    or raster_tolerance_px < 1
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} raster tolerance must be a positive integer"
+                    )
+                reference_coverage = _finite_metric(
+                    metrics.get("referenceCoverageAtTolerance"),
+                    f"{context} reference coverage at tolerance",
+                )
+                candidate_coverage = _finite_metric(
+                    metrics.get("candidateCoverageAtTolerance"),
+                    f"{context} candidate coverage at tolerance",
+                )
+                tolerant_foreground_f1 = _finite_metric(
+                    metrics.get("tolerantForegroundF1"),
+                    f"{context} tolerant foreground F1",
+                )
+                tolerant_bounds_score = _finite_metric(
+                    metrics.get("tolerantBoundsScore"),
+                    f"{context} tolerant bounds score",
+                )
+                tolerant_mean_bounds_error = _finite_metric(
+                    metrics.get("tolerantMeanBoundsErrorRatio"),
+                    f"{context} tolerant bounds error",
+                )
                 ink_coverage_ratio = _finite_metric(
                     metrics.get("inkCoverageRatio"), f"{context} ink coverage ratio"
                 )
@@ -581,12 +612,36 @@ def _validate_camera_local(
                     not 0 <= foreground_iou <= 1
                     or not 0 <= bounds_score <= 1
                     or mean_bounds_error < 0
+                    or not 0 <= reference_coverage <= 1
+                    or not 0 <= candidate_coverage <= 1
+                    or not 0 <= tolerant_foreground_f1 <= 1
+                    or not 0 <= tolerant_bounds_score <= 1
+                    or tolerant_mean_bounds_error < 0
                     or not 0 <= ink_coverage_ratio <= 1
                     or reference_ink_density <= 0
                     or candidate_ink_density <= 0
                 ):
                     raise CapabilityVerificationError(
                         f"{context} metrics are outside their domains"
+                    )
+                expected_tolerant_foreground_f1 = (
+                    2
+                    * reference_coverage
+                    * candidate_coverage
+                    / (reference_coverage + candidate_coverage)
+                    if reference_coverage + candidate_coverage > 0
+                    else 0.0
+                )
+                if (
+                    abs(tolerant_foreground_f1 - expected_tolerant_foreground_f1) > 1e-9
+                    or abs(
+                        tolerant_bounds_score
+                        - max(0.0, 1.0 - tolerant_mean_bounds_error)
+                    )
+                    > 1e-9
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} tolerant metrics are inconsistent"
                     )
                 for kind in ("reference", "candidate"):
                     bounds = metrics.get(f"{kind}Bounds")
@@ -607,8 +662,9 @@ def _validate_camera_local(
                             f"{context} {kind} bounds are invalid"
                         )
                 expected_pass = (
-                    foreground_iou >= CAMERA_TEXT_FOREGROUND_IOU_THRESHOLD
-                    and bounds_score >= CAMERA_TEXT_BOUNDS_SCORE_THRESHOLD
+                    tolerant_foreground_f1
+                    >= CAMERA_TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD
+                    and tolerant_bounds_score >= CAMERA_TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD
                     and ink_coverage_ratio >= CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD
                 )
             if metrics.get("passed") is not expected_pass or slide.get("passed") is not expected_pass:

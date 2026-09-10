@@ -191,8 +191,9 @@ def camera_report(
         "minimumReferenceGradientRange": 4.0,
     }
     text_thresholds = {
-        "foregroundIou": 0.72,
-        "boundsScore": 0.98,
+        "rasterToleranceRatio": 0.0025,
+        "tolerantForegroundF1": 0.90,
+        "tolerantBoundsScore": 0.98,
         "inkCoverageRatio": 0.90,
     }
     thresholds = {"plane": plane_thresholds, "text": text_thresholds}
@@ -215,9 +216,15 @@ def camera_report(
     else:
         metrics = {
             "evaluable": True,
-            "foregroundIou": 0.8 if passed else 0.4,
+            "foregroundIou": 0.4,
             "boundsScore": 0.995,
             "meanBoundsErrorRatio": 0.005,
+            "rasterTolerancePx": 3,
+            "referenceCoverageAtTolerance": 0.95 if passed else 0.4,
+            "candidateCoverageAtTolerance": 0.95 if passed else 0.4,
+            "tolerantForegroundF1": 0.95 if passed else 0.4,
+            "tolerantBoundsScore": 0.998,
+            "tolerantMeanBoundsErrorRatio": 0.002,
             "inkCoverageRatio": 0.96,
             "referenceInkDensity": 1.5,
             "candidateInkDensity": 1.45,
@@ -227,7 +234,7 @@ def camera_report(
             "passed": passed,
         }
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": thresholds,
         "applicableCaseCount": 1,
@@ -521,6 +528,44 @@ def test_rejects_failed_or_tampered_camera_local_evidence(tmp_path: Path):
             baseline_reports=[baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             camera_report=tampered,
+        )
+
+
+def test_rejects_inconsistent_camera_text_metrics_or_thresholds(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-text")
+    baseline = native_report("camera-text", revision="b" * 40)
+
+    inconsistent = camera_report(current, repo, modality="text")
+    inconsistent["caseResults"][0]["slides"][0]["metrics"][
+        "tolerantForegroundF1"
+    ] = 1.0
+    with pytest.raises(CapabilityVerificationError, match="tolerant metrics are inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=inconsistent,
+        )
+
+    threshold_drift = camera_report(current, repo, modality="text")
+    threshold_drift["thresholds"]["text"]["tolerantForegroundF1"] = 0.1
+    with pytest.raises(CapabilityVerificationError, match="unexpected thresholds"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=threshold_drift,
         )
 
 

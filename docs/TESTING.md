@@ -347,13 +347,15 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_camera_metrics.py \
   --out test/e2e/reports/capability-loop/shape3d-camera-local-<revision>.json
 ```
 
-This schema-v2 gate derives each applicable modality from source OOXML and binds both raster hashes
+This schema-v3 gate derives each applicable modality from source OOXML and binds both raster hashes
 to the native API report. Solid rows extract the largest saturated four-corner plane independently
 from renderer DOM bounds: normalized corner score must be at least `0.98`, material-band color
 score at least `0.97`, and a measurable native gradient requires at least `0.65` range ratio and
-`0.95` direction cosine. Live-text rows require foreground IoU `0.72`, projected-bounds score
-`0.98`, and grayscale ink-density retention `0.90`. The verifier recomputes pass status from these
-fixed thresholds; callers cannot self-attest either modality.
+`0.95` direction cosine. Live-text rows use a resolution-normalized raster tolerance of `0.25%`,
+then require bidirectional foreground F1 `0.90`, tolerant projected-bounds score `0.98`, and
+grayscale ink-density retention `0.90`. Raw IoU and raw bounds stay in the report for diagnosis.
+The verifier recomputes pass status from these fixed thresholds; callers cannot self-attest either
+modality.
 
 PowerPoint automation on macOS needs an available interactive session. Error `-9074` can mean the
 session is locked, PowerPoint is waiting for a dialog, or the fixed staged input is still open from
@@ -617,7 +619,7 @@ visible stroke, local transform, backdrop, nonzero `z`, effects, bevel, contour,
 and material. The text row additionally excludes `p:style`, vertical text, independent bounds, and
 local body properties outside the registry's `wrap`, anchor, and autofit tuples. Its exact cameras, paint values,
 aspect ratios, container rows, and implicit-depth semantics are declared in the registry.
-Verification uses all earlier/current report pairs plus the derived schema-v2
+Verification uses all earlier/current report pairs plus the derived schema-v3
 `camera-local` plane/text report and the same caller-run gate classes. The broad
 `drawingml.shape.3d.scene` fallback remains in inventory as a conservative residual, so observing a
 verified narrow tuple cannot hide unimplemented scene values.

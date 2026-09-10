@@ -268,24 +268,25 @@ presentation width and field of view; preset constants describe the native-obser
 projected-plane scales. The renderer emits one replacement SVG path and hides the ordinary flat
 path only after that replacement exists. Perspective solid rows receive a vertical `linearRGB`
 material field; identity and rotated orthographic controls use their native-observed flat material
-responses. For the exact text tuple, `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
+responses. For the exact text tuples, `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
 homography and applies it after text layout, while preserving the text DOM. This is independent
 planar math and does not introduce a mesh or WebGL dependency.
 
-The twelve-slide native matrix covers identity and rotated orthographic controls, explicit
+The fifteen-slide native matrix covers identity and rotated orthographic controls, explicit
 `a:sp3d`, scene-only implicit depth, square/wide/tall perspective shapes, explicit and theme paint,
-a non-identity group, and square/wide/tall live text. Public solid-paint support remains limited to
+a non-identity group, and two square/wide/tall live-text camera tuples. Public solid-paint support remains limited to
 its explicit `#2F75B5` and theme `#4F81BD` rows. A local metric binds the exact native rasters and
 checks normalized four-corner geometry, material color, gradient range, and gradient direction for
-solid planes; live-text rows instead check foreground IoU, projected bounds, and ink-density
-retention in addition to the full-page oracle gate.
+solid planes. Live-text schema v3 retains raw foreground IoU and bounds for diagnosis, then checks
+resolution-tolerant bidirectional foreground F1, tolerant bounds, and ink-density retention in
+addition to the full-page oracle gate.
 
 The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
 picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent
 cross-slide collisions. Existing wrapper transforms, outer shadows, media ownership, and cleanup
 remain in their owning renderers.
 
-Anything outside those two full tuples stays on the existing flat path with a stable planner reason.
+Anything outside the registry's bounded tuples stays on the existing flat path with a stable planner reason.
 Other perspective and rotated cameras, nonzero extrusion, other materials/bevels/lights, negative
 or degenerate picture source crops, gradient/pattern/group/image-filled shapes, tiled pictures,
 chart `view3D`, and Office 2017 `model3d` are separate capability lanes. The raster lighting backend

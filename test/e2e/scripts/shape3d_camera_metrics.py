@@ -28,8 +28,9 @@ COLOR_SCORE_THRESHOLD = 0.97
 GRADIENT_RANGE_RATIO_THRESHOLD = 0.65
 GRADIENT_DIRECTION_THRESHOLD = 0.95
 MIN_REFERENCE_GRADIENT_RANGE = 4.0
-TEXT_FOREGROUND_IOU_THRESHOLD = 0.72
-TEXT_BOUNDS_SCORE_THRESHOLD = 0.98
+TEXT_RASTER_TOLERANCE_RATIO = 0.0025
+TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD = 0.90
+TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD = 0.98
 TEXT_INK_COVERAGE_RATIO_THRESHOLD = 0.90
 
 
@@ -437,8 +438,9 @@ def compute_text_camera_metrics(
     reference: np.ndarray,
     candidate: np.ndarray,
     *,
-    foreground_iou_threshold: float = TEXT_FOREGROUND_IOU_THRESHOLD,
-    bounds_score_threshold: float = TEXT_BOUNDS_SCORE_THRESHOLD,
+    raster_tolerance_ratio: float = TEXT_RASTER_TOLERANCE_RATIO,
+    tolerant_foreground_f1_threshold: float = TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD,
+    tolerant_bounds_score_threshold: float = TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD,
     ink_coverage_ratio_threshold: float = TEXT_INK_COVERAGE_RATIO_THRESHOLD,
 ) -> dict[str, Any]:
     if reference.ndim != 3 or candidate.ndim != 3:
@@ -466,6 +468,26 @@ def compute_text_camera_metrics(
     intersection = int(np.logical_and(reference_mask, candidate_mask).sum())
     union = int(np.logical_or(reference_mask, candidate_mask).sum())
     foreground_iou = intersection / max(union, 1)
+    raster_tolerance_px = max(1, round(max(reference.shape[:2]) * raster_tolerance_ratio))
+    tolerance_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (raster_tolerance_px * 2 + 1, raster_tolerance_px * 2 + 1),
+    )
+    reference_dilated = cv2.dilate(reference_mask.astype(np.uint8), tolerance_kernel) > 0
+    candidate_dilated = cv2.dilate(candidate_mask.astype(np.uint8), tolerance_kernel) > 0
+    reference_coverage = float(
+        np.logical_and(reference_mask, candidate_dilated).sum()
+        / max(int(reference_mask.sum()), 1)
+    )
+    candidate_coverage = float(
+        np.logical_and(candidate_mask, reference_dilated).sum()
+        / max(int(candidate_mask.sum()), 1)
+    )
+    tolerant_foreground_f1 = (
+        2 * reference_coverage * candidate_coverage / (reference_coverage + candidate_coverage)
+        if reference_coverage + candidate_coverage > 0
+        else 0.0
+    )
     reference_bounds = np.asarray(
         [reference_x.min(), reference_y.min(), reference_x.max(), reference_y.max()],
         dtype=np.float64,
@@ -486,9 +508,21 @@ def compute_text_camera_metrics(
         (top_left_error + bottom_right_error) / (2 * reference_diagonal)
     )
     bounds_score = max(0.0, 1.0 - mean_bounds_error_ratio)
+    tolerant_bounds_delta = np.maximum(
+        np.abs(reference_bounds - candidate_bounds) - raster_tolerance_px,
+        0,
+    )
+    tolerant_mean_bounds_error_ratio = float(
+        (
+            np.linalg.norm(tolerant_bounds_delta[:2])
+            + np.linalg.norm(tolerant_bounds_delta[2:])
+        )
+        / (2 * reference_diagonal)
+    )
+    tolerant_bounds_score = max(0.0, 1.0 - tolerant_mean_bounds_error_ratio)
     passed = (
-        foreground_iou >= foreground_iou_threshold
-        and bounds_score >= bounds_score_threshold
+        tolerant_foreground_f1 >= tolerant_foreground_f1_threshold
+        and tolerant_bounds_score >= tolerant_bounds_score_threshold
         and ink_coverage_ratio >= ink_coverage_ratio_threshold
     )
     return {
@@ -496,14 +530,21 @@ def compute_text_camera_metrics(
         "foregroundIou": float(foreground_iou),
         "boundsScore": bounds_score,
         "meanBoundsErrorRatio": mean_bounds_error_ratio,
+        "rasterTolerancePx": raster_tolerance_px,
+        "referenceCoverageAtTolerance": reference_coverage,
+        "candidateCoverageAtTolerance": candidate_coverage,
+        "tolerantForegroundF1": float(tolerant_foreground_f1),
+        "tolerantBoundsScore": tolerant_bounds_score,
+        "tolerantMeanBoundsErrorRatio": tolerant_mean_bounds_error_ratio,
         "inkCoverageRatio": float(ink_coverage_ratio),
         "referenceInkDensity": reference_ink_density,
         "candidateInkDensity": candidate_ink_density,
         "referenceBounds": reference_bounds.astype(int).tolist(),
         "candidateBounds": candidate_bounds.astype(int).tolist(),
         "thresholds": {
-            "foregroundIou": foreground_iou_threshold,
-            "boundsScore": bounds_score_threshold,
+            "rasterToleranceRatio": raster_tolerance_ratio,
+            "tolerantForegroundF1": tolerant_foreground_f1_threshold,
+            "tolerantBoundsScore": tolerant_bounds_score_threshold,
             "inkCoverageRatio": ink_coverage_ratio_threshold,
         },
         "passed": passed,
@@ -639,7 +680,7 @@ def build_camera_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "plane": {
@@ -650,8 +691,9 @@ def build_camera_report(
                 "minimumReferenceGradientRange": MIN_REFERENCE_GRADIENT_RANGE,
             },
             "text": {
-                "foregroundIou": TEXT_FOREGROUND_IOU_THRESHOLD,
-                "boundsScore": TEXT_BOUNDS_SCORE_THRESHOLD,
+                "rasterToleranceRatio": TEXT_RASTER_TOLERANCE_RATIO,
+                "tolerantForegroundF1": TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD,
+                "tolerantBoundsScore": TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD,
                 "inkCoverageRatio": TEXT_INK_COVERAGE_RATIO_THRESHOLD,
             },
         },

@@ -86,13 +86,16 @@ def test_camera_metric_does_not_require_a_gradient_for_a_native_flat_control():
     assert metrics["passed"] is True
 
 
-def _text_specimen(width: int, height: int, *, offset_x: int = 0):
+def _text_specimen(width: int, height: int, *, offset_x: int = 0, offset_y: int = 0):
     image = np.full((height, width, 3), 255, dtype=np.uint8)
     for row, label in enumerate(("ZERO DEPTH", "EDITABLE TEXT", "NATIVE CAMERA")):
         cv2.putText(
             image,
             label,
-            (round(width * 0.38) + offset_x, round(height * (0.43 + row * 0.07))),
+            (
+                round(width * 0.38) + offset_x,
+                round(height * (0.43 + row * 0.07)) + offset_y,
+            ),
             cv2.FONT_HERSHEY_SIMPLEX,
             width / 1800,
             (32, 56, 100),
@@ -111,6 +114,22 @@ def test_text_camera_metric_accepts_scaled_equivalent_live_text_projection():
     assert metrics["passed"] is True
     assert metrics["foregroundIou"] > 0.8
     assert metrics["boundsScore"] > 0.99
+    assert metrics["tolerantForegroundF1"] > 0.99
+    assert metrics["tolerantBoundsScore"] > 0.99
+
+
+def test_text_camera_metric_tolerates_small_font_raster_offset_but_keeps_raw_diagnostics():
+    reference = _text_specimen(1200, 675)
+    shifted = _text_specimen(1200, 675, offset_y=-3)
+
+    metrics = compute_text_camera_metrics(reference, shifted)
+
+    assert metrics["foregroundIou"] < 0.72
+    assert metrics["boundsScore"] < 0.99
+    assert metrics["rasterTolerancePx"] == 3
+    assert metrics["tolerantForegroundF1"] > 0.90
+    assert metrics["tolerantBoundsScore"] > 0.99
+    assert metrics["passed"] is True
 
 
 def test_text_camera_metric_rejects_unprojected_position_drift():
@@ -121,6 +140,7 @@ def test_text_camera_metric_rejects_unprojected_position_drift():
 
     assert metrics["passed"] is False
     assert metrics["foregroundIou"] < 0.5
+    assert metrics["tolerantForegroundF1"] < 0.5
 
 
 def test_extracts_only_zero_depth_rect_camera_planes(tmp_path):

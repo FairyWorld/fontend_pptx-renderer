@@ -262,8 +262,9 @@ After evaluating cases 0013 through 0015, run `../scripts/shape3d_camera_metrics
 native reports. It binds the exact source, ground truth, revision, and per-slide raster hashes. Solid
 rows use normalized four-corner geometry and three material color bands, requiring corner score
 `0.98`, color score `0.97`, and, for measurable gradients, range ratio `0.65` and direction cosine
-`0.95`. Editable-text rows require foreground IoU `0.72`, projected-bounds score `0.98`, and
-grayscale ink-density retention `0.90`. Pass the schema-v2 report to
+`0.95`. Editable-text schema-v3 rows use a `0.25%` resolution-normalized raster tolerance and
+require bidirectional foreground F1 `0.90`, tolerant projected-bounds score `0.98`, and grayscale
+ink-density retention `0.90`; raw IoU and raw bounds remain diagnostic. Pass the schema-v3 report to
 `run_capability_loop.py verify --camera-report ...`; callers cannot self-attest `camera-local`.
 
 On macOS the PowerPoint interactive session must remain available. Error `-9074` can come from a
