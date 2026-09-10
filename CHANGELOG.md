@@ -30,8 +30,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   native-backed `1.01` ceiling for solid donut faces, plus material-specific solid/picture highlight
   floors, alongside
   exact native/renderer slide-equivalence assertions for alternate OOXML encodings and an opt-in
-  ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, and effect-bearing
-  inputs.
+  ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, effect-bearing,
+  and bottom-bevel inputs. The bottom-bevel case isolates implicit/explicit `relaxedInset`
+  dimensions, material and light rotation, live CJK text, transparency, neighboring presets, and
+  square/wide/tall geometry without widening the supported cohort.
 - Added a schema-v4 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,

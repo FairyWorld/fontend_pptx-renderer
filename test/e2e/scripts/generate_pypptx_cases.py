@@ -2280,22 +2280,32 @@ def _build_local_shape3d_cases() -> list[CaseDef]:
     cases: list[CaseDef] = []
     seq = 0
 
-    def _add(slug: str, build_fn, *, features: list[str]) -> None:
+    def _add(
+        slug: str,
+        build_fn,
+        *,
+        features: list[str],
+        slide_count: int = 1,
+        assertions: dict | None = None,
+    ) -> None:
         nonlocal seq
         seq += 1
-        cases.append(
-            {
-                "name": f"oracle-local-shape3d-{seq:04d}-{slug}",
-                "build_fn": build_fn,
-                "local_only": True,
-                "coverage": {
-                    "oracle": "native-powerpoint",
-                    "cohort": "experimental-local",
-                    "claim": "discovery-only",
-                    "features": features,
-                },
-            }
-        )
+        case = {
+            "name": f"oracle-local-shape3d-{seq:04d}-{slug}",
+            "build_fn": build_fn,
+            "local_only": True,
+            "coverage": {
+                "oracle": "native-powerpoint",
+                "cohort": "experimental-local",
+                "claim": "discovery-only",
+                "features": features,
+            },
+        }
+        if slide_count != 1:
+            case["slide_count"] = slide_count
+        if assertions is not None:
+            case["assertions"] = assertions
+        cases.append(case)
 
     def _style_probe(shape, *, color: tuple[int, int, int] = (47, 117, 181)) -> None:
         shape.fill.solid()
@@ -2468,6 +2478,180 @@ def _build_local_shape3d_cases() -> list[CaseDef]:
             "a:effectLst.glow=114300",
             "a:ln=2pt",
             "a:sp3d.bevelT=circle",
+        ],
+    )
+
+    def _apply_bottom_bevel(
+        shape,
+        *,
+        bevel_preset: str = "relaxedInset",
+        bevel_width_emu: int | None = None,
+        bevel_height_emu: int | None = None,
+        material: str | None = "dkEdge",
+        light_rotation: tuple[int, int, int] | None = (0, 0, 3000000),
+    ) -> None:
+        sp_pr = shape._element.spPr
+        scene3d = etree.Element(qn("a:scene3d"))
+        etree.SubElement(scene3d, qn("a:camera"), prst="orthographicFront")
+        light_rig = etree.SubElement(scene3d, qn("a:lightRig"), rig="threePt", dir="t")
+        if light_rotation is not None:
+            latitude, longitude, revolution = light_rotation
+            etree.SubElement(
+                light_rig,
+                qn("a:rot"),
+                lat=str(latitude),
+                lon=str(longitude),
+                rev=str(revolution),
+            )
+
+        shape_attrs = {"prstMaterial": material} if material is not None else {}
+        sp3d = etree.Element(qn("a:sp3d"), **shape_attrs)
+        bevel_attrs = {"prst": bevel_preset}
+        if bevel_width_emu is not None:
+            bevel_attrs["w"] = str(bevel_width_emu)
+        if bevel_height_emu is not None:
+            bevel_attrs["h"] = str(bevel_height_emu)
+        etree.SubElement(sp3d, qn("a:bevelB"), **bevel_attrs)
+        _insert_before_ext_lst(sp_pr, scene3d)
+        _insert_before_ext_lst(sp_pr, sp3d)
+
+    def _add_bottom_bevel_probe(
+        prs,
+        *,
+        name: str,
+        width: float = 6.0,
+        height: float = 3.0,
+        apply_3d: bool = True,
+        bevel_preset: str = "relaxedInset",
+        bevel_width_emu: int | None = None,
+        bevel_height_emu: int | None = None,
+        material: str | None = "dkEdge",
+        light_rotation: tuple[int, int, int] | None = (0, 0, 3000000),
+        text: str | None = None,
+        transparent_overlay: bool = False,
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        left = (13.333 - width) / 2
+        top = (7.5 - height) / 2
+        if transparent_overlay:
+            base = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                _emu(left),
+                _emu(top),
+                _emu(width),
+                _emu(height),
+            )
+            base.name = f"{name} base"
+            base.fill.solid()
+            base.fill.fore_color.rgb = RGBColor(0x44, 0x72, 0xC4)
+            base.line.fill.background()
+
+        shape = slide.shapes.add_shape(
+            MSO_SHAPE.RECTANGLE,
+            _emu(left),
+            _emu(top),
+            _emu(width),
+            _emu(height),
+        )
+        shape.name = name
+        shape.fill.solid()
+        fill_color = (0xBD, 0xC4, 0xF0) if transparent_overlay else (0x44, 0x72, 0xC4)
+        shape.fill.fore_color.rgb = RGBColor(*fill_color)
+        shape.line.fill.background()
+        if transparent_overlay:
+            color = shape._element.spPr.find("a:solidFill/a:srgbClr", namespaces=shape._element.nsmap)
+            if color is None:
+                raise RuntimeError("bottom-bevel overlay has no solid color")
+            etree.SubElement(color, qn("a:alpha"), val="5000")
+            _insert_before_ext_lst(shape._element.spPr, etree.Element(qn("a:effectLst")))
+        if apply_3d:
+            _apply_bottom_bevel(
+                shape,
+                bevel_preset=bevel_preset,
+                bevel_width_emu=bevel_width_emu,
+                bevel_height_emu=bevel_height_emu,
+                material=material,
+                light_rotation=light_rotation,
+            )
+        if text is not None:
+            text_frame = shape.text_frame
+            text_frame.clear()
+            body_pr = text_frame._txBody.find(qn("a:bodyPr"))
+            if body_pr is not None:
+                body_pr.set("anchor", "ctr")
+            paragraph = text_frame.paragraphs[0]
+            paragraph.alignment = PP_ALIGN.CENTER
+            run = paragraph.add_run()
+            run.text = text
+            run.font.size = Pt(20)
+            run.font.bold = True
+            run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+
+    def _build_bottom_relaxed_inset_matrix(prs) -> None:
+        _add_bottom_bevel_probe(prs, name="Flat opaque control", apply_3d=False)
+        _add_bottom_bevel_probe(prs, name="Bottom relaxedInset implicit defaults")
+        _add_bottom_bevel_probe(
+            prs,
+            name="Bottom relaxedInset explicit defaults",
+            bevel_width_emu=76200,
+            bevel_height_emu=76200,
+        )
+        _add_bottom_bevel_probe(
+            prs,
+            name="Bottom relaxedInset live text",
+            text="底部斜面",
+        )
+        _add_bottom_bevel_probe(
+            prs,
+            name="Real transparent bottom-bevel overlay",
+            text="运营管理",
+            transparent_overlay=True,
+        )
+        _add_bottom_bevel_probe(
+            prs,
+            name="Bottom relaxedInset without material",
+            material=None,
+        )
+        _add_bottom_bevel_probe(
+            prs,
+            name="Bottom relaxedInset without light rotation",
+            light_rotation=None,
+        )
+        _add_bottom_bevel_probe(
+            prs,
+            name="Bottom circle neighbor",
+            bevel_preset="circle",
+        )
+        _add_bottom_bevel_probe(
+            prs,
+            name="Bottom relaxedInset square",
+            width=4.2,
+            height=4.2,
+        )
+        _add_bottom_bevel_probe(
+            prs,
+            name="Bottom relaxedInset tall",
+            width=3.2,
+            height=5.2,
+        )
+
+    _add(
+        "bottom-relaxed-inset-matrix",
+        _build_bottom_relaxed_inset_matrix,
+        slide_count=10,
+        assertions={"equivalentSlidePairs": [[1, 2], [1, 6], [1, 7]]},
+        features=[
+            "p:sp.prstGeom=rect",
+            "geometry.aspect=square|wide|tall",
+            "paint=opaqueSolid|transparentOverlay",
+            "text=absent|liveCjk",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:scene3d.lightRig.rot=implicit|0,0,3000000",
+            "a:sp3d.prstMaterial=implicit|dkEdge",
+            "a:sp3d.bevelB.prst=relaxedInset|circle",
+            "a:sp3d.bevelB.w=implicit-76200|explicit-76200",
+            "a:sp3d.bevelB.h=implicit-76200|explicit-76200",
         ],
     )
 

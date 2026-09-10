@@ -1349,6 +1349,7 @@ def test_local_shape3d_experiment_matrix_is_opt_in_and_separate_from_support_cas
         "oracle-local-shape3d-0005-rotated-roundrect-bevel",
         "oracle-local-shape3d-0006-nested-group-scaled-bevel",
         "oracle-local-shape3d-0007-glow-roundrect-bevel",
+        "oracle-local-shape3d-0008-bottom-relaxed-inset-matrix",
     }
     assert all(case["local_only"] is True for case in local_cases)
     assert all(case["coverage"]["cohort"] == "experimental-local" for case in local_cases)
@@ -1374,7 +1375,10 @@ def test_local_shape3d_experiment_matrix_serializes_geometry_transform_and_effec
         pptx_path = tmp_path / name / "source.pptx"
         generator._generate_pptx(case, pptx_path)
         with ZipFile(pptx_path) as zf:
-            roots[name] = etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+            representative_slide = 2 if name.endswith("bottom-relaxed-inset-matrix") else 1
+            roots[name] = etree.fromstring(
+                zf.read(f"ppt/slides/slide{representative_slide}.xml")
+            )
 
     for name, root in roots.items():
         assert root.xpath(
@@ -1414,6 +1418,94 @@ def test_local_shape3d_experiment_matrix_serializes_geometry_transform_and_effec
         "/a:srgbClr[@val='00B0F0']/a:alpha[@val='65000'])",
         namespaces=ns,
     )
+
+
+def test_local_bottom_relaxed_inset_matrix_serializes_real_tuple_and_isolation_rows(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs(include_local_shape3d=True)
+        if case["name"] == "oracle-local-shape3d-0008-bottom-relaxed-inset-matrix"
+    )
+
+    assert case["slide_count"] == 10
+    assert case["assertions"] == {
+        "equivalentSlidePairs": [[1, 2], [1, 6], [1, 7]]
+    }
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as archive:
+        roots = [
+            etree.fromstring(archive.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 11)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    assert not roots[0].xpath(".//a:scene3d | .//a:sp3d", namespaces=ns)
+
+    implicit = roots[1].xpath(".//p:sp[p:spPr/a:sp3d]/p:spPr", namespaces=ns)[0]
+    explicit = roots[2].xpath(".//p:sp[p:spPr/a:sp3d]/p:spPr", namespaces=ns)[0]
+    for shape_properties in (implicit, explicit):
+        assert shape_properties.xpath(
+            "boolean(a:scene3d/a:camera[@prst='orthographicFront'])",
+            namespaces=ns,
+        )
+        assert shape_properties.xpath(
+            "boolean(a:scene3d/a:lightRig[@rig='threePt'][@dir='t']"
+            "/a:rot[@lat='0'][@lon='0'][@rev='3000000'])",
+            namespaces=ns,
+        )
+        assert shape_properties.xpath(
+            "boolean(a:sp3d[@prstMaterial='dkEdge']/a:bevelB[@prst='relaxedInset'])",
+            namespaces=ns,
+        )
+    assert implicit.xpath("a:sp3d/a:bevelB", namespaces=ns)[0].attrib == {
+        "prst": "relaxedInset"
+    }
+    assert explicit.xpath("a:sp3d/a:bevelB", namespaces=ns)[0].attrib == {
+        "w": "76200",
+        "h": "76200",
+        "prst": "relaxedInset",
+    }
+
+    assert roots[3].xpath("string(.//p:sp[p:spPr/a:sp3d]//a:t)", namespaces=ns) == "底部斜面"
+    overlay = roots[4].xpath(".//p:sp[p:spPr/a:sp3d]", namespaces=ns)[0]
+    assert overlay.xpath(
+        "boolean(p:spPr/a:solidFill/a:srgbClr[@val='BDC4F0']/a:alpha[@val='5000'])",
+        namespaces=ns,
+    )
+    assert len(roots[4].xpath(".//p:sp", namespaces=ns)) == 2
+    assert not roots[5].xpath(".//a:sp3d/@prstMaterial", namespaces=ns)
+    assert not roots[6].xpath(".//a:lightRig/a:rot", namespaces=ns)
+    assert roots[7].xpath(
+        "boolean(.//a:sp3d/a:bevelB[@prst='circle'])",
+        namespaces=ns,
+    )
+
+    extents = [
+        (
+            int(
+                root.xpath(
+                    "string(.//p:sp[p:spPr/a:sp3d]/p:spPr/a:xfrm/a:ext/@cx)",
+                    namespaces=ns,
+                )
+            ),
+            int(
+                root.xpath(
+                    "string(.//p:sp[p:spPr/a:sp3d]/p:spPr/a:xfrm/a:ext/@cy)",
+                    namespaces=ns,
+                )
+            ),
+        )
+        for root in roots[8:10]
+    ]
+    assert extents[0][0] == extents[0][1]
+    assert extents[1][0] < extents[1][1]
 
 
 def test_local_shape3d_cli_writes_metadata_to_ignored_directory(tmp_path: Path, monkeypatch):

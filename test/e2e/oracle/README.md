@@ -243,9 +243,15 @@ coverage and font requirements. The generation report includes the selected patt
 fingerprints.
 
 The opt-in `oracle-local-shape3d-*` matrix explores ellipse, adjusted donut/star, concave freeform,
-shape rotation, nested group scaling, and glow interaction. Its definition files
+shape rotation, nested group scaling, glow interaction, and a ten-slide bottom-`relaxedInset`
+matrix. The bottom-bevel rows isolate default encoding, material, light rotation, live CJK text,
+transparent overlay composition, a neighboring `circle` preset, and aspect ratio. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
 ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 176-case matrix.
+The current macOS PowerPoint oracle produces byte-identical native rasters for the implicit/explicit
+dimension pair, the explicit/omitted light-rotation pair, and the `relaxedInset`/`circle` pair. The
+material opt-out is deliberately distinct, so future support must model the front-face material
+response without inventing a visible bottom edge for this orthographic tuple.
 The original one-slide ellipse and donut probes remain useful for preflight comparisons, while the
 tracked three-slide ellipse and five-slide donut matrices bound the public
 `drawingml.shape.3d.top-bevel-contour` claim. That tuple also requires an absent scene backdrop,

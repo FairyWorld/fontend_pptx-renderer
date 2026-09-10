@@ -705,8 +705,10 @@ gradient/pattern/group/image-filled shapes, other text-body/style combinations, 
 PowerPoint material simulation.
 Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
 claim remains limited to native-verified `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular
-pictures. Star, freeform, rotation, and glow probes stay in an opt-in ignored discovery matrix until
-their own geometry-aware native gates pass; the original ellipse and donut probes remain preflight
+pictures. Star, freeform, rotation, glow, and bottom-`relaxedInset` probes stay in an opt-in ignored
+discovery matrix until their own geometry-aware native gates pass; the bottom-bevel matrix isolates
+material, light rotation, live text, transparency, preset, default encoding, and aspect ratio before
+any runtime implementation is admitted. The original ellipse and donut probes remain preflight
 neighbors to their tracked multi-slide matrices.
 
 ### Text — 7-Level Style Inheritance

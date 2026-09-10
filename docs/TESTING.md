@@ -254,10 +254,16 @@ cleanup, and the flat fallback for an unsupported camera. The accepted support c
 the exact tuple in
 `drawingml.shape.3d.top-bevel-contour`; a high aggregate score cannot broaden that registry scope.
 An opt-in eight-case local matrix retains the original ellipse discovery probe and adds adjusted
-donut, adjusted star, concave freeform,
-rotation, nested non-identity groups, and glow interaction. Those cases use the
-`oracle-local-shape3d-*` prefix, write metadata only below the ignored `oracle-runtime` directory,
+donut, adjusted star, concave freeform, rotation, nested non-identity groups, glow interaction, and
+a ten-slide bottom-`relaxedInset` isolation matrix. The bottom-bevel rows compare flat versus full
+scene tuples, implicit versus explicit 76200 EMU dimensions, material and light-rotation opt-outs,
+live CJK text, a 5% alpha overlay, a `circle` neighbor, and square/wide/tall extents. Those cases use
+the `oracle-local-shape3d-*` prefix, write metadata only below the ignored `oracle-runtime` directory,
 and remain discovery evidence until a separately bounded capability and native gate promote them.
+For the current macOS PowerPoint oracle, the implicit/explicit dimension rows, the explicit/omitted
+light-rotation rows, and the `relaxedInset`/`circle` rows are byte-identical pairs. The material
+opt-out remains intentionally distinct; this isolates the visible front-face response from an
+invented bottom-edge geometry effect.
 The CJK text matrix at IDs 0040-0055 covers square/no-wrap behavior, omitted and explicit autofit
 modes, percentage and point line spacing, paragraph spacing, adjacent run spacing, centered text
 inside a parent shape, and square/wide/tall `spAutoFit` growth. IDs 0052-0054 require native
