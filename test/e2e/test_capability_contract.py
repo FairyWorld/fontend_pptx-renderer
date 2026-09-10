@@ -256,7 +256,7 @@ def test_tracked_capability_contract_is_valid():
     history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
 
     validate_acceptance_history(registry, history)
-    assert len(registry.capabilities) == 14
+    assert len(registry.capabilities) == 15
     top_bevel = registry.by_id()["drawingml.shape.3d.top-bevel-contour"]
     assert top_bevel.scope["bevelPresetEncoding"] == (
         "explicit-circle",

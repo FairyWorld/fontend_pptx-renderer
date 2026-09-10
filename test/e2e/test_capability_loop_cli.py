@@ -422,4 +422,4 @@ def test_tracked_cli_contract_validates_current_repository():
     result = run_cli("validate", "--repo-root", project_root)
 
     assert result.returncode == 0, result.stderr
-    assert "validated 14 capabilities" in result.stdout
+    assert "validated 15 capabilities" in result.stdout
