@@ -189,6 +189,12 @@ def camera_report(
         "gradientRangeRatio": 0.65,
         "gradientDirection": 0.95,
         "minimumReferenceGradientRange": 4.0,
+        "shadowRingInnerRatio": 0.0018,
+        "shadowRingOuterRatio": 0.016,
+        "shadowBackgroundLevel": 252.0,
+        "minimumReferenceShadowDensity": 0.25,
+        "shadowEnergyRatio": 0.18,
+        "shadowDirectionCosine": 0.95,
     }
     text_thresholds = {
         "rasterToleranceRatio": 0.0025,
@@ -196,7 +202,18 @@ def camera_report(
         "tolerantBoundsScore": 0.98,
         "inkCoverageRatio": 0.90,
     }
-    thresholds = {"plane": plane_thresholds, "text": text_thresholds}
+    picture_thresholds = {
+        "cornerScore": 0.98,
+        "rectifiedColorScore": 0.95,
+        "rectifiedEdgeF1": 0.90,
+        "rectifiedSize": 384,
+        "edgeToleranceRatio": 0.008,
+    }
+    thresholds = {
+        "plane": plane_thresholds,
+        "text": text_thresholds,
+        "picture": picture_thresholds,
+    }
     if modality == "plane":
         metrics = {
             "evaluable": True,
@@ -210,10 +227,21 @@ def camera_report(
             "gradientDirection": 1.0,
             "referenceBands": [[1, 2, 3]] * 3,
             "candidateBands": [[1, 2, 3]] * 3,
+            "shadowRequired": True,
+            "shadowMeasurable": True,
+            "referenceShadowDensity": 2.0,
+            "candidateShadowDensity": 1.6 if passed else 0.1,
+            "shadowEnergyRatio": 0.8 if passed else 0.05,
+            "shadowDirectionCosine": 1.0,
+            "referenceShadowRingPixels": 500,
+            "candidateShadowRingPixels": 500,
+            "shadowRingInnerPx": 3,
+            "shadowRingOuterPx": 24,
+            "shadowPassed": passed,
             "thresholds": plane_thresholds,
             "passed": passed,
         }
-    else:
+    elif modality == "text":
         metrics = {
             "evaluable": True,
             "foregroundIou": 0.4,
@@ -233,8 +261,29 @@ def camera_report(
             "thresholds": text_thresholds,
             "passed": passed,
         }
+    else:
+        reference_edge_coverage = 0.96
+        candidate_edge_coverage = 0.94
+        metrics = {
+            "evaluable": True,
+            "cornerScore": 0.995 if passed else 0.9,
+            "meanCornerErrorRatio": 0.005 if passed else 0.1,
+            "rectifiedColorScore": 0.97,
+            "rectifiedEdgeF1": (
+                2
+                * reference_edge_coverage
+                * candidate_edge_coverage
+                / (reference_edge_coverage + candidate_edge_coverage)
+            ),
+            "referenceEdgeCoverageAtTolerance": reference_edge_coverage,
+            "candidateEdgeCoverageAtTolerance": candidate_edge_coverage,
+            "edgeTolerancePx": 3,
+            "rectifiedSize": 384,
+            "thresholds": picture_thresholds,
+            "passed": passed,
+        }
     return {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": thresholds,
         "applicableCaseCount": 1,
@@ -497,6 +546,28 @@ def test_derives_camera_local_gate_from_live_text_projection_evidence(tmp_path: 
     assert verified["gates"]["camera-local"] == "passed"
 
 
+def test_derives_camera_local_gate_from_live_picture_projection_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-picture")
+    baseline = native_report("camera-picture", revision="b" * 40)
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        camera_report=camera_report(current, repo, modality="picture"),
+    )
+
+    assert verified["gates"]["camera-local"] == "passed"
+
+
 def test_rejects_failed_or_tampered_camera_local_evidence(tmp_path: Path):
     repo, base_capability = capability_fixture(tmp_path)
     capability = replace(
@@ -528,6 +599,48 @@ def test_rejects_failed_or_tampered_camera_local_evidence(tmp_path: Path):
             baseline_reports=[baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             camera_report=tampered,
+        )
+
+
+def test_rejects_inconsistent_camera_shadow_or_picture_metrics(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+
+    plane = native_report("camera-plane")
+    plane_baseline = native_report("camera-plane", revision="b" * 40)
+    inconsistent_shadow = camera_report(plane, repo)
+    inconsistent_shadow["caseResults"][0]["slides"][0]["metrics"][
+        "shadowEnergyRatio"
+    ] = 0.05
+    with pytest.raises(CapabilityVerificationError, match="shadow metrics are inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [plane],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[plane_baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=inconsistent_shadow,
+        )
+
+    picture = native_report("camera-picture")
+    picture_baseline = native_report("camera-picture", revision="b" * 40)
+    inconsistent_picture = camera_report(picture, repo, modality="picture")
+    inconsistent_picture["caseResults"][0]["slides"][0]["metrics"][
+        "rectifiedEdgeF1"
+    ] = 0.5
+    with pytest.raises(CapabilityVerificationError, match="picture edge metrics are inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [picture],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[picture_baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=inconsistent_picture,
         )
 
 

@@ -21,7 +21,8 @@ E2E_DIR = Path(__file__).resolve().parents[1]
 PROJECT_ROOT = E2E_DIR.parents[1]
 P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
-NS = {"p": P_NS, "a": A_NS}
+R_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+NS = {"p": P_NS, "a": A_NS, "r": R_NS}
 
 CORNER_SCORE_THRESHOLD = 0.98
 COLOR_SCORE_THRESHOLD = 0.97
@@ -32,6 +33,17 @@ TEXT_RASTER_TOLERANCE_RATIO = 0.0025
 TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD = 0.90
 TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD = 0.98
 TEXT_INK_COVERAGE_RATIO_THRESHOLD = 0.90
+SHADOW_RING_INNER_RATIO = 0.0018
+SHADOW_RING_OUTER_RATIO = 0.016
+SHADOW_BACKGROUND_LEVEL = 252.0
+MIN_REFERENCE_SHADOW_DENSITY = 0.25
+SHADOW_ENERGY_RATIO_THRESHOLD = 0.18
+SHADOW_DIRECTION_THRESHOLD = 0.95
+PICTURE_CORNER_SCORE_THRESHOLD = 0.98
+PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD = 0.95
+PICTURE_RECTIFIED_EDGE_F1_THRESHOLD = 0.90
+PICTURE_RECTIFIED_SIZE = 384
+PICTURE_EDGE_TOLERANCE_RATIO = 0.008
 
 
 def _slide_number(path: str) -> int:
@@ -101,7 +113,11 @@ def _supported_camera_fill(
     )
 
 
-def _is_supported_camera_shape(shape, verified_theme_accent1: bool) -> bool:
+def _is_supported_camera_shape(
+    shape,
+    verified_theme_accent1: bool,
+    verified_theme_outer_shadow: bool,
+) -> bool:
     shape_properties = shape.find("p:spPr", NS)
     if shape_properties is None:
         return False
@@ -155,6 +171,15 @@ def _is_supported_camera_shape(shape, verified_theme_accent1: bool) -> bool:
         return False
     if shape.xpath("boolean(p:txBody//a:t[normalize-space(.) != ''])", namespaces=NS):
         return False
+    effect_refs = shape.xpath("p:style/a:effectRef", namespaces=NS)
+    if len(effect_refs) > 1:
+        return False
+    if effect_refs:
+        effect_index = effect_refs[0].get("idx")
+        if effect_index not in {"0", "2"}:
+            return False
+        if effect_index == "2" and not verified_theme_outer_shadow:
+            return False
     return _supported_camera_fill(
         shape,
         shape_properties,
@@ -176,11 +201,48 @@ def _has_verified_theme_accent1(archive: ZipFile) -> bool:
     return values == {"4F81BD"}
 
 
+def _has_verified_theme_outer_shadow(archive: ZipFile) -> bool:
+    themes = 0
+    matches = 0
+    for name in archive.namelist():
+        if not re.fullmatch(r"ppt/theme/theme\d+\.xml", name):
+            continue
+        themes += 1
+        root = etree.fromstring(archive.read(name))
+        styles = root.xpath(".//a:effectStyleLst/a:effectStyle", namespaces=NS)
+        if len(styles) < 2:
+            continue
+        effect_list = styles[1].find("a:effectLst", NS)
+        if effect_list is None or len(effect_list) != 1:
+            continue
+        shadow = effect_list.find("a:outerShdw", NS)
+        if shadow is None or dict(shadow.attrib) != {
+            "blurRad": "40000",
+            "dist": "23000",
+            "dir": "5400000",
+            "rotWithShape": "0",
+        }:
+            continue
+        color = shadow.find("a:srgbClr", NS)
+        alpha = color.find("a:alpha", NS) if color is not None else None
+        if (
+            color is not None
+            and color.get("val", "").upper() == "000000"
+            and len(color) == 1
+            and alpha is not None
+            and alpha.get("val") == "35000"
+            and len(alpha) == 0
+        ):
+            matches += 1
+    return themes > 0 and matches == themes
+
+
 def extract_camera_slide_indices(source_pptx: Path) -> set[int]:
     """Return slides containing the bounded zero-depth rectangular camera-plane tuple."""
     indices: set[int] = set()
     with ZipFile(source_pptx) as archive:
         verified_theme_accent1 = _has_verified_theme_accent1(archive)
+        verified_theme_outer_shadow = _has_verified_theme_outer_shadow(archive)
         slide_paths = sorted(
             (
                 name
@@ -192,7 +254,42 @@ def extract_camera_slide_indices(source_pptx: Path) -> set[int]:
         for slide_index, slide_path in enumerate(slide_paths):
             slide = etree.fromstring(archive.read(slide_path))
             for shape in slide.xpath(".//p:sp", namespaces=NS):
-                if _is_supported_camera_shape(shape, verified_theme_accent1):
+                if _is_supported_camera_shape(
+                    shape,
+                    verified_theme_accent1,
+                    verified_theme_outer_shadow,
+                ):
+                    indices.add(slide_index)
+                    break
+    return indices
+
+
+def extract_camera_shadow_slide_indices(source_pptx: Path) -> set[int]:
+    """Return supported solid camera slides whose exact theme effect requires an outer shadow."""
+    indices: set[int] = set()
+    with ZipFile(source_pptx) as archive:
+        verified_theme_accent1 = _has_verified_theme_accent1(archive)
+        verified_theme_outer_shadow = _has_verified_theme_outer_shadow(archive)
+        if not verified_theme_outer_shadow:
+            return indices
+        slide_paths = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            ),
+            key=_slide_number,
+        )
+        for slide_index, slide_path in enumerate(slide_paths):
+            slide = etree.fromstring(archive.read(slide_path))
+            for shape in slide.xpath(".//p:sp", namespaces=NS):
+                if not _is_supported_camera_shape(
+                    shape,
+                    verified_theme_accent1,
+                    verified_theme_outer_shadow,
+                ):
+                    continue
+                if shape.xpath("boolean(p:style/a:effectRef[@idx='2'])", namespaces=NS):
                     indices.add(slide_index)
                     break
     return indices
@@ -287,6 +384,100 @@ def extract_text_camera_slide_indices(source_pptx: Path) -> set[int]:
     return indices
 
 
+def _supported_source_crop(source_crop) -> bool:
+    if source_crop is None:
+        return True
+    values: dict[str, float] = {}
+    for name in ("l", "t", "r", "b"):
+        raw = source_crop.get(name, "0")
+        try:
+            value = float(raw)
+        except ValueError:
+            return False
+        if not math.isfinite(value) or value < 0 or value > 100000:
+            return False
+        values[name] = value
+    return values["l"] + values["r"] < 99900 and values["t"] + values["b"] < 99900
+
+
+def _is_supported_picture_camera_shape(picture) -> bool:
+    shape_properties = picture.find("p:spPr", NS)
+    blip_fill = picture.find("p:blipFill", NS)
+    if shape_properties is None or blip_fill is None or picture.find("p:style", NS) is not None:
+        return False
+    geometry = shape_properties.find("a:prstGeom", NS)
+    scene = shape_properties.find("a:scene3d", NS)
+    if (
+        geometry is None
+        or geometry.get("prst") != "rect"
+        or scene is None
+        or scene.find("a:backdrop", NS) is not None
+        or shape_properties.find("a:sp3d", NS) is not None
+        or shape_properties.find("a:effectLst", NS) is not None
+        or shape_properties.find("a:effectDag", NS) is not None
+        or shape_properties.find("a:ln", NS) is not None
+        or any(
+            shape_properties.find(f"a:{fill}", NS) is not None
+            for fill in ("solidFill", "gradFill", "pattFill", "blipFill", "grpFill")
+        )
+    ):
+        return False
+    camera = scene.find("a:camera", NS)
+    light = scene.find("a:lightRig", NS)
+    if (
+        camera is None
+        or camera.get("prst") != "perspectiveRight"
+        or camera.get("fov") != "5700000"
+        or camera.get("zoom") is not None
+        or camera.find("a:rot", NS) is not None
+        or light is None
+        or light.get("rig") != "threePt"
+        or light.get("dir") != "t"
+        or light.find("a:rot", NS) is not None
+    ):
+        return False
+    transform = shape_properties.find("a:xfrm", NS)
+    if transform is not None and any(
+        not _zero_or_absent(transform.get(name)) for name in ("rot", "flipH", "flipV")
+    ):
+        return False
+    blip = blip_fill.find("a:blip", NS)
+    stretch = blip_fill.find("a:stretch", NS)
+    if (
+        blip is None
+        or not blip.get(f"{{{R_NS}}}embed")
+        or len(blip) != 0
+        or stretch is None
+        or len(stretch) != 0
+        or blip_fill.find("a:tile", NS) is not None
+        or not _supported_source_crop(blip_fill.find("a:srcRect", NS))
+    ):
+        return False
+    return True
+
+
+def extract_picture_camera_slide_indices(source_pptx: Path) -> set[int]:
+    """Return slides containing the exact perspective-right live-picture plane tuple."""
+    indices: set[int] = set()
+    with ZipFile(source_pptx) as archive:
+        slide_paths = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            ),
+            key=_slide_number,
+        )
+        for slide_index, slide_path in enumerate(slide_paths):
+            slide = etree.fromstring(archive.read(slide_path))
+            if any(
+                _is_supported_picture_camera_shape(picture)
+                for picture in slide.xpath(".//p:pic", namespaces=NS)
+            ):
+                indices.add(slide_index)
+    return indices
+
+
 def _foreground_mask(image: np.ndarray) -> np.ndarray:
     if image.ndim != 3 or image.shape[2] < 3:
         raise ValueError("camera metric requires an RGB image")
@@ -357,6 +548,107 @@ def _material_bands(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
     return np.asarray(bands, dtype=np.float64)
 
 
+def _exterior_shadow_field(image: np.ndarray) -> tuple[float, np.ndarray, int, int, int]:
+    mask = _foreground_mask(image)
+    if int(mask.sum()) < 64:
+        raise ValueError("camera plane foreground is below the resolution floor")
+    raster_scale = max(image.shape[:2])
+    inner_radius = max(1, round(raster_scale * SHADOW_RING_INNER_RATIO))
+    outer_radius = max(inner_radius + 1, round(raster_scale * SHADOW_RING_OUTER_RATIO))
+    inner_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (inner_radius * 2 + 1, inner_radius * 2 + 1),
+    )
+    outer_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (outer_radius * 2 + 1, outer_radius * 2 + 1),
+    )
+    inner = cv2.dilate(mask.astype(np.uint8), inner_kernel) > 0
+    outer = cv2.dilate(mask.astype(np.uint8), outer_kernel) > 0
+    ring = outer & ~inner
+    if int(ring.sum()) < 64:
+        raise ValueError("camera shadow ring is below the resolution floor")
+    grayscale = image[..., :3].astype(np.float64).mean(axis=2)
+    darkness = np.maximum(0.0, SHADOW_BACKGROUND_LEVEL - grayscale) * ring
+    density = float(darkness[ring].mean())
+    total = float(darkness.sum())
+    mask_y, mask_x = np.nonzero(mask)
+    center = np.asarray(
+        [mask_x.mean() / image.shape[1], mask_y.mean() / image.shape[0]],
+        dtype=np.float64,
+    )
+    if total <= 1e-9:
+        direction = np.zeros(2, dtype=np.float64)
+    else:
+        yy, xx = np.indices(mask.shape)
+        direction = np.asarray(
+            [
+                float((darkness * xx).sum() / total) / image.shape[1],
+                float((darkness * yy).sum() / total) / image.shape[0],
+            ],
+            dtype=np.float64,
+        ) - center
+    return density, direction, int(ring.sum()), inner_radius, outer_radius
+
+
+def _camera_shadow_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    required: bool,
+) -> dict[str, Any]:
+    if candidate.shape[:2] != reference.shape[:2]:
+        candidate = cv2.resize(
+            candidate,
+            (reference.shape[1], reference.shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
+    reference_density, reference_direction, reference_pixels, inner_px, outer_px = (
+        _exterior_shadow_field(reference)
+    )
+    candidate_density, candidate_direction, candidate_pixels, _, _ = _exterior_shadow_field(
+        candidate
+    )
+    maximum_density = max(reference_density, candidate_density)
+    energy_ratio = (
+        min(reference_density, candidate_density) / maximum_density
+        if maximum_density > 1e-9
+        else 1.0
+    )
+    direction_denominator = float(
+        np.linalg.norm(reference_direction) * np.linalg.norm(candidate_direction)
+    )
+    if direction_denominator > 1e-12:
+        direction_cosine = float(
+            np.dot(reference_direction, candidate_direction) / direction_denominator
+        )
+    elif (
+        np.linalg.norm(reference_direction) <= 1e-12
+        and np.linalg.norm(candidate_direction) <= 1e-12
+    ):
+        direction_cosine = 1.0
+    else:
+        direction_cosine = 0.0
+    measurable = required and reference_density >= MIN_REFERENCE_SHADOW_DENSITY
+    passed = not measurable or (
+        energy_ratio >= SHADOW_ENERGY_RATIO_THRESHOLD
+        and direction_cosine >= SHADOW_DIRECTION_THRESHOLD
+    )
+    return {
+        "shadowRequired": required,
+        "shadowMeasurable": measurable,
+        "referenceShadowDensity": reference_density,
+        "candidateShadowDensity": candidate_density,
+        "shadowEnergyRatio": float(energy_ratio),
+        "shadowDirectionCosine": direction_cosine,
+        "referenceShadowRingPixels": reference_pixels,
+        "candidateShadowRingPixels": candidate_pixels,
+        "shadowRingInnerPx": inner_px,
+        "shadowRingOuterPx": outer_px,
+        "shadowPassed": passed,
+    }
+
+
 def compute_camera_plane_metrics(
     reference: np.ndarray,
     candidate: np.ndarray,
@@ -365,6 +657,7 @@ def compute_camera_plane_metrics(
     color_score_threshold: float = COLOR_SCORE_THRESHOLD,
     gradient_range_ratio_threshold: float = GRADIENT_RANGE_RATIO_THRESHOLD,
     gradient_direction_threshold: float = GRADIENT_DIRECTION_THRESHOLD,
+    shadow_required: bool = False,
 ) -> dict[str, Any]:
     reference_corners, reference_mask = _ordered_normalized_corners(reference)
     candidate_corners, candidate_mask = _ordered_normalized_corners(candidate)
@@ -400,6 +693,7 @@ def compute_camera_plane_metrics(
         gradient_direction = 1.0
     else:
         gradient_direction = 0.0
+    shadow = _camera_shadow_metrics(reference, candidate, required=shadow_required)
     passed = (
         corner_score >= corner_score_threshold
         and color_score >= color_score_threshold
@@ -410,6 +704,7 @@ def compute_camera_plane_metrics(
                 and gradient_direction >= gradient_direction_threshold
             )
         )
+        and shadow["shadowPassed"]
     )
     return {
         "evaluable": True,
@@ -423,12 +718,133 @@ def compute_camera_plane_metrics(
         "gradientDirection": gradient_direction,
         "referenceBands": reference_bands.round(3).tolist(),
         "candidateBands": candidate_bands.round(3).tolist(),
+        **shadow,
         "thresholds": {
             "cornerScore": corner_score_threshold,
             "colorScore": color_score_threshold,
             "gradientRangeRatio": gradient_range_ratio_threshold,
             "gradientDirection": gradient_direction_threshold,
             "minimumReferenceGradientRange": MIN_REFERENCE_GRADIENT_RANGE,
+            "shadowRingInnerRatio": SHADOW_RING_INNER_RATIO,
+            "shadowRingOuterRatio": SHADOW_RING_OUTER_RATIO,
+            "shadowBackgroundLevel": SHADOW_BACKGROUND_LEVEL,
+            "minimumReferenceShadowDensity": MIN_REFERENCE_SHADOW_DENSITY,
+            "shadowEnergyRatio": SHADOW_ENERGY_RATIO_THRESHOLD,
+            "shadowDirectionCosine": SHADOW_DIRECTION_THRESHOLD,
+        },
+        "passed": passed,
+    }
+
+
+def _rectify_camera_plane(
+    image: np.ndarray,
+    corners: np.ndarray,
+    size: int = PICTURE_RECTIFIED_SIZE,
+) -> np.ndarray:
+    source = (corners * np.asarray([image.shape[1] - 1, image.shape[0] - 1])).astype(
+        np.float32
+    )
+    destination = np.asarray(
+        [[0, 0], [size - 1, 0], [size - 1, size - 1], [0, size - 1]],
+        dtype=np.float32,
+    )
+    transform = cv2.getPerspectiveTransform(source, destination)
+    return cv2.warpPerspective(
+        image[..., :3],
+        transform,
+        (size, size),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_REPLICATE,
+    )
+
+
+def _edge_coverage(reference: np.ndarray, candidate: np.ndarray) -> tuple[float, float, float, int]:
+    reference_gray = cv2.cvtColor(reference, cv2.COLOR_RGB2GRAY)
+    candidate_gray = cv2.cvtColor(candidate, cv2.COLOR_RGB2GRAY)
+    reference_edges = cv2.Canny(reference_gray, 40, 100) > 0
+    candidate_edges = cv2.Canny(candidate_gray, 40, 100) > 0
+    if int(reference_edges.sum()) < 32 or int(candidate_edges.sum()) < 32:
+        raise ValueError("rectified picture edges are below the resolution floor")
+    tolerance_px = max(1, round(reference.shape[0] * PICTURE_EDGE_TOLERANCE_RATIO))
+    kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (tolerance_px * 2 + 1, tolerance_px * 2 + 1),
+    )
+    reference_dilated = cv2.dilate(reference_edges.astype(np.uint8), kernel) > 0
+    candidate_dilated = cv2.dilate(candidate_edges.astype(np.uint8), kernel) > 0
+    reference_coverage = float(
+        np.logical_and(reference_edges, candidate_dilated).sum()
+        / max(int(reference_edges.sum()), 1)
+    )
+    candidate_coverage = float(
+        np.logical_and(candidate_edges, reference_dilated).sum()
+        / max(int(candidate_edges.sum()), 1)
+    )
+    edge_f1 = (
+        2 * reference_coverage * candidate_coverage / (reference_coverage + candidate_coverage)
+        if reference_coverage + candidate_coverage > 0
+        else 0.0
+    )
+    return reference_coverage, candidate_coverage, float(edge_f1), tolerance_px
+
+
+def compute_picture_camera_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    corner_score_threshold: float = PICTURE_CORNER_SCORE_THRESHOLD,
+    rectified_color_score_threshold: float = PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
+    rectified_edge_f1_threshold: float = PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
+) -> dict[str, Any]:
+    reference_corners, _ = _ordered_normalized_corners(reference)
+    candidate_corners, _ = _ordered_normalized_corners(candidate)
+    left, top = reference_corners.min(axis=0)
+    right, bottom = reference_corners.max(axis=0)
+    diagonal = math.hypot(right - left, bottom - top)
+    if diagonal <= 0:
+        raise ValueError("picture camera reference bounds are degenerate")
+    mean_corner_error = float(
+        np.linalg.norm(reference_corners - candidate_corners, axis=1).mean() / diagonal
+    )
+    corner_score = max(0.0, 1.0 - mean_corner_error)
+    reference_rectified = _rectify_camera_plane(reference, reference_corners)
+    candidate_rectified = _rectify_camera_plane(candidate, candidate_corners)
+    rectified_color_score = max(
+        0.0,
+        1.0
+        - float(
+            np.abs(
+                reference_rectified.astype(np.float64)
+                - candidate_rectified.astype(np.float64)
+            ).mean()
+        )
+        / 255,
+    )
+    reference_coverage, candidate_coverage, edge_f1, tolerance_px = _edge_coverage(
+        reference_rectified,
+        candidate_rectified,
+    )
+    passed = (
+        corner_score >= corner_score_threshold
+        and rectified_color_score >= rectified_color_score_threshold
+        and edge_f1 >= rectified_edge_f1_threshold
+    )
+    return {
+        "evaluable": True,
+        "cornerScore": corner_score,
+        "meanCornerErrorRatio": mean_corner_error,
+        "rectifiedColorScore": rectified_color_score,
+        "rectifiedEdgeF1": edge_f1,
+        "referenceEdgeCoverageAtTolerance": reference_coverage,
+        "candidateEdgeCoverageAtTolerance": candidate_coverage,
+        "edgeTolerancePx": tolerance_px,
+        "rectifiedSize": PICTURE_RECTIFIED_SIZE,
+        "thresholds": {
+            "cornerScore": corner_score_threshold,
+            "rectifiedColorScore": rectified_color_score_threshold,
+            "rectifiedEdgeF1": rectified_edge_f1_threshold,
+            "rectifiedSize": PICTURE_RECTIFIED_SIZE,
+            "edgeToleranceRatio": PICTURE_EDGE_TOLERANCE_RATIO,
         },
         "passed": passed,
     }
@@ -609,8 +1025,10 @@ def build_camera_report(
             raise ValueError(f"case report is missing source path: {case_id}")
         source_path = repo / source_value
         plane_slides = extract_camera_slide_indices(source_path)
+        shadow_slides = extract_camera_shadow_slide_indices(source_path)
         text_slides = extract_text_camera_slide_indices(source_path)
-        applicable_slides = plane_slides | text_slides
+        picture_slides = extract_picture_camera_slide_indices(source_path)
+        applicable_slides = plane_slides | text_slides | picture_slides
         slide_results: list[dict[str, Any]] = []
         for slide in case_report.get("perSlide", []):
             if not isinstance(slide, Mapping) or slide.get("hidden") is True:
@@ -620,7 +1038,9 @@ def build_camera_report(
                 continue
             render_artifacts = slide.get("renderArtifacts")
             if not isinstance(render_artifacts, Mapping):
-                raise ValueError(f"native report is missing render artifacts: {case_id} slide {slide_index}")
+                raise ValueError(
+                    f"native report is missing render artifacts: {case_id} slide {slide_index}"
+                )
             artifact_values: dict[str, dict[str, Any]] = {}
             for kind, suffix in (("reference", "pdf"), ("candidate", "html")):
                 path = reports_dir / f"{case_id}_slide{slide_index}_{suffix}.png"
@@ -646,12 +1066,19 @@ def build_camera_report(
             candidate = np.asarray(
                 Image.open(reports_dir / f"{case_id}_slide{slide_index}_html.png").convert("RGB")
             )
-            modality = "plane" if slide_index in plane_slides else "text"
-            metrics = (
-                compute_camera_plane_metrics(reference, candidate)
-                if modality == "plane"
-                else compute_text_camera_metrics(reference, candidate)
-            )
+            if slide_index in plane_slides:
+                modality = "plane"
+                metrics = compute_camera_plane_metrics(
+                    reference,
+                    candidate,
+                    shadow_required=slide_index in shadow_slides,
+                )
+            elif slide_index in text_slides:
+                modality = "text"
+                metrics = compute_text_camera_metrics(reference, candidate)
+            else:
+                modality = "picture"
+                metrics = compute_picture_camera_metrics(reference, candidate)
             slide_results.append(
                 {
                     "slideIdx": slide_index,
@@ -680,7 +1107,7 @@ def build_camera_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "plane": {
@@ -689,12 +1116,25 @@ def build_camera_report(
                 "gradientRangeRatio": GRADIENT_RANGE_RATIO_THRESHOLD,
                 "gradientDirection": GRADIENT_DIRECTION_THRESHOLD,
                 "minimumReferenceGradientRange": MIN_REFERENCE_GRADIENT_RANGE,
+                "shadowRingInnerRatio": SHADOW_RING_INNER_RATIO,
+                "shadowRingOuterRatio": SHADOW_RING_OUTER_RATIO,
+                "shadowBackgroundLevel": SHADOW_BACKGROUND_LEVEL,
+                "minimumReferenceShadowDensity": MIN_REFERENCE_SHADOW_DENSITY,
+                "shadowEnergyRatio": SHADOW_ENERGY_RATIO_THRESHOLD,
+                "shadowDirectionCosine": SHADOW_DIRECTION_THRESHOLD,
             },
             "text": {
                 "rasterToleranceRatio": TEXT_RASTER_TOLERANCE_RATIO,
                 "tolerantForegroundF1": TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD,
                 "tolerantBoundsScore": TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD,
                 "inkCoverageRatio": TEXT_INK_COVERAGE_RATIO_THRESHOLD,
+            },
+            "picture": {
+                "cornerScore": PICTURE_CORNER_SCORE_THRESHOLD,
+                "rectifiedColorScore": PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
+                "rectifiedEdgeF1": PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
+                "rectifiedSize": PICTURE_RECTIFIED_SIZE,
+                "edgeToleranceRatio": PICTURE_EDGE_TOLERANCE_RATIO,
             },
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),

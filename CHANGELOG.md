@@ -26,10 +26,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions.
 - Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored eight-case
   3D discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
-- Added a schema-v3 camera-plane metric and derived capability gate that bind native raster hashes
-  and verify normalized four-corner projection, material color, gradient range, and gradient
-  direction for solid planes, plus resolution-tolerant bidirectional foreground F1, projected bounds,
-  and ink retention for live text while preserving raw IoU diagnostics.
+- Added a schema-v4 camera-plane metric and derived capability gate that bind native raster hashes
+  and verify normalized four-corner projection, material color, gradient range/direction, and
+  source-required external shadow evidence for solid planes; resolution-tolerant foreground,
+  projected bounds, and ink retention for live text; and rectified picture color/edge fidelity so
+  source-crop errors cannot pass on correct outer geometry alone.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -54,11 +55,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Promote finite nonnegative `a:srcRect` picture crops into the bounded static 3D top-bevel lane;
   negative or degenerate crops keep the ordinary flat picture path with a stable fallback reason.
 - Render the verified zero-depth rectangle camera matrix for exact `orthographicFront`,
-  `perspectiveRelaxedModerately`, and scene-only `perspectiveContrastingRightFacing` tuples. Solid
-  rows use independent SVG projection and a native-calibrated material field; the bounded no-fill
-  text row uses a CSS homography while preserving live DOM text. Text-body/style, stroke, transform,
-  depth, bevel, contour, material, effect, camera, light, and paint values outside the accepted
-  matrix retain the ordinary flat path with a diagnostic reason.
+  `perspectiveRelaxedModerately`, scene-only `perspectiveContrastingRightFacing`/`perspectiveLeft`,
+  and stretch-picture `perspectiveRight` tuples. Solid rows use independent SVG projection and a
+  native-calibrated material field; bounded no-fill text and picture rows use CSS homographies while
+  preserving live DOM content and normal picture cropping. Text-body/style, stroke, transform,
+  depth, bevel, contour, material, effect, camera, light, paint, stretch, blip-effect, and source-crop
+  values outside the accepted matrix retain the ordinary flat path with a diagnostic reason.
 - Preserve the scene-only solid camera row's theme `effectRef=2` outer shadow on the visible
   projected polygon, with a filter region derived from the projected four-corner bounds so wide and
   tall planes are not clipped back to their pre-projection rectangle.

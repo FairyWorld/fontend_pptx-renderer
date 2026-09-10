@@ -65,8 +65,8 @@ a strong average cannot hide a local mismatch. Review rows require an explicit c
 - `metrics.py`: visual metrics (`ssim`, `fg_iou`, `fg_iou_tolerant`, `chamfer_score`, `color_hist_corr`, `mae`) and quality gate. Pass/fail uses only `ssim ≥ 0.95` and `color_hist_corr ≥ 0.80`; the foreground color metric tolerates one HSV histogram bin and negligible visually blank PDF residue. Other metrics are diagnostic.
 - `../scripts/shape3d_bevel_metrics.py`: source-OOXML-derived bevel-ring and round-corner lighting
   gate for the bounded static 3D cohort.
-- `../scripts/shape3d_camera_metrics.py`: source-OOXML-derived four-corner projection and material
-  field gate for the bounded zero-depth camera-plane cohort.
+- `../scripts/shape3d_camera_metrics.py`: source-OOXML-derived projection, material, external-shadow,
+  live-text, and rectified-picture gate for the bounded zero-depth camera-plane cohort.
 - `shape` nodes support `shapeTypeId` (numeric `MsoAutoShapeType`) for forward-compatible shape coverage.
 
 4. VBA probe module
@@ -260,13 +260,17 @@ resolution-limited and remain subject to full-slide and manual checks. Pass the 
 `run_capability_loop.py verify --bevel-report ...`; both commands verify the API and on-disk raster
 hashes, and callers cannot self-attest `bevel-local`.
 
-After evaluating cases 0013 through 0015, run `../scripts/shape3d_camera_metrics.py` with all clean
+After evaluating cases 0013 through 0016, run `../scripts/shape3d_camera_metrics.py` with all clean
 native reports. It binds the exact source, ground truth, revision, and per-slide raster hashes. Solid
 rows use normalized four-corner geometry and three material color bands, requiring corner score
 `0.98`, color score `0.97`, and, for measurable gradients, range ratio `0.65` and direction cosine
-`0.95`. Editable-text schema-v3 rows use a `0.25%` resolution-normalized raster tolerance and
-require bidirectional foreground F1 `0.90`, tolerant projected-bounds score `0.98`, and grayscale
-ink-density retention `0.90`; raw IoU and raw bounds remain diagnostic. Pass the schema-v3 report to
+`0.95`. Exact source-required outer shadows additionally require measurable native shadow evidence,
+symmetric candidate/reference energy ratio `0.18`, and direction cosine `0.95`. Editable-text rows
+use a `0.25%` resolution-normalized raster tolerance and require bidirectional foreground F1 `0.90`,
+tolerant projected-bounds score `0.98`, and grayscale ink-density retention `0.90`; raw IoU and raw
+bounds remain diagnostic. Picture rows are inverse-projected to `384×384` and require corner score
+`0.98`, rectified color score `0.95`, and tolerant edge F1 `0.90`, which detects wrong image content
+or crop behind a correct outer plane. Pass the schema-v4 report to
 `run_capability_loop.py verify --camera-report ...`; callers cannot self-attest `camera-local`.
 
 On macOS the PowerPoint interactive session must remain available. Error `-9074` can come from a

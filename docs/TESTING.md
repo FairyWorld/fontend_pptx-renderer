@@ -227,9 +227,9 @@ shape containers, `twoPt:t` and `threePt:t` lighting, donut/ellipse/rect/roundRe
 wide/tall aspect ratios, a non-identity group, and the light rotation plus implicit defaults
 observed in the local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
 outline and outer shadow so the 3D effect is not tested in isolation from its actual container.
-The fifteen cases are one opt-out control, nine single-slide positive bevel cases, one three-slide
-ellipse matrix, one five-slide donut matrix, two six-slide camera-plane matrices, and one three-slide
-`perspectiveLeft` editable-text matrix. The first
+The sixteen cases are one opt-out control, nine single-slide positive bevel cases, one three-slide
+ellipse matrix, one five-slide donut matrix, two six-slide camera-plane matrices, one three-slide
+`perspectiveLeft` editable-text matrix, and one four-slide `perspectiveRight` picture matrix. The first
 camera-plane row covers identity and 20°/30° rotated `orthographicFront`, then square, wide, tall,
 theme-fill, and non-identity-group `perspectiveRelaxedModerately` rendering at the exact verified
 120° field of view and camera rotation. The second proves scene-only implicit zero depth across
@@ -238,9 +238,11 @@ surface without filter clipping, and preserves square/wide/tall editable DOM tex
 `perspectiveContrastingRightFacing` tuple. The third camera matrix isolates the observed
 `perspectiveLeft` camera at a 120-degree field of view with absent explicit rotation, `threePt:t`
 lighting, no fill, `wrap="none"`, default top anchoring, and `spAutoFit` across square, wide, and
-tall editable CJK/mixed-text planes. The real-property slice is copied from the ignored local corpus; the last three
-picture rows isolate horizontal, vertical, and combined nonnegative `a:srcRect` crops against the
-existing no-crop control. The ellipse row spans square explicit paint, wide theme-reference paint,
+tall editable CJK/mixed-text planes. The fourth camera matrix preserves live PNG content under the
+observed 95-degree `perspectiveRight` camera and implicit -20-degree longitude across square, wide,
+tall, and real-corpus asymmetric-crop rows. The real-property slice is copied from the ignored local
+corpus; the last three picture rows isolate horizontal, vertical, and combined nonnegative
+`a:srcRect` crops against the existing no-crop control. The ellipse row spans square explicit paint, wide theme-reference paint,
 and a tall ellipse under a non-identity group transform. The donut row spans the `0..50000`
 adjustment bounds, the `25000` default, an adjusted wide theme-fill shape, and an adjusted grouped
 tall shape. Together
@@ -345,18 +347,23 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_camera_metrics.py \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0013-camera-projection-matrix.json \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0014-scene-only-plane-matrix.json \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix.json \
   --out test/e2e/reports/capability-loop/shape3d-camera-local-<revision>.json
 ```
 
-This schema-v3 gate derives each applicable modality from source OOXML and binds both raster hashes
+This schema-v4 gate derives each applicable modality from source OOXML and binds both raster hashes
 to the native API report. Solid rows extract the largest saturated four-corner plane independently
 from renderer DOM bounds: normalized corner score must be at least `0.98`, material-band color
 score at least `0.97`, and a measurable native gradient requires at least `0.65` range ratio and
-`0.95` direction cosine. Live-text rows use a resolution-normalized raster tolerance of `0.25%`,
-then require bidirectional foreground F1 `0.90`, tolerant projected-bounds score `0.98`, and
-grayscale ink-density retention `0.90`. Raw IoU and raw bounds stay in the report for diagnosis.
-The verifier recomputes pass status from these fixed thresholds; callers cannot self-attest either
-modality.
+`0.95` direction cosine. When source OOXML selects the exact verified theme outer shadow, the native
+reference must expose enough external shadow energy to be measurable; the candidate then requires
+at least `0.18` symmetric energy ratio and `0.95` direction cosine. Live-text rows use a
+resolution-normalized raster tolerance of `0.25%`, then require bidirectional foreground F1 `0.90`,
+tolerant projected-bounds score `0.98`, and grayscale ink-density retention `0.90`. Picture rows are
+inverse-projected to `384×384` and require corner score `0.98`, rectified color score `0.95`, and
+tolerant edge F1 `0.90`; this makes crop/content errors visible even when the outer quadrilateral is
+correct. Raw IoU and raw bounds stay in the report for diagnosis. The verifier recomputes pass
+status and derived ratios from fixed thresholds; callers cannot self-attest any modality.
 
 PowerPoint automation on macOS needs an available interactive session. Error `-9074` can mean the
 session is locked, PowerPoint is waiting for a dialog, or the fixed staged input is still open from
@@ -614,15 +621,18 @@ uses cases 0001-0012 and the same twelve earlier-revision baselines,
 the derived `bevel-local` report, explicit manual verdicts for review rows, and the `source`,
 `structural`, `unit`, `browser`, `performance`, `package-size`, and `docs` caller-run gates.
 
-The separate `drawingml.shape.3d.camera-projected-plane` cohort uses cases 0013-0015. It
-promotes exact zero-depth solid rectangles and two scene-only no-fill live-text tuples; all exclude
-visible stroke, local transform, backdrop, nonzero `z`, explicit effect lists, bevel, contour,
-extrusion color, and material. The scene-only solid row retains the exact theme outer-shadow style;
-the text row excludes `p:style`, vertical text, independent bounds, and
+The separate `drawingml.shape.3d.camera-projected-plane` cohort uses cases 0013-0016. It promotes
+exact zero-depth solid rectangles, two scene-only no-fill live-text tuples, and one live-picture
+tuple with absent or bounded nonnegative source crop; all exclude local transform, backdrop,
+nonzero `z`, explicit effect lists, bevel, contour, extrusion color, and material. The scene-only
+solid row retains the exact theme outer-shadow style; the text rows exclude `p:style`, vertical text,
+independent bounds, and
 local body properties outside the registry's `wrap`, anchor, and autofit tuples. Its exact cameras, paint values,
-aspect ratios, container rows, and implicit-depth semantics are declared in the registry.
-Verification uses all earlier/current report pairs plus the derived schema-v3
-`camera-local` plane/text report and the same caller-run gate classes. The broad
+aspect ratios, container rows, and implicit-depth semantics are declared in the registry. The
+picture row additionally excludes visible outlines, non-rectangular geometry, `a:fillRect`, tiles,
+style references, picture background fills, blip effects, and degenerate crops. Verification uses
+all earlier/current report pairs plus the derived schema-v4 `camera-local` plane/text/picture report
+and the same caller-run gate classes. The broad
 `drawingml.shape.3d.scene` fallback remains in inventory as a conservative residual, so observing a
 verified narrow tuple cannot hide unimplemented scene values.
 

@@ -29,6 +29,17 @@ CAMERA_TEXT_RASTER_TOLERANCE_RATIO = 0.0025
 CAMERA_TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD = 0.90
 CAMERA_TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD = 0.98
 CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD = 0.90
+CAMERA_SHADOW_RING_INNER_RATIO = 0.0018
+CAMERA_SHADOW_RING_OUTER_RATIO = 0.016
+CAMERA_SHADOW_BACKGROUND_LEVEL = 252.0
+CAMERA_MINIMUM_REFERENCE_SHADOW_DENSITY = 0.25
+CAMERA_SHADOW_ENERGY_RATIO_THRESHOLD = 0.18
+CAMERA_SHADOW_DIRECTION_THRESHOLD = 0.95
+CAMERA_PICTURE_CORNER_SCORE_THRESHOLD = 0.98
+CAMERA_PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD = 0.95
+CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD = 0.90
+CAMERA_PICTURE_RECTIFIED_SIZE = 384
+CAMERA_PICTURE_EDGE_TOLERANCE_RATIO = 0.008
 
 
 class CapabilityVerificationError(ValueError):
@@ -382,8 +393,8 @@ def _validate_camera_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 3:
-        raise CapabilityVerificationError("camera-local report requires schemaVersion=3")
+    if report.get("schemaVersion") != 4:
+        raise CapabilityVerificationError("camera-local report requires schemaVersion=4")
     renderer = _mapping(report.get("renderer"), "camera-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -396,12 +407,25 @@ def _validate_camera_local(
             "gradientRangeRatio": CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD,
             "gradientDirection": CAMERA_GRADIENT_DIRECTION_THRESHOLD,
             "minimumReferenceGradientRange": CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE,
+            "shadowRingInnerRatio": CAMERA_SHADOW_RING_INNER_RATIO,
+            "shadowRingOuterRatio": CAMERA_SHADOW_RING_OUTER_RATIO,
+            "shadowBackgroundLevel": CAMERA_SHADOW_BACKGROUND_LEVEL,
+            "minimumReferenceShadowDensity": CAMERA_MINIMUM_REFERENCE_SHADOW_DENSITY,
+            "shadowEnergyRatio": CAMERA_SHADOW_ENERGY_RATIO_THRESHOLD,
+            "shadowDirectionCosine": CAMERA_SHADOW_DIRECTION_THRESHOLD,
         },
         "text": {
             "rasterToleranceRatio": CAMERA_TEXT_RASTER_TOLERANCE_RATIO,
             "tolerantForegroundF1": CAMERA_TEXT_TOLERANT_FOREGROUND_F1_THRESHOLD,
             "tolerantBoundsScore": CAMERA_TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD,
             "inkCoverageRatio": CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD,
+        },
+        "picture": {
+            "cornerScore": CAMERA_PICTURE_CORNER_SCORE_THRESHOLD,
+            "rectifiedColorScore": CAMERA_PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
+            "rectifiedEdgeF1": CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
+            "rectifiedSize": CAMERA_PICTURE_RECTIFIED_SIZE,
+            "edgeToleranceRatio": CAMERA_PICTURE_EDGE_TOLERANCE_RATIO,
         },
     }
     thresholds = _mapping(report.get("thresholds"), "camera-local thresholds")
@@ -530,6 +554,51 @@ def _validate_camera_local(
                 direction = _finite_metric(
                     metrics.get("gradientDirection"), f"{context} gradient direction"
                 )
+                shadow_required = metrics.get("shadowRequired")
+                shadow_measurable = metrics.get("shadowMeasurable")
+                shadow_passed = metrics.get("shadowPassed")
+                if (
+                    not isinstance(shadow_required, bool)
+                    or not isinstance(shadow_measurable, bool)
+                    or not isinstance(shadow_passed, bool)
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} shadow flags must be booleans"
+                    )
+                reference_shadow_density = _finite_metric(
+                    metrics.get("referenceShadowDensity"),
+                    f"{context} reference shadow density",
+                )
+                candidate_shadow_density = _finite_metric(
+                    metrics.get("candidateShadowDensity"),
+                    f"{context} candidate shadow density",
+                )
+                shadow_energy_ratio = _finite_metric(
+                    metrics.get("shadowEnergyRatio"),
+                    f"{context} shadow energy ratio",
+                )
+                shadow_direction = _finite_metric(
+                    metrics.get("shadowDirectionCosine"),
+                    f"{context} shadow direction cosine",
+                )
+                ring_values = {
+                    name: metrics.get(name)
+                    for name in (
+                        "referenceShadowRingPixels",
+                        "candidateShadowRingPixels",
+                        "shadowRingInnerPx",
+                        "shadowRingOuterPx",
+                    )
+                }
+                if any(
+                    not isinstance(value, int)
+                    or isinstance(value, bool)
+                    or value < 1
+                    for value in ring_values.values()
+                ) or ring_values["shadowRingOuterPx"] <= ring_values["shadowRingInnerPx"]:
+                    raise CapabilityVerificationError(
+                        f"{context} shadow ring dimensions are invalid"
+                    )
                 if (
                     not 0 <= corner_score <= 1
                     or mean_corner_error < 0
@@ -538,6 +607,10 @@ def _validate_camera_local(
                     or candidate_range < 0
                     or not 0 <= range_ratio <= 1
                     or not -1 <= direction <= 1
+                    or reference_shadow_density < 0
+                    or candidate_shadow_density < 0
+                    or not 0 <= shadow_energy_ratio <= 1
+                    or not -1 <= shadow_direction <= 1
                 ):
                     raise CapabilityVerificationError(
                         f"{context} metrics are outside their domains"
@@ -549,6 +622,48 @@ def _validate_camera_local(
                     raise CapabilityVerificationError(
                         f"{context} gradient requirement is inconsistent"
                     )
+                expected_corner_score = max(0.0, 1.0 - mean_corner_error)
+                expected_range_ratio = (
+                    min(reference_range, candidate_range)
+                    / max(reference_range, candidate_range)
+                    if max(reference_range, candidate_range) > 0
+                    else 1.0
+                )
+                if (
+                    abs(corner_score - expected_corner_score) > 1e-9
+                    or abs(range_ratio - expected_range_ratio) > 1e-9
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} plane metrics are inconsistent"
+                    )
+                expected_shadow_measurable = (
+                    shadow_required
+                    and reference_shadow_density
+                    >= CAMERA_MINIMUM_REFERENCE_SHADOW_DENSITY
+                )
+                maximum_shadow_density = max(
+                    reference_shadow_density,
+                    candidate_shadow_density,
+                )
+                expected_shadow_energy_ratio = (
+                    min(reference_shadow_density, candidate_shadow_density)
+                    / maximum_shadow_density
+                    if maximum_shadow_density > 1e-9
+                    else 1.0
+                )
+                expected_shadow_passed = not expected_shadow_measurable or (
+                    shadow_energy_ratio >= CAMERA_SHADOW_ENERGY_RATIO_THRESHOLD
+                    and shadow_direction >= CAMERA_SHADOW_DIRECTION_THRESHOLD
+                )
+                if (
+                    abs(shadow_energy_ratio - expected_shadow_energy_ratio) > 1e-9
+                    or
+                    shadow_measurable is not expected_shadow_measurable
+                    or shadow_passed is not expected_shadow_passed
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} shadow metrics are inconsistent"
+                    )
                 expected_pass = (
                     corner_score >= CAMERA_CORNER_SCORE_THRESHOLD
                     and color_score >= CAMERA_COLOR_SCORE_THRESHOLD
@@ -559,8 +674,9 @@ def _validate_camera_local(
                             and direction >= CAMERA_GRADIENT_DIRECTION_THRESHOLD
                         )
                     )
+                    and expected_shadow_passed
                 )
-            else:
+            elif modality == "text":
                 foreground_iou = _finite_metric(
                     metrics.get("foregroundIou"), f"{context} foreground IoU"
                 )
@@ -667,13 +783,96 @@ def _validate_camera_local(
                     and tolerant_bounds_score >= CAMERA_TEXT_TOLERANT_BOUNDS_SCORE_THRESHOLD
                     and ink_coverage_ratio >= CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD
                 )
-            if metrics.get("passed") is not expected_pass or slide.get("passed") is not expected_pass:
+            else:
+                corner_score = _finite_metric(
+                    metrics.get("cornerScore"), f"{context} picture corner score"
+                )
+                mean_corner_error = _finite_metric(
+                    metrics.get("meanCornerErrorRatio"),
+                    f"{context} picture corner error",
+                )
+                rectified_color_score = _finite_metric(
+                    metrics.get("rectifiedColorScore"),
+                    f"{context} rectified picture color score",
+                )
+                rectified_edge_f1 = _finite_metric(
+                    metrics.get("rectifiedEdgeF1"),
+                    f"{context} rectified picture edge F1",
+                )
+                reference_edge_coverage = _finite_metric(
+                    metrics.get("referenceEdgeCoverageAtTolerance"),
+                    f"{context} reference picture edge coverage",
+                )
+                candidate_edge_coverage = _finite_metric(
+                    metrics.get("candidateEdgeCoverageAtTolerance"),
+                    f"{context} candidate picture edge coverage",
+                )
+                edge_tolerance_px = metrics.get("edgeTolerancePx")
+                rectified_size = metrics.get("rectifiedSize")
+                if (
+                    not 0 <= corner_score <= 1
+                    or mean_corner_error < 0
+                    or not 0 <= rectified_color_score <= 1
+                    or not 0 <= rectified_edge_f1 <= 1
+                    or not 0 <= reference_edge_coverage <= 1
+                    or not 0 <= candidate_edge_coverage <= 1
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} metrics are outside their domains"
+                    )
+                if (
+                    not isinstance(edge_tolerance_px, int)
+                    or isinstance(edge_tolerance_px, bool)
+                    or edge_tolerance_px < 1
+                    or edge_tolerance_px
+                    != max(
+                        1,
+                        round(
+                            CAMERA_PICTURE_RECTIFIED_SIZE
+                            * CAMERA_PICTURE_EDGE_TOLERANCE_RATIO
+                        ),
+                    )
+                    or rectified_size != CAMERA_PICTURE_RECTIFIED_SIZE
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} picture raster dimensions are invalid"
+                    )
+                expected_corner_score = max(0.0, 1.0 - mean_corner_error)
+                expected_edge_f1 = (
+                    2
+                    * reference_edge_coverage
+                    * candidate_edge_coverage
+                    / (reference_edge_coverage + candidate_edge_coverage)
+                    if reference_edge_coverage + candidate_edge_coverage > 0
+                    else 0.0
+                )
+                if abs(corner_score - expected_corner_score) > 1e-9:
+                    raise CapabilityVerificationError(
+                        f"{context} picture corner metrics are inconsistent"
+                    )
+                if abs(rectified_edge_f1 - expected_edge_f1) > 1e-9:
+                    raise CapabilityVerificationError(
+                        f"{context} picture edge metrics are inconsistent"
+                    )
+                expected_pass = (
+                    corner_score >= CAMERA_PICTURE_CORNER_SCORE_THRESHOLD
+                    and rectified_color_score
+                    >= CAMERA_PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD
+                    and rectified_edge_f1
+                    >= CAMERA_PICTURE_RECTIFIED_EDGE_F1_THRESHOLD
+                )
+            if (
+                metrics.get("passed") is not expected_pass
+                or slide.get("passed") is not expected_pass
+            ):
                 raise CapabilityVerificationError(f"{context} metric pass status is inconsistent")
             slide_passes.append(expected_pass)
 
         applicable = value.get("applicable")
         if not isinstance(applicable, bool) or applicable is not bool(slides):
-            raise CapabilityVerificationError(f"{case_id} camera-local applicability is inconsistent")
+            raise CapabilityVerificationError(
+                f"{case_id} camera-local applicability is inconsistent"
+            )
         if applicable:
             applicable_count += 1
         case_passed = applicable and all(slide_passes)

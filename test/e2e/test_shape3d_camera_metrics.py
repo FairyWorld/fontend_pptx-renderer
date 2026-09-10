@@ -12,8 +12,11 @@ from PIL import Image
 from scripts.shape3d_camera_metrics import (
     build_camera_report,
     compute_camera_plane_metrics,
+    compute_picture_camera_metrics,
     compute_text_camera_metrics,
+    extract_camera_shadow_slide_indices,
     extract_camera_slide_indices,
+    extract_picture_camera_slide_indices,
     extract_text_camera_slide_indices,
 )
 
@@ -35,6 +38,71 @@ def _plane_specimen(
         ratio = (y - top) / max(bottom - top, 1)
         color = np.asarray(top_color) * (1 - ratio) + np.asarray(bottom_color) * ratio
         image[y, mask[y] > 0] = np.rint(color).astype(np.uint8)
+    return image
+
+
+def _shadowed_plane_specimen(
+    width: int,
+    height: int,
+    corners: tuple[tuple[float, float], ...],
+):
+    image = _plane_specimen(width, height, corners)
+    points = np.asarray([(round(x * width), round(y * height)) for x, y in corners], np.int32)
+    mask = np.zeros((height, width), dtype=np.uint8)
+    cv2.fillConvexPoly(mask, points, 255)
+    shifted = np.zeros_like(mask)
+    shifted[5:] = mask[:-5]
+    shadow = cv2.GaussianBlur(shifted, (0, 0), sigmaX=4, sigmaY=4).astype(np.float64) / 255
+    background = np.full_like(image, 255, dtype=np.float64)
+    background -= shadow[..., None] * 80
+    background[mask > 0] = image[mask > 0]
+    return np.rint(background).astype(np.uint8)
+
+
+def _picture_plane_specimen(
+    width: int,
+    height: int,
+    corners: tuple[tuple[float, float], ...],
+    *,
+    crop_left: float = 0,
+):
+    source = np.zeros((240, 320, 3), dtype=np.uint8)
+    source[..., 0] = np.linspace(20, 80, source.shape[1], dtype=np.uint8)
+    source[..., 1] = np.linspace(80, 180, source.shape[1], dtype=np.uint8)
+    source[..., 2] = 190
+    cv2.rectangle(source, (24, 20), (295, 218), (250, 205, 65), 8)
+    cv2.ellipse(source, (160, 120), (45, 62), 0, 0, 360, (245, 245, 245), -1)
+    cv2.ellipse(source, (160, 120), (45, 62), 0, 0, 360, (25, 45, 70), 6)
+    left = min(source.shape[1] - 2, round(source.shape[1] * crop_left))
+    source = source[:, left:]
+    destination = np.asarray(
+        [(round(x * width), round(y * height)) for x, y in corners], dtype=np.float32
+    )
+    source_corners = np.asarray(
+        [
+            [0, 0],
+            [source.shape[1] - 1, 0],
+            [source.shape[1] - 1, source.shape[0] - 1],
+            [0, source.shape[0] - 1],
+        ],
+        dtype=np.float32,
+    )
+    transform = cv2.getPerspectiveTransform(source_corners, destination)
+    image = cv2.warpPerspective(
+        source,
+        transform,
+        (width, height),
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=(255, 255, 255),
+    )
+    plane_mask = cv2.warpPerspective(
+        np.full(source.shape[:2], 255, dtype=np.uint8),
+        transform,
+        (width, height),
+        flags=cv2.INTER_NEAREST,
+    )
+    image[plane_mask == 0] = 255
     return image
 
 
@@ -84,6 +152,44 @@ def test_camera_metric_does_not_require_a_gradient_for_a_native_flat_control():
 
     assert metrics["gradientRequired"] is False
     assert metrics["passed"] is True
+
+
+def test_camera_metric_requires_native_shadow_energy_outside_the_projected_plane():
+    corners = ((0.39, 0.28), (0.61, 0.28), (0.79, 0.82), (0.21, 0.82))
+    reference = _shadowed_plane_specimen(600, 360, corners)
+    candidate = _shadowed_plane_specimen(300, 180, corners)
+    missing_shadow = _plane_specimen(300, 180, corners)
+
+    present = compute_camera_plane_metrics(reference, candidate, shadow_required=True)
+    missing = compute_camera_plane_metrics(reference, missing_shadow, shadow_required=True)
+
+    assert present["shadowRequired"] is True
+    assert present["shadowMeasurable"] is True
+    assert present["shadowPassed"] is True
+    assert present["passed"] is True
+    assert missing["cornerScore"] > 0.995
+    assert missing["colorScore"] > 0.995
+    assert missing["shadowEnergyRatio"] < present["thresholds"]["shadowEnergyRatio"]
+    assert missing["shadowPassed"] is False
+    assert missing["passed"] is False
+
+
+def test_picture_camera_metric_rectifies_projection_and_rejects_wrong_source_crop():
+    corners = ((0.34, 0.22), (0.67, 0.27), (0.67, 0.78), (0.34, 0.83))
+    reference = _picture_plane_specimen(800, 450, corners)
+    candidate = _picture_plane_specimen(400, 225, corners)
+    wrong_crop = _picture_plane_specimen(400, 225, corners, crop_left=0.22)
+
+    matching = compute_picture_camera_metrics(reference, candidate)
+    mismatched = compute_picture_camera_metrics(reference, wrong_crop)
+
+    assert matching["passed"] is True
+    assert matching["cornerScore"] > 0.995
+    assert matching["rectifiedColorScore"] > 0.98
+    assert matching["rectifiedEdgeF1"] > 0.95
+    assert mismatched["cornerScore"] > 0.995
+    assert mismatched["rectifiedEdgeF1"] < matching["thresholds"]["rectifiedEdgeF1"]
+    assert mismatched["passed"] is False
 
 
 def _text_specimen(width: int, height: int, *, offset_x: int = 0, offset_y: int = 0):
@@ -236,6 +342,75 @@ def test_extracts_only_zero_depth_rect_camera_planes(tmp_path):
             target.writestr(name, data)
     assert extract_camera_slide_indices(wrong_theme) == {0, 1, 3}
     assert extract_text_camera_slide_indices(wrong_theme) == {5, 6}
+
+
+def test_extracts_exact_theme_shadow_contract_for_solid_camera_planes(tmp_path):
+    source = tmp_path / "camera-shadow.pptx"
+    shape = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:spPr>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill><a:ln><a:noFill/></a:ln>
+          <a:scene3d><a:camera prst="perspectiveRelaxedModerately" fov="7200000"><a:rot lat="18590633" lon="0" rev="0"/></a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+        </p:spPr><p:style><a:effectRef idx="EFFECT_INDEX"><a:schemeClr val="accent1"/></a:effectRef></p:style><p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    theme = """
+      <a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements>
+        <a:clrScheme name="Verified"><a:accent1><a:srgbClr val="4F81BD"/></a:accent1></a:clrScheme>
+        <a:fmtScheme name="Verified"><a:effectStyleLst>
+          <a:effectStyle><a:effectLst/></a:effectStyle>
+          <a:effectStyle><a:effectLst><a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle>
+        </a:effectStyleLst></a:fmtScheme>
+      </a:themeElements></a:theme>"""
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/theme/theme1.xml", theme)
+        archive.writestr("ppt/slides/slide1.xml", shape.replace("EFFECT_INDEX", "2"))
+        archive.writestr("ppt/slides/slide2.xml", shape.replace("EFFECT_INDEX", "0"))
+
+    assert extract_camera_slide_indices(source) == {0, 1}
+    assert extract_camera_shadow_slide_indices(source) == {0}
+
+    wrong_theme = tmp_path / "camera-shadow-wrong-theme.pptx"
+    with ZipFile(source) as source_archive, ZipFile(wrong_theme, "w", ZIP_DEFLATED) as target:
+        for name in source_archive.namelist():
+            data = source_archive.read(name)
+            if name == "ppt/theme/theme1.xml":
+                data = data.replace(b'alpha val="35000"', b'alpha val="34000"')
+            target.writestr(name, data)
+    assert extract_camera_slide_indices(wrong_theme) == {1}
+    assert extract_camera_shadow_slide_indices(wrong_theme) == set()
+
+
+def test_extracts_only_exact_perspective_right_picture_plane_tuple(tmp_path):
+    source = tmp_path / "camera-picture.pptx"
+    positive = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+             xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <p:cSld><p:spTree><p:pic><p:nvPicPr/><p:blipFill>
+          <a:blip r:embed="rId2"/><a:srcRect l="22000" r="8000"/><a:stretch/>
+        </p:blipFill><p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1000" cy="500"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:scene3d><a:camera prst="perspectiveRight" fov="5700000"/><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+        </p:spPr></p:pic></p:spTree></p:cSld>
+      </p:sld>"""
+    negatives = [
+        positive.replace("<a:stretch/>", "<a:stretch><a:fillRect/></a:stretch>"),
+        positive.replace("<a:blip r:embed=\"rId2\"/>", "<a:blip r:embed=\"rId2\"><a:alphaModFix amt=\"50000\"/></a:blip>"),
+        positive.replace("l=\"22000\" r=\"8000\"", "l=\"99000\" r=\"1000\""),
+        positive.replace(
+            '<a:camera prst="perspectiveRight" fov="5700000"/>',
+            '<a:camera prst="perspectiveRight" fov="5700000"><a:rot lat="0" lon="0" rev="0"/></a:camera>',
+        ),
+    ]
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/slides/slide1.xml", positive)
+        for index, negative in enumerate(negatives, start=2):
+            archive.writestr(f"ppt/slides/slide{index}.xml", negative)
+
+    assert extract_picture_camera_slide_indices(source) == {0}
 
 
 def test_camera_report_binds_exact_native_rasters_and_rejects_hash_drift(tmp_path):

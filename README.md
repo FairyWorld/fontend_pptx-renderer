@@ -642,27 +642,32 @@ rendering is unavailable, the vector fallback remains visible. Text stays outsid
 overlay, picture outlines remain centered on the source bounds, and group transforms retain the
 existing coordinate mapping.
 
-The separate camera-plane lane has two zero-depth rectangle modalities. Solid planes become SVG
-quadrilaterals. No-fill text planes retain their live DOM text and receive a CSS `matrix3d`
-homography, so the projected content remains selectable. The solid matrix contains
+The separate camera-plane lane has three zero-depth rectangle modalities. Solid planes become SVG
+quadrilaterals. No-fill text planes and stretch-filled pictures retain their live DOM content and
+receive a CSS `matrix3d` homography, so text remains selectable and picture crop stays in the normal
+image pipeline. The solid matrix contains
 `orthographicFront` with absent rotation, `orthographicFront` with exactly `lat=20°`, `lon=30°`,
 `rev=0°`, and `perspectiveRelaxedModerately` with `fov=120°` and exactly
 `lat=18590633/60000°`, `lon=0°`, `rev=0°`. The live-text rows are
 `perspectiveContrastingRightFacing` with `fov=85°` and exactly `lat=0°`,
 `lon=19532225/60000°`, `rev=0°`, plus `perspectiveLeft` with `fov=120°`, absent explicit
-rotation, and the preset's implicit `lat=0°`, `lon=20°`, `rev=0°`. All rows use an unrotated
-`threePt:t` light.
+rotation, and the preset's implicit `lat=0°`, `lon=20°`, `rev=0°`. The picture row uses
+`perspectiveRight` with `fov=95°`, absent explicit rotation, and implicit `lat=0°`, `lon=-20°`,
+`rev=0°`. All rows use an unrotated `threePt:t` light.
 
-Fifteen native slides cover the original six explicit-`a:sp3d` solid controls plus scene-only solid
-and two live-text square/wide/tall matrices. An absent `a:sp3d` is treated as implicit zero depth only
-for those exact scene-only tuples. Solid shapes must have no visible text or stroke and use the
+Nineteen native slides cover the original six explicit-`a:sp3d` solid controls, scene-only solid,
+two live-text square/wide/tall matrices, and a four-slide picture matrix spanning absent,
+horizontal, vertical, and asymmetric source crops. An absent `a:sp3d` is treated as implicit zero
+depth only for those exact scene-only tuples. Solid shapes must have no visible text or stroke and use the
 verified explicit `#2F75B5` or theme `#4F81BD` rows. Live-text shapes must use explicit `a:noFill`,
 omit the line element and `p:style`, and declare local `bodyPr wrap="none"` with `a:spAutoFit`.
 The contrasting-right row requires `anchor="ctr"`; the perspective-left row requires the anchor to
 be absent so Office's top default applies. Vertical text and independent text bounds remain outside
-this lane. Both modalities
-exclude shape rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion
-color, material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
+this lane. Picture rows require rectangular `a:stretch` without `a:fillRect`, style references,
+visible outlines, picture background fills, or direct blip effects; source crops must be finite,
+nonnegative, and leave positive visible width and height. All three modalities exclude local
+rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion color,
+material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
 its resolved `outerShdw` is applied to the visible projected polygon with a filter region covering
 the projected four-corner bounds. Live-text rows omit the entire shape style.
 
@@ -670,11 +675,13 @@ This plane projection uses small independent SVG math rather than a mesh engine:
 latitude, and revolution rotations are followed by orthographic or perspective division. OOXML
 provides the camera properties; preset viewport scale and material response are pinned to native
 PowerPoint evidence. A dedicated gate compares normalized four-corner geometry, three material
-color bands, gradient range, and gradient direction for solid planes. For live text, schema v3 keeps
-raw foreground IoU and bounds as diagnostics, then gates on bidirectional foreground F1 and bounds
-after a resolution-normalized `0.25%` raster tolerance, plus grayscale ink-density retention. The
-tolerance absorbs font rasterization and antialiasing differences while preserving large-position
-failure detection against the same hashed native rasters.
+color bands, gradient range, gradient direction, and source-required external shadow energy and
+direction for solid planes. Schema v4 keeps raw foreground IoU and bounds for live-text diagnosis,
+then gates on bidirectional foreground F1 and bounds after a resolution-normalized `0.25%` raster
+tolerance, plus grayscale ink-density retention. It inverse-projects picture planes to a fixed
+rectangle and gates their content with color similarity and tolerant edge F1, so a correct outer
+quadrilateral cannot hide a wrong crop. The tolerance absorbs font and image rasterization
+differences while preserving semantic failures against the same hashed native rasters.
 
 This support does not include camera values outside that exact plane matrix, nonzero extrusion,
 arbitrary light rotation, other bevel presets, tiled pictures, negative or degenerate source crops,
