@@ -6887,6 +6887,53 @@ describe('ShapeRenderer', () => {
     expect(filterBottom).toBeGreaterThan(Math.max(...projectedY));
   });
 
+  it('scales an orthographic camera shadow to the projected plane footprint', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="842" name="Orthographic plane shadow"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d>
+            <a:camera prst="orthographicFront"/>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:spPr>
+        <p:style><a:effectRef idx="2"><a:schemeClr val="accent1"/></a:effectRef></p:style>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+      </p:sp>`;
+
+    const baseContext = createMockRenderContext();
+    const el = renderShape(
+      parseShapeNode(parseXml(xml)),
+      createMockRenderContext({
+        theme: {
+          ...baseContext.theme,
+          effectStyles: [
+            parseXml(
+              '<a:effectStyle xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectLst/></a:effectStyle>',
+            ),
+            parseXml(
+              '<a:effectStyle xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:effectLst><a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw></a:effectLst></a:effectStyle>',
+            ),
+          ],
+        },
+      }),
+    );
+    const projected = el.querySelector('[data-pptx-shape3d-projected-plane="orthographic"]');
+    const shadowFilter = el.querySelector('filter[id^="shape-shadow-"]');
+    const dropShadow = shadowFilter?.querySelector('feDropShadow');
+
+    expect(projected?.getAttribute('filter')).toMatch(/^url\(#shape-shadow-/);
+    expect(dropShadow?.getAttribute('stdDeviation')).toBe('1.99');
+    expect(dropShadow?.getAttribute('dx')).toBe('0.0');
+    expect(dropShadow?.getAttribute('dy')).toBe('2.3');
+    expect(shadowFilter?.getAttribute('color-interpolation-filters')).toBe('sRGB');
+  });
+
   it('keeps a camera shape with visible text on the ordinary flat renderer', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

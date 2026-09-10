@@ -19,6 +19,9 @@ DERIVED_GATES = frozenset(
 SSIM_REGRESSION_BUDGET = 0.02
 BEVEL_SCORE_THRESHOLD = 0.60
 BEVEL_CORNER_SCORE_THRESHOLD = 0.78
+BEVEL_RANGE_RATIO_THRESHOLD = 0.85
+BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
+BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 CAMERA_CORNER_SCORE_THRESHOLD = 0.98
 CAMERA_COLOR_SCORE_THRESHOLD = 0.97
@@ -215,8 +218,8 @@ def _validate_bevel_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 1:
-        raise CapabilityVerificationError("bevel-local report requires schemaVersion=1")
+    if report.get("schemaVersion") != 2:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=2")
     renderer = _mapping(report.get("renderer"), "bevel-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -226,6 +229,9 @@ def _validate_bevel_local(
     if thresholds != {
         "score": BEVEL_SCORE_THRESHOLD,
         "cornerScore": BEVEL_CORNER_SCORE_THRESHOLD,
+        "rangeRatio": BEVEL_RANGE_RATIO_THRESHOLD,
+        "highlightAmplitudeRatio": BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
+        "shadowAmplitudeRatio": BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD,
     }:
         raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
     values = report.get("caseResults")
@@ -335,12 +341,93 @@ def _validate_bevel_local(
                     corner_score = _finite_metric(
                         metrics.get("cornerScore"), f"{metric_context} corner score"
                     )
+                    reference_range = _finite_metric(
+                        metrics.get("referenceDynamicRange"),
+                        f"{metric_context} reference dynamic range",
+                    )
+                    candidate_range = _finite_metric(
+                        metrics.get("candidateDynamicRange"),
+                        f"{metric_context} candidate dynamic range",
+                    )
+                    range_ratio = _finite_metric(
+                        metrics.get("rangeRatio"), f"{metric_context} range ratio"
+                    )
+                    reference_highlight = _finite_metric(
+                        metrics.get("referenceHighlightAmplitude"),
+                        f"{metric_context} reference highlight amplitude",
+                    )
+                    candidate_highlight = _finite_metric(
+                        metrics.get("candidateHighlightAmplitude"),
+                        f"{metric_context} candidate highlight amplitude",
+                    )
+                    highlight_ratio = _finite_metric(
+                        metrics.get("highlightAmplitudeRatio"),
+                        f"{metric_context} highlight amplitude ratio",
+                    )
+                    reference_shadow = _finite_metric(
+                        metrics.get("referenceShadowAmplitude"),
+                        f"{metric_context} reference shadow amplitude",
+                    )
+                    candidate_shadow = _finite_metric(
+                        metrics.get("candidateShadowAmplitude"),
+                        f"{metric_context} candidate shadow amplitude",
+                    )
+                    shadow_ratio = _finite_metric(
+                        metrics.get("shadowAmplitudeRatio"),
+                        f"{metric_context} shadow amplitude ratio",
+                    )
+                    if (
+                        reference_range < 0
+                        or candidate_range < 0
+                        or reference_highlight < 0
+                        or candidate_highlight < 0
+                        or reference_shadow < 0
+                        or candidate_shadow < 0
+                        or not 0 <= range_ratio <= 1
+                        or not 0 <= highlight_ratio <= 1
+                        or not 0 <= shadow_ratio <= 1
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{metric_context} metrics are outside their domains"
+                        )
+                    expected_range_ratio = (
+                        min(reference_range, candidate_range) / max(reference_range, candidate_range)
+                        if max(reference_range, candidate_range) > 1e-6
+                        else 1.0
+                    )
+                    expected_highlight_ratio = (
+                        min(reference_highlight, candidate_highlight)
+                        / max(reference_highlight, candidate_highlight)
+                        if max(reference_highlight, candidate_highlight) > 1e-6
+                        else 1.0
+                    )
+                    expected_shadow_ratio = (
+                        min(reference_shadow, candidate_shadow)
+                        / max(reference_shadow, candidate_shadow)
+                        if max(reference_shadow, candidate_shadow) > 1e-6
+                        else 1.0
+                    )
+                    if (
+                        abs(range_ratio - expected_range_ratio) > 1e-9
+                        or abs(highlight_ratio - expected_highlight_ratio) > 1e-9
+                        or abs(shadow_ratio - expected_shadow_ratio) > 1e-9
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{metric_context} amplitude metrics are inconsistent"
+                        )
                     if metric_thresholds != thresholds:
                         raise CapabilityVerificationError(
                             f"{metric_context} uses unexpected thresholds"
                         )
-                    expected_pass = score >= BEVEL_SCORE_THRESHOLD and (
-                        not corner_required or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD
+                    expected_pass = (
+                        score >= BEVEL_SCORE_THRESHOLD
+                        and range_ratio >= BEVEL_RANGE_RATIO_THRESHOLD
+                        and highlight_ratio >= BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
+                        and shadow_ratio >= BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD
+                        and (
+                            not corner_required
+                            or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD
+                        )
                     )
                 else:
                     if metrics.get("reason") != "bevel-band-below-resolution-floor":

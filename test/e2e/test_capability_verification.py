@@ -112,9 +112,15 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
         {"slideIdx": 0, "hidden": False, "renderArtifacts": native_artifacts}
     ]
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "renderer": dict(case["provenance"]["renderer"]),
-        "thresholds": {"score": 0.6, "cornerScore": 0.78},
+        "thresholds": {
+            "score": 0.6,
+            "cornerScore": 0.78,
+            "rangeRatio": 0.85,
+            "highlightAmplitudeRatio": 0.8,
+            "shadowAmplitudeRatio": 0.85,
+        },
         "applicableCaseCount": 1,
         "passed": passed,
         "caseResults": [
@@ -142,7 +148,22 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                                     "score": 0.9 if passed else 0.4,
                                     "cornerScore": 0.9 if passed else 0.4,
                                     "cornerRequired": True,
-                                    "thresholds": {"score": 0.6, "cornerScore": 0.78},
+                                    "rangeRatio": 1.0,
+                                    "referenceDynamicRange": 80.0,
+                                    "candidateDynamicRange": 80.0,
+                                    "highlightAmplitudeRatio": 1.0,
+                                    "referenceHighlightAmplitude": 35.0,
+                                    "candidateHighlightAmplitude": 35.0,
+                                    "shadowAmplitudeRatio": 1.0,
+                                    "referenceShadowAmplitude": 45.0,
+                                    "candidateShadowAmplitude": 45.0,
+                                    "thresholds": {
+                                        "score": 0.6,
+                                        "cornerScore": 0.78,
+                                        "rangeRatio": 0.85,
+                                        "highlightAmplitudeRatio": 0.8,
+                                        "shadowAmplitudeRatio": 0.85,
+                                    },
                                     "passed": passed,
                                 },
                             }
@@ -846,4 +867,24 @@ def test_rejects_tampered_bevel_artifacts_and_inconsistent_metric_results(tmp_pa
             baseline_reports=[baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             bevel_report=inconsistent,
+        )
+
+    overdark = bevel_report(current, repo)
+    metrics = overdark["caseResults"][0]["slides"][0]["regions"][0]["metrics"]
+    metrics.update(
+        candidateDynamicRange=120.0,
+        rangeRatio=80.0 / 120.0,
+        candidateShadowAmplitude=90.0,
+        shadowAmplitudeRatio=0.5,
+    )
+
+    with pytest.raises(CapabilityVerificationError, match="metric pass status"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            bevel_report=overdark,
         )

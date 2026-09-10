@@ -3261,11 +3261,19 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       const blurPx = emuToPx(blurRad);
       // The projected replacement path is emitted directly in camera-space coordinates while the
       // OOXML effect lengths are still expressed for the source plane. Carry the measured
-      // horizontal projection scale into blur and distance; otherwise the native-oracle shadow is
-      // visibly underpowered after the plane widens.
+      // horizontal projection scale into blur and distance. Native orthographic planes contract
+      // that effect footprint slightly even when the projected width is unchanged.
       const cameraShadowScale =
         shape3dPlan?.mode === 'camera-projected-plane' && outerShadowBounds
-          ? Math.min(4, Math.max(1, outerShadowBounds.w / Math.max(shape3dPlan.bounds.width, 1)))
+          ? shape3dPlan.camera.kind === 'perspective'
+            ? Math.min(4, Math.max(1, outerShadowBounds.w / Math.max(shape3dPlan.bounds.width, 1)))
+            : Math.min(
+                4,
+                Math.max(
+                  0.25,
+                  (outerShadowBounds.w / Math.max(shape3dPlan.bounds.width, 1)) * 0.95,
+                ),
+              )
           : 1;
       const cameraShadowFilterOptions =
         shape3dPlan?.mode === 'camera-projected-plane'

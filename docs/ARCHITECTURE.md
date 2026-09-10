@@ -239,8 +239,11 @@ than retaining rectangular face boundaries.
 The resulting transparent texture replaces only the fallback lighting after its object URL decodes.
 Solid shapes map light and shadow through material-color lookup tables so highlights retain the
 source hue; pictures use relative black/white overlays so their pixels remain visible. The render
-plan carries material intensity separately from bevel geometry. Native evidence calibrates the
-implicit `twoPt:t` picture response independently from the solid-shape `threePt:t` response. Texture
+plan carries material intensity separately from bevel geometry. Solid-shape highlights preserve the
+common material response, while shadow attenuation is interpolated over log aspect ratio from the
+native square, wide, and tall matrices; this avoids making the dark bevel face progressively too
+heavy as the silhouette widens. Native evidence calibrates the implicit `twoPt:t` picture response
+independently from the solid-shape `threePt:t` response. Texture
 work is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry,
 dimensions, bevel, light, intensity, surface, raster size, and algorithm version, and guarded by the
 slide abort signal.
@@ -279,7 +282,8 @@ material field; identity and rotated orthographic controls use their native-obse
 responses. The scene-only solid row's theme `effectRef=2` outer shadow is transferred from the
 hidden source path to this projected path. Its SVG filter uses the projected four-corner bounds to
 avoid clipping overflow, scales blur and distance by the plane's measured horizontal projection,
-and uses sRGB filter interpolation for the native-verified camera tuple. For the exact text tuples,
+applies a native-calibrated `0.95` footprint factor to orthographic planes, and uses sRGB filter
+interpolation for the native-verified camera tuple. For the exact text tuples,
 `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
 homography and applies it after text layout, while preserving the text DOM. The picture path applies
 the same homography to the existing crop-clipping stage, preserving the image pipeline and its

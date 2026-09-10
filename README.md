@@ -634,7 +634,9 @@ bevel texture. This makes rounded corners follow the source contour instead of i
 face edges. Shape textures retain the resolved material hue, while picture textures remain relative
 black/white lighting so the source pixels stay visible. The supported implicit `twoPt:t` picture
 response uses its native-validated edge direction and a lower material intensity than opaque solid
-shapes; the bevel geometry remains shared.
+shapes; the bevel geometry remains shared. Solid highlights keep their common material mapping,
+while dark-face attenuation is interpolated across the native square, wide, and tall matrices so a
+wide ellipse or donut does not become disproportionately dark.
 
 The asynchronous texture work is serialized per slide, capped at 262,144 pixels per texture, cached
 with the render context, and tied to slide abort and blob-URL cleanup. If Canvas, decoding, scale, or
@@ -670,8 +672,9 @@ rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, ext
 material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
 its resolved `outerShdw` is applied to the visible projected polygon with a filter region covering
 the projected four-corner bounds. Blur and distance follow the plane's measured horizontal
-projection scale, and the camera-local gate requires at least `0.70` of measurable native shadow
-energy. Live-text rows omit the entire shape style.
+projection scale; orthographic rows apply their native-calibrated `0.95` footprint factor. The
+camera-local gate requires at least `0.70` of measurable native shadow energy. Live-text rows omit
+the entire shape style.
 
 This plane projection uses small independent SVG math rather than a mesh engine: longitude,
 latitude, and revolution rotations are followed by orthographic or perspective division. OOXML

@@ -25,6 +25,9 @@ A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 NS = {"p": P_NS, "a": A_NS}
 SCORE_THRESHOLD = 0.60
 CORNER_SCORE_THRESHOLD = 0.78
+RANGE_RATIO_THRESHOLD = 0.85
+HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
+SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 MIN_EVALUABLE_BAND_PX = 4.0
 
 
@@ -296,12 +299,12 @@ def _field_score(
     candidate_values = candidate_delta[mask]
     if reference_values.size < 20:
         raise ValueError("bevel ring contains too few pixels")
-    reference_range = float(
-        np.percentile(reference_values, 95) - np.percentile(reference_values, 5)
-    )
-    candidate_range = float(
-        np.percentile(candidate_values, 95) - np.percentile(candidate_values, 5)
-    )
+    reference_p95 = float(np.percentile(reference_values, 95))
+    reference_p05 = float(np.percentile(reference_values, 5))
+    candidate_p95 = float(np.percentile(candidate_values, 95))
+    candidate_p05 = float(np.percentile(candidate_values, 5))
+    reference_range = reference_p95 - reference_p05
+    candidate_range = candidate_p95 - candidate_p05
     if np.std(reference_values) > 0.5 and np.std(candidate_values) > 0.5:
         correlation = float(np.corrcoef(reference_values, candidate_values)[0, 1])
         if not math.isfinite(correlation):
@@ -315,6 +318,17 @@ def _field_score(
         if max(reference_range, candidate_range) > 1e-6
         else 1.0
     )
+    reference_highlight = max(reference_p95, 0.0)
+    candidate_highlight = max(candidate_p95, 0.0)
+    reference_shadow = max(-reference_p05, 0.0)
+    candidate_shadow = max(-candidate_p05, 0.0)
+
+    def amplitude_ratio(reference_amplitude: float, candidate_amplitude: float) -> float:
+        maximum = max(reference_amplitude, candidate_amplitude)
+        return min(reference_amplitude, candidate_amplitude) / maximum if maximum > 1e-6 else 1.0
+
+    highlight_amplitude_ratio = amplitude_ratio(reference_highlight, candidate_highlight)
+    shadow_amplitude_ratio = amplitude_ratio(reference_shadow, candidate_shadow)
     salient = np.abs(reference_values) >= max(3.0, reference_range * 0.15)
     sign_agreement = (
         float(np.mean(np.sign(reference_values[salient]) == np.sign(candidate_values[salient])))
@@ -335,6 +349,12 @@ def _field_score(
         "signAgreement": sign_agreement,
         "referenceDynamicRange": reference_range,
         "candidateDynamicRange": candidate_range,
+        "referenceHighlightAmplitude": reference_highlight,
+        "candidateHighlightAmplitude": candidate_highlight,
+        "highlightAmplitudeRatio": float(highlight_amplitude_ratio),
+        "referenceShadowAmplitude": reference_shadow,
+        "candidateShadowAmplitude": candidate_shadow,
+        "shadowAmplitudeRatio": float(shadow_amplitude_ratio),
         "meanAbsoluteError": mean_absolute_error,
     }
 
@@ -346,6 +366,9 @@ def compute_bevel_ring_metrics(
     *,
     score_threshold: float = SCORE_THRESHOLD,
     corner_score_threshold: float = CORNER_SCORE_THRESHOLD,
+    range_ratio_threshold: float = RANGE_RATIO_THRESHOLD,
+    highlight_amplitude_ratio_threshold: float = HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
+    shadow_amplitude_ratio_threshold: float = SHADOW_AMPLITUDE_RATIO_THRESHOLD,
 ) -> dict[str, Any]:
     reference, candidate = _common_images(reference, candidate)
     image_height, image_width = reference.shape[:2]
@@ -371,6 +394,9 @@ def compute_bevel_ring_metrics(
                 "minimumBandWidthPx": MIN_EVALUABLE_BAND_PX,
                 "score": score_threshold,
                 "cornerScore": corner_score_threshold,
+                "rangeRatio": range_ratio_threshold,
+                "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
+                "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
             },
         }
     unsupported_reason = None
@@ -389,6 +415,9 @@ def compute_bevel_ring_metrics(
             "thresholds": {
                 "score": score_threshold,
                 "cornerScore": corner_score_threshold,
+                "rangeRatio": range_ratio_threshold,
+                "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
+                "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
             },
         }
     padded = np.pad(geometry.astype(np.uint8), 1)
@@ -417,8 +446,12 @@ def compute_bevel_ring_metrics(
             | ((xx >= crop_width - extent) & (yy >= crop_height - extent))
         )
     corner = _field_score(reference_delta, candidate_delta, corner_mask)
-    passed = overall["score"] >= score_threshold and (
-        not corner_required or corner["score"] >= corner_score_threshold
+    passed = (
+        overall["score"] >= score_threshold
+        and overall["rangeRatio"] >= range_ratio_threshold
+        and overall["highlightAmplitudeRatio"] >= highlight_amplitude_ratio_threshold
+        and overall["shadowAmplitudeRatio"] >= shadow_amplitude_ratio_threshold
+        and (not corner_required or corner["score"] >= corner_score_threshold)
     )
     return {
         **overall,
@@ -433,6 +466,9 @@ def compute_bevel_ring_metrics(
         "thresholds": {
             "score": score_threshold,
             "cornerScore": corner_score_threshold,
+            "rangeRatio": range_ratio_threshold,
+            "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
+            "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
         },
         "passed": passed,
     }
@@ -569,9 +605,15 @@ def build_bevel_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "renderer": dict(renderer or {}),
-        "thresholds": {"score": SCORE_THRESHOLD, "cornerScore": CORNER_SCORE_THRESHOLD},
+        "thresholds": {
+            "score": SCORE_THRESHOLD,
+            "cornerScore": CORNER_SCORE_THRESHOLD,
+            "rangeRatio": RANGE_RATIO_THRESHOLD,
+            "highlightAmplitudeRatio": HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
+            "shadowAmplitudeRatio": SHADOW_AMPLITUDE_RATIO_THRESHOLD,
+        },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),
         "applicableCaseCount": applicable_count,
         "passed": applicable_count > 0 and all(case["passed"] for case in cases),

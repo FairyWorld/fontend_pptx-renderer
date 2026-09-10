@@ -329,9 +329,12 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_bevel_metrics.py \
 The metric extracts shape bounds, group transforms, ellipse contours, round-rectangle corners, and
 donut inner/outer radii independently from source OOXML, then compares luminance only in the inward
 bevel ring. Unknown silhouettes and rotated shapes fail as unevaluable instead of being scored with
-a rectangular mask. The general field score must be at least `0.60`; verified `roundRect` corners
-also require `0.78`. A zero-thickness donut stays in the full-slide native gate because it has no
-interior bevel surface. A band below four output pixels is explicitly recorded as
+a rectangular mask. The schema-v2 gate requires a general field score of at least `0.60`, dynamic
+range ratio `0.85`, highlight-amplitude ratio `0.80`, and shadow-amplitude ratio `0.85`; verified
+`roundRect` corners also require `0.78`. Amplitude ratios are symmetric, so both washed-out and
+over-dark lighting fail even when correlation leaves the composite score high. A zero-thickness
+donut stays in the full-slide native gate because it has no interior bevel surface. A band below
+four output pixels is explicitly recorded as
 resolution-limited and remains covered by full-slide and manual gates rather than guessed from too
 few pixels. The flat control has no applicable region. This local metric complements the full-page
 SSIM/color-histogram gate; it does not replace it. Each native API slide row fingerprints the exact

@@ -133,6 +133,26 @@ def test_bevel_ring_metrics_reject_a_flat_edge_and_accept_directional_curvature(
     assert flattened["ringPixelCount"] < reference.shape[0] * reference.shape[1] * 0.2
 
 
+def test_bevel_ring_metrics_reject_an_overdark_shadow_even_with_a_high_composite_score():
+    reference, _flat, region = _bevel_specimen()
+    base = np.array([50, 126, 196], dtype=np.float32)
+    candidate = reference.astype(np.float32)
+    delta = candidate - base
+    shadow = np.mean(delta, axis=2) < 0
+    candidate[shadow] = base + delta[shadow] * 1.8
+
+    result = compute_bevel_ring_metrics(
+        reference,
+        np.clip(candidate, 0, 255).astype(np.uint8),
+        region,
+    )
+
+    assert result["score"] > 0.85
+    assert result["highlightAmplitudeRatio"] > 0.95
+    assert result["shadowAmplitudeRatio"] < 0.85
+    assert result["passed"] is False
+
+
 @pytest.mark.parametrize("preset", ["ellipse", "donut"])
 def test_bevel_ring_metrics_follow_elliptical_silhouettes_and_holes(preset: str):
     reference, flat, region = _elliptical_bevel_specimen(preset)
@@ -194,6 +214,9 @@ def test_bevel_ring_reports_resolution_limited_instead_of_guessing():
             "minimumBandWidthPx": 4.0,
             "score": 0.6,
             "cornerScore": 0.78,
+            "rangeRatio": 0.85,
+            "highlightAmplitudeRatio": 0.8,
+            "shadowAmplitudeRatio": 0.85,
         },
     }
 

@@ -262,7 +262,7 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
-const SHAPE3D_LIGHTING_VERSION = 'distance-field-v1';
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v2';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
@@ -272,6 +272,31 @@ const PERSPECTIVE_LEFT_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_RIGHT_VIEWPORT_SCALE = 0.95;
 const shape3dTaskTails = new WeakMap<Promise<void>[], Promise<void>>();
 let shape3dIdCounter = 0;
+
+const SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS = [
+  { aspect: 0.55, strength: 0.72 },
+  { aspect: 1, strength: 0.58 },
+  { aspect: 1.6, strength: 0.45 },
+] as const;
+
+function solidBevelShadowStrength(width: number, height: number): number {
+  const aspect = width / height;
+  let lower: (typeof SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS)[number] =
+    SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[0];
+  let upper: (typeof SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS)[number] =
+    SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS.length - 1];
+  for (let index = 1; index < SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS.length; index += 1) {
+    if (aspect <= SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[index].aspect) {
+      lower = SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[index - 1];
+      upper = SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[index];
+      break;
+    }
+  }
+  const lowerLog = Math.log(lower.aspect);
+  const upperLog = Math.log(upper.aspect);
+  const ratio = clamp((Math.log(aspect) - lowerLog) / Math.max(upperLog - lowerLog, 1e-9), 0, 1);
+  return lower.strength + (upper.strength - lower.strength) * ratio;
+}
 
 function flat(
   reason: StaticShape3DFallbackReason,
@@ -963,6 +988,7 @@ function appendLightingImage(
 function applySolidMaterialLighting(
   lighting: Uint8ClampedArray,
   faceColor: string,
+  shadowStrength: number,
 ): Uint8ClampedArray {
   const positive = new Uint8Array(256 * 3);
   const negative = new Uint8Array(256 * 3);
@@ -975,7 +1001,7 @@ function applySolidMaterialLighting(
       ),
     );
     const shadowColor = hexToRgb(
-      applyLumMod(faceColor, Math.round((1 - strength * 0.85) * 100000)),
+      applyLumMod(faceColor, Math.round((1 - strength * shadowStrength) * 100000)),
     );
     for (const [table, color] of [
       [positive, lightColor],
@@ -1060,7 +1086,11 @@ async function renderDistanceFieldLighting(
     intensity: plan.light.intensity,
   });
   if (plan.surface === 'shape' && plan.faceColor) {
-    lighting = applySolidMaterialLighting(lighting, plan.faceColor);
+    lighting = applySolidMaterialLighting(
+      lighting,
+      plan.faceColor,
+      solidBevelShadowStrength(plan.bounds.width, plan.bounds.height),
+    );
   }
 
   const outputCanvas = document.createElement('canvas');

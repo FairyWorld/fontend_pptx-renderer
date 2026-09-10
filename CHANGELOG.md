@@ -24,8 +24,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   vertical and combined source crops, plus explicit- and implicit-depth camera planes, editable-text
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions.
-- Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored eight-case
-  3D discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
+- Added a schema-v2 bevel-ring fidelity metric and derived capability gate with independent dynamic
+  range, highlight-amplitude, and shadow-amplitude floors, plus an opt-in ignored eight-case 3D
+  discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
 - Added a schema-v4 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,
@@ -66,8 +67,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Preserve the scene-only solid camera row's theme `effectRef=2` outer shadow on the visible
   projected polygon, with a filter region derived from the projected four-corner bounds so wide and
   tall planes are not clipped back to their pre-projection rectangle. Scale its blur and distance
-  with the measured horizontal camera projection, use sRGB filter interpolation for this bounded
-  tuple, and require at least `0.70` of measurable native shadow energy in the camera-local gate.
+  with the measured horizontal camera projection, apply the native-calibrated `0.95` effect
+  footprint to orthographic rows, use sRGB filter interpolation for this bounded tuple, and require
+  at least `0.70` of measurable native shadow energy in the camera-local gate.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
   `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures with a
   silhouette-aware interior
@@ -75,7 +77,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   edge extent while height controls lighting contrast; a bounded cached texture replaces a
   synchronous vector fallback only after decode, preserving contour, group, outline, outer-shadow,
   abort, and cleanup behavior. Picture lighting now uses its native-validated `twoPt:t` direction
-  and material intensity independently from solid-shape lighting. Unmatched 3D tuples stay flat.
+  and material intensity independently from solid-shape lighting. Solid highlights retain their
+  common material mapping while dark-face attenuation is interpolated across the native square,
+  wide, and tall matrices. Unmatched 3D tuples stay flat.
 - Validate ellipse bevels across square explicit paint, wide theme-reference paint, and a tall
   ellipse under a non-identity group transform; all three use the same source-silhouette distance
   field instead of a geometry-specific lighting approximation.
