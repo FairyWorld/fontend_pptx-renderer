@@ -2041,6 +2041,76 @@ def _build_shape3d_cases() -> list[CaseDef]:
         ],
     )
 
+    def _add_perspective_left_text_probe(
+        prs,
+        *,
+        width: float,
+        height: float,
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_textbox(
+            _emu((13.333 - width) / 2),
+            _emu((7.5 - height) / 2),
+            _emu(width),
+            _emu(height),
+        )
+        shape.name = "Perspective-left editable text plane"
+        text_frame = shape.text_frame
+        text_frame.clear()
+        text_frame.margin_left = 0
+        text_frame.margin_right = 0
+        text_frame.margin_top = 0
+        text_frame.margin_bottom = 0
+        _configure_text_body(
+            text_frame,
+            wrap="none",
+            autofit="spAutoFit",
+        )
+        body_pr = text_frame._txBody.find(qn("a:bodyPr"))
+        if body_pr is None:
+            raise RuntimeError("perspective-left text plane has no a:bodyPr")
+        body_pr.attrib.pop("anchor", None)
+
+        paragraph = text_frame.paragraphs[0]
+        paragraph.alignment = PP_ALIGN.LEFT
+        run = paragraph.add_run()
+        run.text = "透视文本 LEFT 120"
+        run.font.name = "Arial"
+        run.font.size = Pt(28)
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(0x20, 0x38, 0x64)
+
+        _apply_flat_shape3d_scene(
+            shape,
+            camera_preset="perspectiveLeft",
+            camera_rotation=None,
+            field_of_view=7200000,
+            include_shape_format=False,
+        )
+
+    def _build_perspective_left_text_plane_matrix(prs) -> None:
+        for width, height in ((4.2, 4.2), (8.0, 3.2), (3.2, 5.4)):
+            _add_perspective_left_text_probe(prs, width=width, height=height)
+
+    _add(
+        "perspective-left-text-plane-matrix",
+        _build_perspective_left_text_plane_matrix,
+        slide_count=3,
+        features=[
+            "p:sp.prstGeom=rect",
+            "geometry.aspect=square|wide|tall",
+            "surface=noFillTextPlane",
+            "text.content=CJK|latin|digits",
+            "text.bodyPr=wrap-none|anchor-absent|spAutoFit",
+            "a:scene3d.camera=perspectiveLeft",
+            "a:scene3d.camera.rot=absent",
+            "a:scene3d.camera.fov=7200000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d=absent",
+            "effects=absent",
+        ],
+    )
+
     return cases
 
 

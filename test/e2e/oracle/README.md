@@ -185,7 +185,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 173 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 174 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -195,7 +195,7 @@ ground-truth export. It defines 173 cases under `oracle/cases-pypptx/` with the
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Zero-adjustment flowcharts** (28 cases, 84 slides): presets in shape IDs 61-88, each with
   square explicit paint, wide theme-reference paint, and grouped-tall rendering
-- **Static DrawingML 3D** (14 cases, 30 slides): flat picture opt-out plus a bounded
+- **Static DrawingML 3D** (15 cases, 33 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
   `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
@@ -204,7 +204,9 @@ ground-truth export. It defines 173 cases under `oracle/cases-pypptx/` with the
   covers donut adjustment bounds/default plus wide-theme and grouped-tall variants; case 13 adds
   identity and rotated orthographic camera controls plus square/wide/tall, explicit/theme, and
   grouped perspective zero-depth planes; case 14 adds scene-only square/wide/tall solid planes and
-  square/wide/tall editable text planes for the exact contrasting-right camera tuple
+  square/wide/tall editable text planes for the exact contrasting-right camera tuple; case 15 adds
+  square/wide/tall editable CJK/mixed-text planes for the observed `perspectiveLeft`, 120-degree
+  field-of-view tuple with implicit camera rotation and default top anchoring
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -240,7 +242,7 @@ fingerprints.
 The opt-in `oracle-local-shape3d-*` matrix explores ellipse, adjusted donut/star, concave freeform,
 shape rotation, nested group scaling, and glow interaction. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
-ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 173-case matrix.
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 174-case matrix.
 The original one-slide ellipse and donut probes remain useful for preflight comparisons, while the
 tracked three-slide ellipse and five-slide donut matrices bound the public
 `drawingml.shape.3d.top-bevel-contour` claim. That tuple also requires an absent scene backdrop,
@@ -256,7 +258,7 @@ resolution-limited and remain subject to full-slide and manual checks. Pass the 
 `run_capability_loop.py verify --bevel-report ...`; both commands verify the API and on-disk raster
 hashes, and callers cannot self-attest `bevel-local`.
 
-After evaluating cases 0013 and 0014, run `../scripts/shape3d_camera_metrics.py` with both clean
+After evaluating cases 0013 through 0015, run `../scripts/shape3d_camera_metrics.py` with all clean
 native reports. It binds the exact source, ground truth, revision, and per-slide raster hashes. Solid
 rows use normalized four-corner geometry and three material color bands, requiring corner score
 `0.98`, color score `0.97`, and, for measurable gradients, range ratio `0.65` and direction cosine
