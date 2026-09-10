@@ -154,7 +154,13 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
     }
 
 
-def camera_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
+def camera_report(
+    case: dict,
+    repo: Path,
+    *,
+    passed: bool = True,
+    modality: str = "plane",
+) -> dict:
     case_id = case["testFile"]
     reports_dir = repo / "test/e2e/reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -177,30 +183,51 @@ def camera_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
         },
     }
     case["perSlide"] = [{"slideIdx": 0, "hidden": False, "renderArtifacts": artifacts}]
-    thresholds = {
+    plane_thresholds = {
         "cornerScore": 0.98,
         "colorScore": 0.97,
         "gradientRangeRatio": 0.65,
         "gradientDirection": 0.95,
         "minimumReferenceGradientRange": 4.0,
     }
-    metrics = {
-        "evaluable": True,
-        "cornerScore": 0.995 if passed else 0.9,
-        "meanCornerErrorRatio": 0.005 if passed else 0.1,
-        "colorScore": 0.99,
-        "gradientRequired": True,
-        "referenceGradientRange": 20.0,
-        "candidateGradientRange": 18.0,
-        "gradientRangeRatio": 0.9,
-        "gradientDirection": 1.0,
-        "referenceBands": [[1, 2, 3]] * 3,
-        "candidateBands": [[1, 2, 3]] * 3,
-        "thresholds": thresholds,
-        "passed": passed,
+    text_thresholds = {
+        "foregroundIou": 0.72,
+        "boundsScore": 0.98,
+        "inkCoverageRatio": 0.90,
     }
+    thresholds = {"plane": plane_thresholds, "text": text_thresholds}
+    if modality == "plane":
+        metrics = {
+            "evaluable": True,
+            "cornerScore": 0.995 if passed else 0.9,
+            "meanCornerErrorRatio": 0.005 if passed else 0.1,
+            "colorScore": 0.99,
+            "gradientRequired": True,
+            "referenceGradientRange": 20.0,
+            "candidateGradientRange": 18.0,
+            "gradientRangeRatio": 0.9,
+            "gradientDirection": 1.0,
+            "referenceBands": [[1, 2, 3]] * 3,
+            "candidateBands": [[1, 2, 3]] * 3,
+            "thresholds": plane_thresholds,
+            "passed": passed,
+        }
+    else:
+        metrics = {
+            "evaluable": True,
+            "foregroundIou": 0.8 if passed else 0.4,
+            "boundsScore": 0.995,
+            "meanBoundsErrorRatio": 0.005,
+            "inkCoverageRatio": 0.96,
+            "referenceInkDensity": 1.5,
+            "candidateInkDensity": 1.45,
+            "referenceBounds": [10, 20, 100, 80],
+            "candidateBounds": [10, 20, 100, 80],
+            "thresholds": text_thresholds,
+            "passed": passed,
+        }
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": thresholds,
         "applicableCaseCount": 1,
@@ -217,6 +244,7 @@ def camera_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                 "slides": [
                     {
                         "slideIdx": 0,
+                        "modality": modality,
                         "referencePath": artifacts["reference"]["path"],
                         "candidatePath": artifacts["candidate"]["path"],
                         "referenceSha256": reference_hash,
@@ -437,6 +465,28 @@ def test_derives_camera_local_gate_from_matching_artifact_evidence(tmp_path: Pat
         passed_gates=("source", "structural", "unit", "browser", "docs"),
         camera_report=camera_report(current, repo),
     )
+    assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_derives_camera_local_gate_from_live_text_projection_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-text")
+    baseline = native_report("camera-text", revision="b" * 40)
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        camera_report=camera_report(current, repo, modality="text"),
+    )
+
     assert verified["gates"]["camera-local"] == "passed"
 
 

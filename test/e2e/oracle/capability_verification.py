@@ -25,6 +25,9 @@ CAMERA_COLOR_SCORE_THRESHOLD = 0.97
 CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD = 0.65
 CAMERA_GRADIENT_DIRECTION_THRESHOLD = 0.95
 CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE = 4.0
+CAMERA_TEXT_FOREGROUND_IOU_THRESHOLD = 0.72
+CAMERA_TEXT_BOUNDS_SCORE_THRESHOLD = 0.98
+CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD = 0.90
 
 
 class CapabilityVerificationError(ValueError):
@@ -378,19 +381,26 @@ def _validate_camera_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 1:
-        raise CapabilityVerificationError("camera-local report requires schemaVersion=1")
+    if report.get("schemaVersion") != 2:
+        raise CapabilityVerificationError("camera-local report requires schemaVersion=2")
     renderer = _mapping(report.get("renderer"), "camera-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
             "camera-local report must match the clean native-report revision"
         )
     expected_thresholds = {
-        "cornerScore": CAMERA_CORNER_SCORE_THRESHOLD,
-        "colorScore": CAMERA_COLOR_SCORE_THRESHOLD,
-        "gradientRangeRatio": CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD,
-        "gradientDirection": CAMERA_GRADIENT_DIRECTION_THRESHOLD,
-        "minimumReferenceGradientRange": CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE,
+        "plane": {
+            "cornerScore": CAMERA_CORNER_SCORE_THRESHOLD,
+            "colorScore": CAMERA_COLOR_SCORE_THRESHOLD,
+            "gradientRangeRatio": CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD,
+            "gradientDirection": CAMERA_GRADIENT_DIRECTION_THRESHOLD,
+            "minimumReferenceGradientRange": CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE,
+        },
+        "text": {
+            "foregroundIou": CAMERA_TEXT_FOREGROUND_IOU_THRESHOLD,
+            "boundsScore": CAMERA_TEXT_BOUNDS_SCORE_THRESHOLD,
+            "inkCoverageRatio": CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD,
+        },
     }
     thresholds = _mapping(report.get("thresholds"), "camera-local thresholds")
     if thresholds != expected_thresholds:
@@ -482,56 +492,125 @@ def _validate_camera_local(
                 if digest != expected_hash:
                     raise CapabilityVerificationError(f"{context} {kind} artifact hash changed")
 
+            modality = slide.get("modality")
+            if modality not in expected_thresholds:
+                raise CapabilityVerificationError(f"{context} modality is unsupported")
+            modality_thresholds = expected_thresholds[modality]
             metrics = _mapping(slide.get("metrics"), f"{context} metrics")
             if metrics.get("evaluable") is not True:
                 raise CapabilityVerificationError(f"{context} must contain evaluable metrics")
-            if _mapping(metrics.get("thresholds"), f"{context} thresholds") != thresholds:
-                raise CapabilityVerificationError(f"{context} uses unexpected thresholds")
-            corner_score = _finite_metric(metrics.get("cornerScore"), f"{context} corner score")
-            mean_corner_error = _finite_metric(
-                metrics.get("meanCornerErrorRatio"), f"{context} corner error"
-            )
-            color_score = _finite_metric(metrics.get("colorScore"), f"{context} color score")
-            reference_range = _finite_metric(
-                metrics.get("referenceGradientRange"), f"{context} reference gradient range"
-            )
-            candidate_range = _finite_metric(
-                metrics.get("candidateGradientRange"), f"{context} candidate gradient range"
-            )
-            range_ratio = _finite_metric(
-                metrics.get("gradientRangeRatio"), f"{context} gradient range ratio"
-            )
-            direction = _finite_metric(
-                metrics.get("gradientDirection"), f"{context} gradient direction"
-            )
             if (
-                not 0 <= corner_score <= 1
-                or mean_corner_error < 0
-                or not 0 <= color_score <= 1
-                or reference_range < 0
-                or candidate_range < 0
-                or not 0 <= range_ratio <= 1
-                or not -1 <= direction <= 1
+                _mapping(metrics.get("thresholds"), f"{context} thresholds")
+                != modality_thresholds
             ):
-                raise CapabilityVerificationError(f"{context} metrics are outside their domains")
-            gradient_required = metrics.get("gradientRequired")
-            if not isinstance(gradient_required, bool) or gradient_required is not (
-                reference_range >= CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE
-            ):
-                raise CapabilityVerificationError(
-                    f"{context} gradient requirement is inconsistent"
+                raise CapabilityVerificationError(f"{context} uses unexpected thresholds")
+            if modality == "plane":
+                corner_score = _finite_metric(
+                    metrics.get("cornerScore"), f"{context} corner score"
                 )
-            expected_pass = (
-                corner_score >= CAMERA_CORNER_SCORE_THRESHOLD
-                and color_score >= CAMERA_COLOR_SCORE_THRESHOLD
-                and (
-                    not gradient_required
-                    or (
-                        range_ratio >= CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD
-                        and direction >= CAMERA_GRADIENT_DIRECTION_THRESHOLD
+                mean_corner_error = _finite_metric(
+                    metrics.get("meanCornerErrorRatio"), f"{context} corner error"
+                )
+                color_score = _finite_metric(
+                    metrics.get("colorScore"), f"{context} color score"
+                )
+                reference_range = _finite_metric(
+                    metrics.get("referenceGradientRange"),
+                    f"{context} reference gradient range",
+                )
+                candidate_range = _finite_metric(
+                    metrics.get("candidateGradientRange"),
+                    f"{context} candidate gradient range",
+                )
+                range_ratio = _finite_metric(
+                    metrics.get("gradientRangeRatio"), f"{context} gradient range ratio"
+                )
+                direction = _finite_metric(
+                    metrics.get("gradientDirection"), f"{context} gradient direction"
+                )
+                if (
+                    not 0 <= corner_score <= 1
+                    or mean_corner_error < 0
+                    or not 0 <= color_score <= 1
+                    or reference_range < 0
+                    or candidate_range < 0
+                    or not 0 <= range_ratio <= 1
+                    or not -1 <= direction <= 1
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} metrics are outside their domains"
+                    )
+                gradient_required = metrics.get("gradientRequired")
+                if not isinstance(gradient_required, bool) or gradient_required is not (
+                    reference_range >= CAMERA_MINIMUM_REFERENCE_GRADIENT_RANGE
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} gradient requirement is inconsistent"
+                    )
+                expected_pass = (
+                    corner_score >= CAMERA_CORNER_SCORE_THRESHOLD
+                    and color_score >= CAMERA_COLOR_SCORE_THRESHOLD
+                    and (
+                        not gradient_required
+                        or (
+                            range_ratio >= CAMERA_GRADIENT_RANGE_RATIO_THRESHOLD
+                            and direction >= CAMERA_GRADIENT_DIRECTION_THRESHOLD
+                        )
                     )
                 )
-            )
+            else:
+                foreground_iou = _finite_metric(
+                    metrics.get("foregroundIou"), f"{context} foreground IoU"
+                )
+                bounds_score = _finite_metric(
+                    metrics.get("boundsScore"), f"{context} bounds score"
+                )
+                mean_bounds_error = _finite_metric(
+                    metrics.get("meanBoundsErrorRatio"), f"{context} bounds error"
+                )
+                ink_coverage_ratio = _finite_metric(
+                    metrics.get("inkCoverageRatio"), f"{context} ink coverage ratio"
+                )
+                reference_ink_density = _finite_metric(
+                    metrics.get("referenceInkDensity"), f"{context} reference ink density"
+                )
+                candidate_ink_density = _finite_metric(
+                    metrics.get("candidateInkDensity"), f"{context} candidate ink density"
+                )
+                if (
+                    not 0 <= foreground_iou <= 1
+                    or not 0 <= bounds_score <= 1
+                    or mean_bounds_error < 0
+                    or not 0 <= ink_coverage_ratio <= 1
+                    or reference_ink_density <= 0
+                    or candidate_ink_density <= 0
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} metrics are outside their domains"
+                    )
+                for kind in ("reference", "candidate"):
+                    bounds = metrics.get(f"{kind}Bounds")
+                    if (
+                        not isinstance(bounds, list)
+                        or len(bounds) != 4
+                        or any(
+                            not isinstance(coordinate, (int, float))
+                            or isinstance(coordinate, bool)
+                            or not math.isfinite(coordinate)
+                            or coordinate < 0
+                            for coordinate in bounds
+                        )
+                        or bounds[0] > bounds[2]
+                        or bounds[1] > bounds[3]
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{context} {kind} bounds are invalid"
+                        )
+                expected_pass = (
+                    foreground_iou >= CAMERA_TEXT_FOREGROUND_IOU_THRESHOLD
+                    and bounds_score >= CAMERA_TEXT_BOUNDS_SCORE_THRESHOLD
+                    and ink_coverage_ratio >= CAMERA_TEXT_INK_COVERAGE_RATIO_THRESHOLD
+                )
             if metrics.get("passed") is not expected_pass or slide.get("passed") is not expected_pass:
                 raise CapabilityVerificationError(f"{context} metric pass status is inconsistent")
             slide_passes.append(expected_pass)

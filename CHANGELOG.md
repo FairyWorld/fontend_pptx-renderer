@@ -18,14 +18,16 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus a thirteen-case, twenty-four-slide
+  shapes and pictures, with stable renderer fallback reasons, plus a fourteen-case, thirty-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
   ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
-  vertical and combined source crops, plus zero-depth camera planes.
+  vertical and combined source crops, plus explicit- and implicit-depth camera planes and a live
+  editable-text projection matrix.
 - Added a bevel-ring fidelity metric and derived capability gate, plus an opt-in ignored eight-case
   3D discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
-- Added a camera-plane metric and derived capability gate that bind native raster hashes and verify
-  normalized four-corner projection, material color, gradient range, and gradient direction.
+- Added a schema-v2 camera-plane metric and derived capability gate that bind native raster hashes
+  and verify normalized four-corner projection, material color, gradient range, and gradient
+  direction for solid planes, plus foreground IoU, projected bounds, and ink retention for live text.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -49,10 +51,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
 - Promote finite nonnegative `a:srcRect` picture crops into the bounded static 3D top-bevel lane;
   negative or degenerate crops keep the ordinary flat picture path with a stable fallback reason.
-- Render the verified zero-depth rectangle camera matrix for exact `orthographicFront` and
-  `perspectiveRelaxedModerately` tuples using independent SVG plane projection and a native-calibrated
-  material field. Text, stroke, transform, depth, bevel, contour, material, effect, camera, light,
-  and paint values outside the accepted matrix retain the ordinary flat path with a diagnostic reason.
+- Render the verified zero-depth rectangle camera matrix for exact `orthographicFront`,
+  `perspectiveRelaxedModerately`, and scene-only `perspectiveContrastingRightFacing` tuples. Solid
+  rows use independent SVG projection and a native-calibrated material field; the bounded no-fill
+  text row uses a CSS homography while preserving live DOM text. Text-body/style, stroke, transform,
+  depth, bevel, contour, material, effect, camera, light, and paint values outside the accepted
+  matrix retain the ordinary flat path with a diagnostic reason.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
   `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures with a
   silhouette-aware interior

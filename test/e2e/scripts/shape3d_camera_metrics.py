@@ -28,6 +28,9 @@ COLOR_SCORE_THRESHOLD = 0.97
 GRADIENT_RANGE_RATIO_THRESHOLD = 0.65
 GRADIENT_DIRECTION_THRESHOLD = 0.95
 MIN_REFERENCE_GRADIENT_RANGE = 4.0
+TEXT_FOREGROUND_IOU_THRESHOLD = 0.72
+TEXT_BOUNDS_SCORE_THRESHOLD = 0.98
+TEXT_INK_COVERAGE_RATIO_THRESHOLD = 0.90
 
 
 def _slide_number(path: str) -> int:
@@ -108,7 +111,6 @@ def _is_supported_camera_shape(shape, verified_theme_accent1: bool) -> bool:
         geometry is None
         or geometry.get("prst") != "rect"
         or scene is None
-        or shape3d is None
         or scene.find("a:backdrop", NS) is not None
     ):
         return False
@@ -129,17 +131,23 @@ def _is_supported_camera_shape(shape, verified_theme_accent1: bool) -> bool:
         not _zero_or_absent(transform.get(name)) for name in ("rot", "flipH", "flipV")
     ):
         return False
-    if any(
+    if shape3d is None:
+        # Native case 0014 proves absence is implicit zero depth only for the exact relaxed
+        # perspective tuple. Orthographic absence remains outside this metric's contract.
+        if camera_kind != "perspective":
+            return False
+    elif any(
         not _zero_or_absent(shape3d.get(name)) for name in ("z", "extrusionH", "contourW")
-    ):
-        return False
-    if (
+    ) or (
         shape3d.get("prstMaterial") is not None
         or shape3d.find("a:bevelT", NS) is not None
         or shape3d.find("a:bevelB", NS) is not None
         or shape3d.find("a:extrusionClr", NS) is not None
         or shape3d.find("a:contourClr", NS) is not None
-        or shape_properties.find("a:effectLst", NS) is not None
+    ):
+        return False
+    if (
+        shape_properties.find("a:effectLst", NS) is not None
         or shape_properties.find("a:effectDag", NS) is not None
         or shape_properties.find("a:ln/a:noFill", NS) is None
     ):
@@ -186,6 +194,81 @@ def extract_camera_slide_indices(source_pptx: Path) -> set[int]:
                 if _is_supported_camera_shape(shape, verified_theme_accent1):
                     indices.add(slide_index)
                     break
+    return indices
+
+
+def _is_supported_text_camera_shape(shape) -> bool:
+    shape_properties = shape.find("p:spPr", NS)
+    if shape_properties is None:
+        return False
+    geometry = shape_properties.find("a:prstGeom", NS)
+    scene = shape_properties.find("a:scene3d", NS)
+    if (
+        geometry is None
+        or geometry.get("prst") != "rect"
+        or scene is None
+        or shape_properties.find("a:sp3d", NS) is not None
+        or scene.find("a:backdrop", NS) is not None
+    ):
+        return False
+    camera = scene.find("a:camera", NS)
+    light = scene.find("a:lightRig", NS)
+    if (
+        camera is None
+        or camera.get("prst") != "perspectiveContrastingRightFacing"
+        or camera.get("fov") != "5100000"
+        or camera.get("zoom") is not None
+        or not _rotation_matches(camera.find("a:rot", NS), (0, 19532225, 0))
+        or light is None
+        or light.get("rig") != "threePt"
+        or light.get("dir") != "t"
+        or light.find("a:rot", NS) is not None
+    ):
+        return False
+    transform = shape_properties.find("a:xfrm", NS)
+    if transform is not None and any(
+        not _zero_or_absent(transform.get(name)) for name in ("rot", "flipH", "flipV")
+    ):
+        return False
+    body = shape.find("p:txBody/a:bodyPr", NS)
+    if (
+        shape_properties.find("a:noFill", NS) is None
+        or shape_properties.find("a:ln", NS) is not None
+        or shape_properties.find("a:effectLst", NS) is not None
+        or shape_properties.find("a:effectDag", NS) is not None
+        or shape.find("p:style", NS) is not None
+        or body is None
+        or body.get("wrap") != "none"
+        or body.get("anchor") != "ctr"
+        or body.get("vert") is not None
+        or body.find("a:spAutoFit", NS) is None
+        or body.find("a:normAutofit", NS) is not None
+        or body.find("a:noAutofit", NS) is not None
+        or not shape.xpath("boolean(p:txBody//a:t[normalize-space(.) != ''])", namespaces=NS)
+    ):
+        return False
+    return True
+
+
+def extract_text_camera_slide_indices(source_pptx: Path) -> set[int]:
+    """Return slides containing the exact scene-only editable-text camera tuple."""
+    indices: set[int] = set()
+    with ZipFile(source_pptx) as archive:
+        slide_paths = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            ),
+            key=_slide_number,
+        )
+        for slide_index, slide_path in enumerate(slide_paths):
+            slide = etree.fromstring(archive.read(slide_path))
+            if any(
+                _is_supported_text_camera_shape(shape)
+                for shape in slide.xpath(".//p:sp", namespaces=NS)
+            ):
+                indices.add(slide_index)
     return indices
 
 
@@ -336,6 +419,83 @@ def compute_camera_plane_metrics(
     }
 
 
+def compute_text_camera_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    foreground_iou_threshold: float = TEXT_FOREGROUND_IOU_THRESHOLD,
+    bounds_score_threshold: float = TEXT_BOUNDS_SCORE_THRESHOLD,
+    ink_coverage_ratio_threshold: float = TEXT_INK_COVERAGE_RATIO_THRESHOLD,
+) -> dict[str, Any]:
+    if reference.ndim != 3 or candidate.ndim != 3:
+        raise ValueError("text camera metric requires RGB images")
+    reference_ink_density = float((255 - reference[..., :3].astype(np.float64)).mean())
+    candidate_ink_density = float((255 - candidate[..., :3].astype(np.float64)).mean())
+    if max(reference_ink_density, candidate_ink_density) <= 0:
+        raise ValueError("text camera ink coverage is empty")
+    ink_coverage_ratio = min(reference_ink_density, candidate_ink_density) / max(
+        reference_ink_density, candidate_ink_density
+    )
+    if candidate.shape[:2] != reference.shape[:2]:
+        candidate = cv2.resize(
+            candidate,
+            (reference.shape[1], reference.shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
+    reference_mask = _foreground_mask(reference)
+    candidate_mask = _foreground_mask(candidate)
+    reference_y, reference_x = np.nonzero(reference_mask)
+    candidate_y, candidate_x = np.nonzero(candidate_mask)
+    if reference_x.size < 32 or candidate_x.size < 32:
+        raise ValueError("text camera foreground is below the resolution floor")
+
+    intersection = int(np.logical_and(reference_mask, candidate_mask).sum())
+    union = int(np.logical_or(reference_mask, candidate_mask).sum())
+    foreground_iou = intersection / max(union, 1)
+    reference_bounds = np.asarray(
+        [reference_x.min(), reference_y.min(), reference_x.max(), reference_y.max()],
+        dtype=np.float64,
+    )
+    candidate_bounds = np.asarray(
+        [candidate_x.min(), candidate_y.min(), candidate_x.max(), candidate_y.max()],
+        dtype=np.float64,
+    )
+    reference_diagonal = math.hypot(
+        reference_bounds[2] - reference_bounds[0],
+        reference_bounds[3] - reference_bounds[1],
+    )
+    if reference_diagonal <= 0:
+        raise ValueError("text camera reference bounds are degenerate")
+    top_left_error = np.linalg.norm(reference_bounds[:2] - candidate_bounds[:2])
+    bottom_right_error = np.linalg.norm(reference_bounds[2:] - candidate_bounds[2:])
+    mean_bounds_error_ratio = float(
+        (top_left_error + bottom_right_error) / (2 * reference_diagonal)
+    )
+    bounds_score = max(0.0, 1.0 - mean_bounds_error_ratio)
+    passed = (
+        foreground_iou >= foreground_iou_threshold
+        and bounds_score >= bounds_score_threshold
+        and ink_coverage_ratio >= ink_coverage_ratio_threshold
+    )
+    return {
+        "evaluable": True,
+        "foregroundIou": float(foreground_iou),
+        "boundsScore": bounds_score,
+        "meanBoundsErrorRatio": mean_bounds_error_ratio,
+        "inkCoverageRatio": float(ink_coverage_ratio),
+        "referenceInkDensity": reference_ink_density,
+        "candidateInkDensity": candidate_ink_density,
+        "referenceBounds": reference_bounds.astype(int).tolist(),
+        "candidateBounds": candidate_bounds.astype(int).tolist(),
+        "thresholds": {
+            "foregroundIou": foreground_iou_threshold,
+            "boundsScore": bounds_score_threshold,
+            "inkCoverageRatio": ink_coverage_ratio_threshold,
+        },
+        "passed": passed,
+    }
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -393,7 +553,9 @@ def build_camera_report(
         if not isinstance(source_value, str):
             raise ValueError(f"case report is missing source path: {case_id}")
         source_path = repo / source_value
-        applicable_slides = extract_camera_slide_indices(source_path)
+        plane_slides = extract_camera_slide_indices(source_path)
+        text_slides = extract_text_camera_slide_indices(source_path)
+        applicable_slides = plane_slides | text_slides
         slide_results: list[dict[str, Any]] = []
         for slide in case_report.get("perSlide", []):
             if not isinstance(slide, Mapping) or slide.get("hidden") is True:
@@ -429,10 +591,16 @@ def build_camera_report(
             candidate = np.asarray(
                 Image.open(reports_dir / f"{case_id}_slide{slide_index}_html.png").convert("RGB")
             )
-            metrics = compute_camera_plane_metrics(reference, candidate)
+            modality = "plane" if slide_index in plane_slides else "text"
+            metrics = (
+                compute_camera_plane_metrics(reference, candidate)
+                if modality == "plane"
+                else compute_text_camera_metrics(reference, candidate)
+            )
             slide_results.append(
                 {
                     "slideIdx": slide_index,
+                    "modality": modality,
                     "referencePath": artifact_values["reference"]["path"],
                     "candidatePath": artifact_values["candidate"]["path"],
                     "referenceSha256": artifact_values["reference"]["sha256"],
@@ -457,14 +625,21 @@ def build_camera_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "renderer": dict(renderer or {}),
         "thresholds": {
-            "cornerScore": CORNER_SCORE_THRESHOLD,
-            "colorScore": COLOR_SCORE_THRESHOLD,
-            "gradientRangeRatio": GRADIENT_RANGE_RATIO_THRESHOLD,
-            "gradientDirection": GRADIENT_DIRECTION_THRESHOLD,
-            "minimumReferenceGradientRange": MIN_REFERENCE_GRADIENT_RANGE,
+            "plane": {
+                "cornerScore": CORNER_SCORE_THRESHOLD,
+                "colorScore": COLOR_SCORE_THRESHOLD,
+                "gradientRangeRatio": GRADIENT_RANGE_RATIO_THRESHOLD,
+                "gradientDirection": GRADIENT_DIRECTION_THRESHOLD,
+                "minimumReferenceGradientRange": MIN_REFERENCE_GRADIENT_RANGE,
+            },
+            "text": {
+                "foregroundIou": TEXT_FOREGROUND_IOU_THRESHOLD,
+                "boundsScore": TEXT_BOUNDS_SCORE_THRESHOLD,
+                "inkCoverageRatio": TEXT_INK_COVERAGE_RATIO_THRESHOLD,
+            },
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),
         "applicableCaseCount": applicable_count,

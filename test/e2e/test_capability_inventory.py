@@ -70,6 +70,7 @@ def test_scan_pptx_detects_shape_and_chart_3d_by_namespace(tmp_path: Path, regis
 
     assert observation.capability_ids == (
         "drawingml.chart.3d.view",
+        "drawingml.shape.3d.camera-projected-plane",
         "drawingml.shape.3d.scene",
         "drawingml.shape.3d.top-bevel-contour",
     )
@@ -126,6 +127,36 @@ def test_scan_pptx_detects_zero_depth_shape_camera_candidate_and_keeps_residual_
 
     observation = scan_pptx(
         write_test_pptx(tmp_path / "camera-plane.pptx", slide_xml=slide, chart_xml=None),
+        registry,
+    )
+
+    assert observation.capability_ids == (
+        "drawingml.shape.3d.camera-projected-plane",
+        "drawingml.shape.3d.scene",
+    )
+
+
+def test_scan_pptx_detects_scene_only_camera_candidate_and_keeps_residual_scene(
+    tmp_path: Path,
+    registry,
+):
+    slide = f"""
+    <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+           xmlns:a="{A_NS}">
+      <p:cSld><p:spTree><p:sp><p:spPr>
+        <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+        <a:scene3d>
+          <a:camera prst="perspectiveContrastingRightFacing" fov="5100000">
+            <a:rot lat="0" lon="19532225" rev="0"/>
+          </a:camera>
+          <a:lightRig rig="threePt" dir="t"/>
+        </a:scene3d>
+      </p:spPr></p:sp></p:spTree></p:cSld>
+    </p:sld>
+    """
+
+    observation = scan_pptx(
+        write_test_pptx(tmp_path / "scene-only-camera.pptx", slide_xml=slide, chart_xml=None),
         registry,
     )
 

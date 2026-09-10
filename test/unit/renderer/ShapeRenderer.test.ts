@@ -6848,6 +6848,117 @@ describe('ShapeRenderer', () => {
     expect(el.textContent).toContain('Keep readable');
   });
 
+  it('projects the exact scene-only text plane while preserving live DOM text', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="86" name="Projected text"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="4206240" cy="3657600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:scene3d>
+            <a:camera prst="perspectiveContrastingRightFacing" fov="5100000">
+              <a:rot lat="0" lon="19532225" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="none" anchor="ctr"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2600"/><a:t>Editable camera text</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>`;
+    const ctx = createMockRenderContext({
+      presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+    });
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), ctx);
+    const textPlane = el.querySelector<HTMLElement>(
+      '[data-pptx-shape3d-projected-text-plane="perspective"]',
+    );
+
+    expect(textPlane).toBeTruthy();
+    expect(textPlane?.style.transform).toMatch(/^matrix3d\(/);
+    expect(textPlane?.style.transformOrigin).toBe('0px 0px');
+    expect(textPlane?.textContent).toContain('Editable camera text');
+    expect(textPlane?.querySelector('canvas, img, svg')).toBeNull();
+  });
+
+  it('does not project a scene-only text plane with a shape style reference', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="87" name="Styled camera text"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="4206240" cy="3657600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:scene3d>
+            <a:camera prst="perspectiveContrastingRightFacing" fov="5100000">
+              <a:rot lat="0" lon="19532225" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:spPr>
+        <p:style><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></p:style>
+        <p:txBody>
+          <a:bodyPr wrap="none" anchor="ctr"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:r><a:rPr sz="2600"/><a:t>Styled camera text</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>`;
+
+    const el = renderShape(
+      parseShapeNode(parseXml(xml)),
+      createMockRenderContext({
+        presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+      }),
+    );
+
+    expect(el.querySelector('[data-pptx-shape3d-projected-text-plane]')).toBeNull();
+    expect(el.textContent).toContain('Styled camera text');
+  });
+
+  it('does not promote inherited body properties into the scene-only text tuple', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="88" name="Inherited camera text"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="4206240" cy="3657600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:scene3d>
+            <a:camera prst="perspectiveContrastingRightFacing" fov="5100000">
+              <a:rot lat="0" lon="19532225" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr/>
+          <a:lstStyle/>
+          <a:p><a:r><a:t>Inherited camera text</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>`;
+    const node = parseShapeNode(parseXml(xml));
+    node.textBody!.layoutBodyProperties = parseXml(`
+      <a:bodyPr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                wrap="none" anchor="ctr"><a:spAutoFit/></a:bodyPr>`);
+
+    const el = renderShape(
+      node,
+      createMockRenderContext({
+        presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+      }),
+    );
+
+    expect(el.querySelector('[data-pptx-shape3d-projected-text-plane]')).toBeNull();
+    expect(el.textContent).toContain('Inherited camera text');
+  });
+
   it('keeps unsupported perspective shape 3D as the ordinary flat renderer', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

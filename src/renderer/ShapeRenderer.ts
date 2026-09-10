@@ -148,7 +148,12 @@ import {
   parseMoveLinePathData,
   parseSimpleMoveLinePathData,
 } from './pathData';
-import { appendStaticShape3DEffects, buildStaticShape3DPlan } from './Shape3DRenderer';
+import {
+  appendStaticShape3DEffects,
+  applyStaticShape3DTextPlane,
+  buildStaticShape3DPlan,
+  type StaticShape3DPlan,
+} from './Shape3DRenderer';
 
 const ooxmlRuntimeMultiPathShapeNameSet = new Set(
   ooxmlPresetRuntimeMultiPathShapeNames.map((name) => name.toLowerCase()),
@@ -1769,6 +1774,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
   let mainPath: SVGPathElement | null = null;
   let mainSvg: SVGSVGElement | null = null;
   let mainSvgBounds: { w: number; h: number } | null = null;
+  let shape3dPlan: StaticShape3DPlan | undefined;
   if (pathD) {
     const svgNs = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNs, 'svg');
@@ -2537,7 +2543,12 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
                     hasResolvedSolidShapeFill
                   ? 'solid'
                   : 'unknown';
-      const shape3dPlan = buildStaticShape3DPlan(
+      const shape3dSourceTextBody = node.textBody;
+      const ownShape3dBodyPr = shape3dSourceTextBody?.bodyProperties;
+      const shape3dAutofit = (['spAutoFit', 'normAutofit', 'noAutofit'] as const).find((mode) =>
+        ownShape3dBodyPr?.child(mode).exists(),
+      );
+      shape3dPlan = buildStaticShape3DPlan(
         node.shape3d,
         {
           nodeType: 'shape',
@@ -2551,10 +2562,20 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             node.textBody?.paragraphs.some((paragraph) =>
               paragraph.runs.some((run) => run.text.trim().length > 0),
             ) ?? false,
+          hasStyleReference: styleNode.exists(),
           hasVisibleStroke: path.getAttribute('stroke') !== 'none',
           rotation: node.rotation,
           flipH: node.flipH,
           flipV: node.flipV,
+          textPlane: shape3dSourceTextBody
+            ? {
+                wrap: ownShape3dBodyPr?.attr('wrap'),
+                anchor: ownShape3dBodyPr?.attr('anchor'),
+                autofit: shape3dAutofit ?? 'none',
+                vertical: ownShape3dBodyPr?.attr('vert'),
+                hasIndependentBounds: node.textBoxBounds !== undefined,
+              }
+            : undefined,
         },
         ctx,
       );
@@ -2927,6 +2948,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       };
 
       renderTextBody(textBody, node.placeholder, ctx, textContainer, textOptions);
+      applyStaticShape3DTextPlane(textContainer, shape3dPlan);
       wrapper.appendChild(textContainer);
 
       // Dynamic text fit: measure rendered text and compute any additional scale

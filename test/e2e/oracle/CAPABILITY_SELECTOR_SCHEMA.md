@@ -31,9 +31,11 @@ stack. Contract and scanner behavior are covered by `test_capability_contract.py
 
 Selectors identify candidate packages; they do not replace the capability's full accepted scope.
 Some renderer decisions depend on siblings or descendants that this streaming element selector does
-not express. For example, the bounded camera-plane capability selects zero-depth `a:sp3d` directly
-under `p:spPr` while its registry scope additionally constrains the sibling geometry, scene camera,
-light, fill, text, stroke, transform, bevel, contour, material, and effects:
+not express. For example, the bounded camera-plane capability selects zero-depth `a:sp3d` and direct
+`a:scene3d` candidates under `p:spPr`. The scene selector is needed because PowerPoint can encode an
+implicit zero-depth plane without emitting `a:sp3d`. The registry scope additionally constrains the
+sibling geometry, scene camera, light, fill, text body, shape style, stroke, transform, bevel,
+contour, material, and effects:
 
 ```json
 {
@@ -49,6 +51,10 @@ light, fill, text, stroke, transform, bevel, contour, material, and effects:
   }
 }
 ```
+
+The broader `scene3d` selector is candidate discovery only. It does not promote every scene-only
+shape: the native capability currently admits only the exact solid-plane and live editable-text
+rows declared in `scope.modalityRows`; all other matches remain residual fallback observations.
 
 The broad `drawingml.shape.3d.scene` row deliberately overlaps bounded native rows and remains a
 fallback residual. As a result, inventory still exposes unverified camera, light, or backdrop values

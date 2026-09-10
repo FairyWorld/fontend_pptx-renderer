@@ -554,6 +554,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0011-ellipse-circle-bevel-matrix",
         "oracle-pypptx-shape3d-0012-donut-circle-bevel-adjustment-matrix",
         "oracle-pypptx-shape3d-0013-camera-projection-matrix",
+        "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
     }
 
 
@@ -582,6 +583,7 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
     positive_names = set(cases) - {
         "oracle-pypptx-shape3d-0001-flat-optout",
         "oracle-pypptx-shape3d-0013-camera-projection-matrix",
+        "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
     }
     for name in positive_names:
         root = roots[name]
@@ -685,6 +687,87 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         "[@l='12000'][@t='8000'][@r='18000'][@b='10000'])",
         namespaces=ns,
     )
+
+
+def test_static_shape3d_scene_only_plane_matrix_serializes_absent_shape_format_and_modalities(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-shape3d-0014-scene-only-plane-matrix"
+    )
+    assert case["slide_count"] == 6
+    assert case["coverage"]["features"] == [
+        "p:sp.prstGeom=rect",
+        "geometry.aspect=square|wide|tall",
+        "surface=solidPlane|noFillTextPlane",
+        "text.bodyPr=wrap-none|anchor-ctr|spAutoFit",
+        "a:scene3d.camera=perspectiveRelaxedModerately|perspectiveContrastingRightFacing",
+        "a:scene3d.camera.rot=18590633,0,0|0,19532225,0",
+        "a:scene3d.camera.fov=7200000|5100000",
+        "a:scene3d.lightRig=threePt:t",
+        "a:sp3d=absent",
+        "effects=absent",
+    ]
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    with ZipFile(pptx_path) as archive:
+        roots = [
+            etree.fromstring(archive.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 7)
+        ]
+
+    for index, root in enumerate(roots):
+        targets = root.xpath(".//p:sp[p:spPr/a:scene3d]", namespaces=ns)
+        assert len(targets) == 1
+        target = targets[0]
+        assert target.xpath("boolean(p:spPr/a:prstGeom[@prst='rect'])", namespaces=ns)
+        assert not target.xpath("p:spPr/a:sp3d", namespaces=ns)
+        assert not target.xpath("p:spPr/a:effectLst | p:spPr/a:effectDag", namespaces=ns)
+        assert target.xpath(
+            "boolean(p:spPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'][not(a:rot)])",
+            namespaces=ns,
+        )
+        if index < 3:
+            assert target.xpath(
+                "boolean(p:spPr/a:scene3d/a:camera"
+                "[@prst='perspectiveRelaxedModerately'][@fov='7200000']"
+                "/a:rot[@lat='18590633'][@lon='0'][@rev='0'])",
+                namespaces=ns,
+            )
+            assert target.xpath(
+                "boolean(p:spPr/a:solidFill/a:srgbClr[@val='2F75B5'])",
+                namespaces=ns,
+            )
+            assert not target.xpath(
+                "p:txBody//a:t[normalize-space(.) != '']",
+                namespaces=ns,
+            )
+        else:
+            assert target.xpath("boolean(p:nvSpPr/p:cNvSpPr[@txBox='1'])", namespaces=ns)
+            assert target.xpath(
+                "boolean(p:spPr/a:scene3d/a:camera"
+                "[@prst='perspectiveContrastingRightFacing'][@fov='5100000']"
+                "/a:rot[@lat='0'][@lon='19532225'][@rev='0'])",
+                namespaces=ns,
+            )
+            assert target.xpath("boolean(p:spPr/a:noFill)", namespaces=ns)
+            assert not target.xpath("p:spPr/a:ln | p:style", namespaces=ns)
+            assert target.xpath(
+                "boolean(p:txBody/a:bodyPr[@wrap='none'][@anchor='ctr']/a:spAutoFit)",
+                namespaces=ns,
+            )
+            assert target.xpath(
+                "boolean(p:txBody//a:t[normalize-space(.) != ''])",
+                namespaces=ns,
+            )
 
 
 def test_static_shape3d_ellipse_matrix_serializes_aspects_paints_and_group(tmp_path: Path):

@@ -642,24 +642,37 @@ rendering is unavailable, the vector fallback remains visible. Text stays outsid
 overlay, picture outlines remain centered on the source bounds, and group transforms retain the
 existing coordinate mapping.
 
-The separate camera-plane lane projects a zero-depth solid rectangle into an SVG quadrilateral. Its
-verified matrix contains `orthographicFront` with absent rotation, `orthographicFront` with exactly
-`lat=20°`, `lon=30°`, `rev=0°`, and `perspectiveRelaxedModerately` with `fov=120°` and exactly
-`lat=18590633/60000°`, `lon=0°`, `rev=0°`. All rows use an unrotated `threePt:t` light. The six
-native slides cover square, wide, tall, explicit and theme paint, and a non-identity group. The
-shape must be a `rect` with no visible text or stroke, shape rotation/flip, backdrop, nonzero `z`,
-effect, bevel, contour, extrusion color, material, or extrusion. Public paint coverage is limited to
-the explicit `#2F75B5` and theme `#4F81BD` rows in that matrix.
+The separate camera-plane lane has two zero-depth rectangle modalities. Solid planes become SVG
+quadrilaterals. No-fill text planes retain their live DOM text and receive a CSS `matrix3d`
+homography, so the projected content remains selectable. The solid matrix contains
+`orthographicFront` with absent rotation, `orthographicFront` with exactly `lat=20°`, `lon=30°`,
+`rev=0°`, and `perspectiveRelaxedModerately` with `fov=120°` and exactly
+`lat=18590633/60000°`, `lon=0°`, `rev=0°`. The live-text row is
+`perspectiveContrastingRightFacing` with `fov=85°` and exactly `lat=0°`, `lon=19532225/60000°`,
+`rev=0°`. All rows use an unrotated `threePt:t` light.
+
+Twelve native slides cover the original six explicit-`a:sp3d` solid controls plus scene-only solid
+and live-text square/wide/tall matrices. An absent `a:sp3d` is treated as implicit zero depth only
+for those exact scene-only tuples. Solid shapes must have no visible text or stroke and use the
+verified explicit `#2F75B5` or theme `#4F81BD` rows. Live-text shapes must use explicit `a:noFill`,
+omit the line element and `p:style`, and declare local `bodyPr wrap="none" anchor="ctr"` with
+`a:spAutoFit`; vertical text and independent text bounds remain outside this lane. Both modalities
+exclude shape rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion
+color, material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
+live-text rows omit the entire shape style.
 
 This plane projection uses small independent SVG math rather than a mesh engine: longitude,
 latitude, and revolution rotations are followed by orthographic or perspective division. OOXML
 provides the camera properties; preset viewport scale and material response are pinned to native
 PowerPoint evidence. A dedicated gate compares normalized four-corner geometry, three material
-color bands, gradient range, and gradient direction against the same hashed native rasters.
+color bands, gradient range, and gradient direction for solid planes. For live text it checks
+foreground IoU, projected bounds, and resolution-independent grayscale ink density against the same
+hashed native rasters.
 
 This support does not include camera values outside that exact plane matrix, nonzero extrusion,
 arbitrary light rotation, other bevel presets, tiled pictures, negative or degenerate source crops,
-gradient/pattern/group/image-filled shapes, or pixel-identical PowerPoint material simulation.
+gradient/pattern/group/image-filled shapes, other text-body/style combinations, or pixel-identical
+PowerPoint material simulation.
 Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
 claim remains limited to native-verified `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular
 pictures. Star, freeform, rotation, and glow probes stay in an opt-in ignored discovery matrix until

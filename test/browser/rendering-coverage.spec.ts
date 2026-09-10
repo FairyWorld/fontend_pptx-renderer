@@ -496,6 +496,91 @@ test('bounded camera planes project in a browser and preserve text opt-out and g
   });
 });
 
+test('scene-only camera projection preserves live text and rejects styled text planes', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const shapeXml = (styled: boolean) => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="1" name="Scene-only camera text"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="4206240" cy="3657600"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/>
+          <a:scene3d>
+            <a:camera prst="perspectiveContrastingRightFacing" fov="5100000">
+              <a:rot lat="0" lon="19532225" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:spPr>
+        ${styled ? '<p:style><a:fontRef idx="minor"><a:schemeClr val="tx1"/></a:fontRef></p:style>' : ''}
+        <p:txBody>
+          <a:bodyPr wrap="none" anchor="ctr"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="2600"/><a:t>Editable camera text</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>`;
+    const presentation = {
+      ...createMockRenderContext().presentation,
+      width: 1280,
+      height: 720,
+    };
+    document.body.style.margin = '0';
+    const projectedShape = renderShape(
+      parseShapeNode(parseXml(shapeXml(false))),
+      createMockRenderContext({ presentation }),
+    );
+    const styledShape = renderShape(
+      parseShapeNode(parseXml(shapeXml(true))),
+      createMockRenderContext({ presentation }),
+    );
+    styledShape.style.left = '600px';
+    document.body.append(projectedShape, styledShape);
+    await document.fonts.ready;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+    const projected = projectedShape.querySelector<HTMLElement>(
+      '[data-pptx-shape3d-projected-text-plane="perspective"]',
+    );
+    const styled = styledShape.querySelector<HTMLElement>(
+      '[data-pptx-shape3d-projected-text-plane]',
+    );
+    const bounds = projected?.getBoundingClientRect();
+    return {
+      projected: !!projected,
+      transform: projected ? getComputedStyle(projected).transform : '',
+      liveText: projected?.textContent,
+      hasRasterReplacement: !!projected?.querySelector('canvas, img, svg'),
+      bounds: bounds
+        ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+        : null,
+      styledProjected: !!styled,
+      styledText: styledShape.textContent,
+    };
+  });
+
+  expect(result.projected).toBe(true);
+  expect(result.transform).toMatch(/^matrix3d\(/);
+  expect(result.liveText).toContain('Editable camera text');
+  expect(result.hasRasterReplacement).toBe(false);
+  expect(result.bounds).toEqual({
+    x: expect.closeTo(-3.5, 1),
+    y: expect.closeTo(-44.5, 1),
+    width: expect.closeTo(377.3, 0),
+    height: expect.closeTo(473.1, 0),
+  });
+  expect(result.styledProjected).toBe(false);
+  expect(result.styledText).toContain('Editable camera text');
+});
+
 test('static 3D donut composes with its upper adjustment bound and a solid theme fill', async ({
   page,
 }) => {

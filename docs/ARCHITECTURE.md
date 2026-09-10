@@ -209,8 +209,9 @@ removes the retained `SafeXmlNode` color source while preserving its JSON-safe o
 detection remains independent from renderer support policy.
 
 `src/renderer/Shape3DRenderer.ts` is a narrow decision and effect layer. It returns either an
-`orthographic-top-bevel` plan, a `camera-projected-plane` plan, or an explicit flat-fallback reason
-before touching the DOM. The top-bevel plan requires all of the following:
+`orthographic-top-bevel` plan, a `camera-projected-plane` plan, a
+`camera-projected-text-plane` plan, or an explicit flat-fallback reason before touching the DOM.
+The top-bevel plan requires all of the following:
 
 - `orthographicFront` without camera rotation;
 - `twoPt:t` or `threePt:t` light, with no rotation except the real-corpus
@@ -245,29 +246,39 @@ slide abort signal.
 Failure, insufficient raster scale, or disposal leaves the vector fallback in place and prevents
 late DOM writes or cache repopulation.
 
-The camera-plane plan is a separate zero-depth lane. It requires an opaque solid `rect` shape with
-no visible text or stroke, local rotation or flip, backdrop, nonzero `z`, effect, bevel, contour,
-extrusion color, material, or extrusion.
+The camera-plane plan is a separate zero-depth lane with solid SVG and live DOM text modalities.
+Both require a `rect` shape with no visible stroke, local rotation or flip, backdrop, nonzero `z`,
+effect, bevel, contour, extrusion color, material, or extrusion. The solid modality requires an
+opaque supported fill and no visible text. The text modality requires no shape fill, an absent line
+element and `p:style`, plus local `bodyPr wrap="none" anchor="ctr"` with `a:spAutoFit`; inherited
+body properties, vertical text, and independent text bounds remain flat. Both modalities reject
+explicit effect lists; solid matrix rows retain the generator's theme `effectRef=2` style.
 The accepted camera/light tuples are deliberately finite:
 
 - `orthographicFront` with absent rotation;
 - `orthographicFront` with `lat=20°`, `lon=30°`, `rev=0°`;
 - `perspectiveRelaxedModerately` with `fov=120°`, `lat=18590633/60000°`, `lon=0°`, `rev=0°`;
+- `perspectiveContrastingRightFacing` live text with `fov=85°`, `lat=0°`,
+  `lon=19532225/60000°`, `rev=0°`;
 - `threePt:t` lighting without light rotation and no camera zoom.
 
 `shape3d/CameraProjection.ts` rotates the four local plane corners around Y, then X, applies camera
 revolution, and performs perspective division when required. The perspective distance uses the
-presentation width and field of view; two preset constants describe the native-observed viewport
-and projected-plane scales. The renderer emits one replacement SVG path and hides the ordinary
-flat path only after that replacement exists. Perspective rows receive a vertical `linearRGB`
+presentation width and field of view; preset constants describe the native-observed viewport and
+projected-plane scales. The renderer emits one replacement SVG path and hides the ordinary flat
+path only after that replacement exists. Perspective solid rows receive a vertical `linearRGB`
 material field; identity and rotated orthographic controls use their native-observed flat material
-responses. This is independent planar math and does not introduce a mesh or WebGL dependency.
+responses. For the exact text tuple, `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
+homography and applies it after text layout, while preserving the text DOM. This is independent
+planar math and does not introduce a mesh or WebGL dependency.
 
-The six-slide native matrix covers identity and rotated orthographic controls, square/wide/tall
-perspective shapes, explicit and theme paint, and a non-identity group. Public paint support remains
-limited to its explicit `#2F75B5` and theme `#4F81BD` rows. A local metric binds the exact native
-rasters and checks normalized four-corner geometry, material color, gradient range, and gradient
-direction in addition to the full-page oracle gate.
+The twelve-slide native matrix covers identity and rotated orthographic controls, explicit
+`a:sp3d`, scene-only implicit depth, square/wide/tall perspective shapes, explicit and theme paint,
+a non-identity group, and square/wide/tall live text. Public solid-paint support remains limited to
+its explicit `#2F75B5` and theme `#4F81BD` rows. A local metric binds the exact native rasters and
+checks normalized four-corner geometry, material color, gradient range, and gradient direction for
+solid planes; live-text rows instead check foreground IoU, projected bounds, and ink-density
+retention in addition to the full-page oracle gate.
 
 The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
 picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent

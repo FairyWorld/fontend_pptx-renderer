@@ -275,6 +275,7 @@ def _apply_flat_shape3d_scene(
     camera_preset: str,
     camera_rotation: tuple[int, int, int] | None = None,
     field_of_view: int | None = None,
+    include_shape_format: bool = True,
 ) -> None:
     """Insert a camera-only scene around one zero-depth shape face."""
     sp_pr = shape._element.spPr
@@ -293,9 +294,10 @@ def _apply_flat_shape3d_scene(
             rev=str(rev),
         )
     etree.SubElement(scene3d, qn("a:lightRig"), rig="threePt", dir="t")
-    sp3d = etree.Element(qn("a:sp3d"), extrusionH="0")
     _insert_before_ext_lst(sp_pr, scene3d)
-    _insert_before_ext_lst(sp_pr, sp3d)
+    if include_shape_format:
+        sp3d = etree.Element(qn("a:sp3d"), extrusionH="0")
+        _insert_before_ext_lst(sp_pr, sp3d)
 
 
 def _add_cjk_textbox(
@@ -1946,6 +1948,96 @@ def _build_shape3d_cases() -> list[CaseDef]:
             "a:scene3d.lightRig=threePt:t",
             "a:sp3d.extrusionH=0",
             "a:sp3d.bevel=absent",
+        ],
+    )
+
+    def _add_scene_only_probe(
+        prs,
+        *,
+        width: float,
+        height: float,
+        text_plane: bool,
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        left = _emu((13.333 - width) / 2)
+        top = _emu((7.5 - height) / 2)
+        if text_plane:
+            shape = slide.shapes.add_textbox(left, top, _emu(width), _emu(height))
+            shape.name = "Scene-only editable text plane"
+            text_frame = shape.text_frame
+            text_frame.clear()
+            text_frame.margin_left = 0
+            text_frame.margin_right = 0
+            text_frame.margin_top = 0
+            text_frame.margin_bottom = 0
+            _configure_text_body(
+                text_frame,
+                wrap="none",
+                autofit="spAutoFit",
+                anchor="ctr",
+            )
+            for line_index, text in enumerate(("ZERO DEPTH", "EDITABLE TEXT", "NATIVE CAMERA")):
+                paragraph = (
+                    text_frame.paragraphs[0]
+                    if line_index == 0
+                    else text_frame.add_paragraph()
+                )
+                paragraph.alignment = PP_ALIGN.CENTER
+                run = paragraph.add_run()
+                run.text = text
+                run.font.name = "Arial"
+                run.font.size = Pt(26)
+                run.font.bold = True
+                run.font.color.rgb = RGBColor(0x20, 0x38, 0x64)
+            _apply_flat_shape3d_scene(
+                shape,
+                camera_preset="perspectiveContrastingRightFacing",
+                camera_rotation=(0, 19532225, 0),
+                field_of_view=5100000,
+                include_shape_format=False,
+            )
+        else:
+            shape = slide.shapes.add_shape(
+                MSO_SHAPE.RECTANGLE,
+                left,
+                top,
+                _emu(width),
+                _emu(height),
+            )
+            shape.name = "Scene-only solid plane"
+            shape.fill.solid()
+            shape.fill.fore_color.rgb = RGBColor(0x2F, 0x75, 0xB5)
+            shape.line.fill.background()
+            _apply_flat_shape3d_scene(
+                shape,
+                camera_preset="perspectiveRelaxedModerately",
+                camera_rotation=(18590633, 0, 0),
+                field_of_view=7200000,
+                include_shape_format=False,
+            )
+
+    def _build_scene_only_plane_matrix(prs) -> None:
+        aspect_matrix = ((4.2, 4.2), (8.0, 3.2), (3.2, 5.4))
+        for width, height in aspect_matrix:
+            _add_scene_only_probe(prs, width=width, height=height, text_plane=False)
+        for width, height in aspect_matrix:
+            _add_scene_only_probe(prs, width=width, height=height, text_plane=True)
+
+    _add(
+        "scene-only-plane-matrix",
+        _build_scene_only_plane_matrix,
+        slide_count=6,
+        features=[
+            "p:sp.prstGeom=rect",
+            "geometry.aspect=square|wide|tall",
+            "surface=solidPlane|noFillTextPlane",
+            "text.bodyPr=wrap-none|anchor-ctr|spAutoFit",
+            "a:scene3d.camera=perspectiveRelaxedModerately|perspectiveContrastingRightFacing",
+            "a:scene3d.camera.rot=18590633,0,0|0,19532225,0",
+            "a:scene3d.camera.fov=7200000|5100000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d=absent",
+            "effects=absent",
         ],
     )
 

@@ -45,6 +45,14 @@ const perspectiveCameraScene = `
     <a:lightRig rig="threePt" dir="t"/>
   </a:scene3d>`;
 
+const perspectiveTextCameraScene = `
+  <a:scene3d>
+    <a:camera prst="perspectiveContrastingRightFacing" fov="5100000">
+      <a:rot lat="0" lon="19532225" rev="0"/>
+    </a:camera>
+    <a:lightRig rig="threePt" dir="t"/>
+  </a:scene3d>`;
+
 const originalImageDecode = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'decode');
 
 afterEach(() => {
@@ -150,6 +158,140 @@ describe('buildStaticShape3DPlan', () => {
     if (plan.mode !== 'camera-projected-plane') throw new Error('expected camera plan');
     expect(plan.corners[0].x).toBeCloseTo(62.3, 1);
     expect(plan.corners[2].x).toBeCloseTo(560.8, 1);
+  });
+
+  it('treats an absent sp3d as the verified zero-depth solid camera plane', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveCameraScene, ''),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+        hasVisibleStroke: false,
+        hasVisibleText: false,
+      },
+      createMockRenderContext({
+        presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+      }),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'camera-projected-plane',
+      camera: { preset: 'perspectiveRelaxedModerately' },
+      fill: { top: '#4b94d6', middle: '#438bce', bottom: '#3c85c7' },
+    });
+  });
+
+  it.each([
+    ['wide', 768, 307.2, { top: '#4089cb', middle: '#3c85c7', bottom: '#367ec1' }],
+    ['tall', 307.2, 518.4, { top: '#4992d4', middle: '#3d86c8', bottom: '#3780c2' }],
+  ])(
+    'uses the native scene-only material field for the %s aspect',
+    (_label, width, height, fill) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(perspectiveCameraScene, ''),
+        {
+          nodeType: 'shape',
+          presetGeometry: 'rect',
+          width,
+          height,
+          paintKind: 'solid',
+          baseFill: '#2F75B5',
+          hasVisibleStroke: false,
+          hasVisibleText: false,
+        },
+        createMockRenderContext({
+          presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+        }),
+      );
+
+      expect(plan).toMatchObject({ mode: 'camera-projected-plane', fill });
+    },
+  );
+
+  it('builds the exact scene-only editable-text camera plane', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveTextCameraScene, ''),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 441.6,
+        height: 384,
+        paintKind: 'none',
+        hasVisibleStroke: false,
+        hasVisibleText: true,
+        textPlane: {
+          wrap: 'none',
+          anchor: 'ctr',
+          autofit: 'spAutoFit',
+        },
+      },
+      createMockRenderContext({
+        presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+      }),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'camera-projected-text-plane',
+      camera: {
+        kind: 'perspective',
+        preset: 'perspectiveContrastingRightFacing',
+        fieldOfView: 85,
+      },
+    });
+    if (plan.mode !== 'camera-projected-text-plane') throw new Error('expected text plan');
+    expect(plan.corners[0].x).toBeCloseTo(-3.5, 1);
+    expect(plan.corners[3].y).toBeCloseTo(428.5, 1);
+  });
+
+  it('keeps unverified scene-only text-body modes on the flat fallback', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveTextCameraScene, ''),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 441.6,
+        height: 384,
+        paintKind: 'none',
+        hasVisibleStroke: false,
+        hasVisibleText: true,
+        textPlane: {
+          wrap: 'square',
+          anchor: 'ctr',
+          autofit: 'spAutoFit',
+        },
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toEqual({ mode: 'flat', reason: 'text-body-properties' });
+  });
+
+  it('keeps styled scene-only text planes on the flat fallback', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveTextCameraScene, ''),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'rect',
+        width: 441.6,
+        height: 384,
+        paintKind: 'none',
+        hasVisibleStroke: false,
+        hasVisibleText: true,
+        hasStyleReference: true,
+        textPlane: {
+          wrap: 'none',
+          anchor: 'ctr',
+          autofit: 'spAutoFit',
+        },
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toEqual({ mode: 'flat', reason: 'style-reference' });
   });
 
   it('supports the identity control and the exact orthographic rotation tuple', () => {

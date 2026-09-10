@@ -9,9 +9,20 @@
 import type { Shape3DProperties, Shape3DRotation } from '../model/nodes/Shape3D';
 import type { RenderContext } from './RenderContext';
 import { resolveColor } from './StyleResolver';
-import { applyLumMod, applyLumOff, applySatMod, hexToRgb, rgbToHsl } from '../utils/color';
+import {
+  applyLumMod,
+  applyLumOff,
+  applySatMod,
+  hexToRgb,
+  rgbToHex,
+  rgbToHsl,
+} from '../utils/color';
 import { fitShape3DRasterScale, renderCircleBevelOverlay } from './shape3d/BevelLighting';
-import { projectFlatPlane, type ProjectedPoint } from './shape3d/CameraProjection';
+import {
+  projectFlatPlane,
+  projectiveTransformToCssMatrix3d,
+  type ProjectedPoint,
+} from './shape3d/CameraProjection';
 
 type StaticShape3DSurface = 'shape' | 'picture';
 type StaticShape3DGeometry = 'donut' | 'ellipse' | 'rect' | 'roundrect';
@@ -46,6 +57,8 @@ type StaticShape3DFallbackReason =
   | 'picture-source-crop'
   | 'tiled-picture'
   | 'visible-text'
+  | 'text-body-properties'
+  | 'style-reference'
   | 'visible-stroke'
   | 'shape-transform'
   | 'paint-value'
@@ -68,6 +81,8 @@ interface StaticShape3DTarget {
   height: number;
   isLineLike?: boolean;
   hasVisibleText?: boolean;
+  /** Presence of p:style can add unverified text/effect inheritance to a live text plane. */
+  hasStyleReference?: boolean;
   hasVisibleStroke?: boolean;
   rotation?: number;
   flipH?: boolean;
@@ -79,6 +94,14 @@ interface StaticShape3DTarget {
   isTiledPicture?: boolean;
   /** Parsed a:srcRect fractions removed from each source-image edge. */
   sourceCrop?: StaticShape3DSourceCrop;
+  /** Exact live-text layout tuple covered by the scene-only native matrix. */
+  textPlane?: {
+    wrap?: string;
+    anchor?: string;
+    autofit?: 'spAutoFit' | 'normAutofit' | 'noAutofit' | 'none';
+    vertical?: string;
+    hasIndependentBounds?: boolean;
+  };
 }
 
 export interface StaticShape3DFlatPlan {
@@ -127,14 +150,48 @@ export interface StaticShape3DCameraPlan {
   };
   fill: {
     top: string;
+    middle?: string;
     bottom: string;
+  };
+}
+
+export interface StaticShape3DTextCameraPlan {
+  mode: 'camera-projected-text-plane';
+  surface: 'shape';
+  geometry: 'rect';
+  bounds: { width: number; height: number };
+  corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint];
+  camera: {
+    kind: 'perspective';
+    preset: 'perspectiveContrastingRightFacing';
+    rotation: Shape3DRotation;
+    fieldOfView: number;
   };
 }
 
 export type StaticShape3DPlan =
   | StaticShape3DFlatPlan
   | StaticShape3DSupportedPlan
-  | StaticShape3DCameraPlan;
+  | StaticShape3DCameraPlan
+  | StaticShape3DTextCameraPlan;
+
+/** Apply the supported camera homography to live text without rasterizing its DOM content. */
+export function applyStaticShape3DTextPlane(
+  textContainer: HTMLElement,
+  plan: StaticShape3DPlan | undefined,
+): boolean {
+  if (plan?.mode !== 'camera-projected-text-plane' || textContainer.style.transform) return false;
+  const transform = projectiveTransformToCssMatrix3d(
+    plan.bounds.width,
+    plan.bounds.height,
+    plan.corners,
+  );
+  if (!transform) return false;
+  textContainer.dataset.pptxShape3dProjectedTextPlane = plan.camera.kind;
+  textContainer.style.transformOrigin = '0px 0px';
+  textContainer.style.transform = transform;
+  return true;
+}
 
 interface AppendStaticShape3DEffectsOptions {
   svg: SVGSVGElement;
@@ -161,6 +218,7 @@ const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_RELAXED_MODERATELY_PROJECTION_SCALE = 0.996;
+const PERSPECTIVE_CONTRASTING_RIGHT_FACING_VIEWPORT_SCALE = 0.95;
 const shape3dTaskTails = new WeakMap<Promise<void>[], Promise<void>>();
 let shape3dIdCounter = 0;
 
@@ -248,25 +306,150 @@ function cameraMaterialFill(
   };
 }
 
+interface NativeMaterialAnchor {
+  aspect: number;
+  top: readonly [number, number, number];
+  middle: readonly [number, number, number];
+  bottom: readonly [number, number, number];
+}
+
+const SCENE_ONLY_MATERIAL_ANCHORS: readonly NativeMaterialAnchor[] = [
+  {
+    aspect: 3.2 / 5.4,
+    top: [73, 146, 212],
+    middle: [61, 134, 200],
+    bottom: [55, 128, 194],
+  },
+  {
+    aspect: 1,
+    top: [75, 148, 214],
+    middle: [67, 139, 206],
+    bottom: [60, 133, 199],
+  },
+  {
+    aspect: 8 / 3.2,
+    top: [64, 137, 203],
+    middle: [60, 133, 199],
+    bottom: [54, 126, 193],
+  },
+];
+
+function interpolateRgb(
+  lower: readonly [number, number, number],
+  upper: readonly [number, number, number],
+  ratio: number,
+): string {
+  return rgbToHex(
+    lower[0] + (upper[0] - lower[0]) * ratio,
+    lower[1] + (upper[1] - lower[1]) * ratio,
+    lower[2] + (upper[2] - lower[2]) * ratio,
+  );
+}
+
+/** Piecewise log-aspect interpolation through the three native scene-only material probes. */
+function sceneOnlyCameraMaterialFill(
+  width: number,
+  height: number,
+): StaticShape3DCameraPlan['fill'] {
+  const aspect = width / height;
+  let lower = SCENE_ONLY_MATERIAL_ANCHORS[0];
+  let upper = SCENE_ONLY_MATERIAL_ANCHORS[SCENE_ONLY_MATERIAL_ANCHORS.length - 1];
+  for (let index = 1; index < SCENE_ONLY_MATERIAL_ANCHORS.length; index += 1) {
+    if (aspect <= SCENE_ONLY_MATERIAL_ANCHORS[index].aspect) {
+      lower = SCENE_ONLY_MATERIAL_ANCHORS[index - 1];
+      upper = SCENE_ONLY_MATERIAL_ANCHORS[index];
+      break;
+    }
+  }
+  const lowerLog = Math.log(lower.aspect);
+  const upperLog = Math.log(upper.aspect);
+  const ratio =
+    lower === upper
+      ? 0
+      : clamp((Math.log(aspect) - lowerLog) / Math.max(upperLog - lowerLog, 1e-9), 0, 1);
+  return {
+    top: interpolateRgb(lower.top, upper.top, ratio),
+    middle: interpolateRgb(lower.middle, upper.middle, ratio),
+    bottom: interpolateRgb(lower.bottom, upper.bottom, ratio),
+  };
+}
+
 function buildCameraProjectionPlan(
   properties: Shape3DProperties,
   target: StaticShape3DTarget,
   ctx: RenderContext,
 ): StaticShape3DPlan {
   const scene = properties.scene!;
-  const shape = properties.shape!;
+  const shape = properties.shape;
   if (target.nodeType !== 'shape') return flat('missing-top-bevel');
-  if (target.hasVisibleText) return flat('visible-text');
   if (target.hasVisibleStroke) return flat('visible-stroke');
   if ((target.rotation ?? 0) !== 0 || target.flipH || target.flipV) return flat('shape-transform');
   if (properties.effectKinds.length > 0) return flat('effect-list-conflict');
-  if ((shape.extrusionHeight ?? 0) > 0) return flat('extrusion-height');
-  if (shape.bevelBottom) return flat('bottom-bevel');
-  if (shape.presetMaterial !== undefined) return flat('preset-material');
-  if ((shape.contourWidth ?? 0) > 0 || shape.contourColorSource?.exists()) {
+  if ((shape?.extrusionHeight ?? 0) > 0) return flat('extrusion-height');
+  if (shape?.bevelBottom) return flat('bottom-bevel');
+  if (shape?.presetMaterial !== undefined) return flat('preset-material');
+  if ((shape?.contourWidth ?? 0) > 0 || shape?.contourColorSource?.exists()) {
     return flat('contour-paint');
   }
   if (normalizedPreset(target) !== 'rect') return flat('geometry-preset');
+  if (!scene.lightRig) return flat('missing-light-rig');
+  if (scene.lightRig !== 'threePt') return flat('light-rig');
+  if (scene.lightDirection !== 't') return flat('light-direction');
+  if (scene.lightRotation) return flat('light-rotation');
+  if (scene.cameraZoom !== undefined) return flat('camera-zoom');
+
+  if (target.hasVisibleText) {
+    if (shape) return flat('visible-text');
+    if (target.paintKind !== 'none') return flat('paint-kind');
+    if (target.hasStyleReference) return flat('style-reference');
+    const textPlane = target.textPlane;
+    if (
+      !textPlane ||
+      textPlane.wrap !== 'none' ||
+      textPlane.anchor !== 'ctr' ||
+      textPlane.autofit !== 'spAutoFit' ||
+      textPlane.vertical !== undefined ||
+      textPlane.hasIndependentBounds
+    ) {
+      return flat('text-body-properties');
+    }
+    if (scene.cameraPreset !== 'perspectiveContrastingRightFacing') {
+      return flat('camera-preset');
+    }
+    if (scene.fieldOfView === undefined || Math.abs(scene.fieldOfView - 85) > 1e-6) {
+      return flat('camera-field-of-view');
+    }
+    const expectedRotation = {
+      latitude: 0,
+      longitude: 19532225 / 60000,
+      revolution: 0,
+    };
+    if (!rotationEquals(scene.cameraRotation, expectedRotation)) return flat('camera-rotation');
+    const projection = projectFlatPlane({
+      kind: 'perspective',
+      width: target.width,
+      height: target.height,
+      presentationWidth: ctx.presentation.width,
+      rotation: scene.cameraRotation!,
+      fieldOfView: scene.fieldOfView,
+      presetViewportScale: PERSPECTIVE_CONTRASTING_RIGHT_FACING_VIEWPORT_SCALE,
+    });
+    if (!projection) return flat('projection-out-of-range');
+    return {
+      mode: 'camera-projected-text-plane',
+      surface: 'shape',
+      geometry: 'rect',
+      bounds: { width: target.width, height: target.height },
+      corners: projection.corners,
+      camera: {
+        kind: 'perspective',
+        preset: 'perspectiveContrastingRightFacing',
+        rotation: scene.cameraRotation!,
+        fieldOfView: scene.fieldOfView,
+      },
+    };
+  }
+
   if (
     target.paintKind !== 'solid' ||
     !target.baseFill ||
@@ -276,11 +459,7 @@ function buildCameraProjectionPlan(
   }
   const baseFill = target.baseFill.toLowerCase();
   if (!SUPPORTED_CAMERA_BASE_FILLS.has(baseFill)) return flat('paint-value');
-  if (!scene.lightRig) return flat('missing-light-rig');
-  if (scene.lightRig !== 'threePt') return flat('light-rig');
-  if (scene.lightDirection !== 't') return flat('light-direction');
-  if (scene.lightRotation) return flat('light-rotation');
-  if (scene.cameraZoom !== undefined) return flat('camera-zoom');
+  if (!shape && baseFill !== '#2f75b5') return flat('paint-value');
 
   let kind: StaticShape3DCameraPlan['camera']['kind'];
   let preset: StaticShape3DCameraPlan['camera']['preset'];
@@ -321,7 +500,9 @@ function buildCameraProjectionPlan(
     fieldOfView = scene.fieldOfView;
     materialKind = 'perspective';
     presetViewportScale = PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE;
+    // Absence of a:sp3d is verified as an implicit zero-depth plane only for this exact tuple.
   } else {
+    if (!shape) return flat('missing-shape-format');
     return flat('camera-preset');
   }
 
@@ -344,7 +525,9 @@ function buildCameraProjectionPlan(
     bounds: { width: target.width, height: target.height },
     corners: projection.corners,
     camera: { kind, preset, rotation, fieldOfView },
-    fill: cameraMaterialFill(baseFill, materialKind),
+    fill: shape
+      ? cameraMaterialFill(baseFill, materialKind)
+      : sceneOnlyCameraMaterialFill(target.width, target.height),
   };
 }
 
@@ -376,11 +559,10 @@ export function buildStaticShape3DPlan(
   if (!scene) return flat('missing-scene');
   if (!scene.cameraPreset) return flat('missing-camera');
   const shape = properties.shape;
-  if (!shape) return flat('missing-shape-format');
   if (scene.hasBackdrop) return flat('backdrop');
-  if (Math.abs(shape.zPosition ?? 0) > 1e-9) return flat('z-position');
-  if (shape.extrusionColor) return flat('extrusion-paint');
-  if (!shape.bevelTop) return buildCameraProjectionPlan(properties, target, ctx);
+  if (Math.abs(shape?.zPosition ?? 0) > 1e-9) return flat('z-position');
+  if (shape?.extrusionColor) return flat('extrusion-paint');
+  if (!shape?.bevelTop) return buildCameraProjectionPlan(properties, target, ctx);
   if (scene.cameraPreset !== 'orthographicFront') return flat('camera-preset');
   if (scene.cameraRotation) return flat('camera-rotation');
   if (!scene.lightRig) return flat('missing-light-rig');
@@ -849,6 +1031,7 @@ function appendCameraProjectedPlane(
     gradient.setAttribute('y1', String(Math.min(...yValues)));
     gradient.setAttribute('y2', String(Math.max(...yValues)));
     appendStop(gradient, '0%', plan.fill.top, 1);
+    if (plan.fill.middle) appendStop(gradient, '50%', plan.fill.middle, 1);
     appendStop(gradient, '100%', plan.fill.bottom, 1);
     defs.appendChild(gradient);
     projectedPath.setAttribute('fill', `url(#${gradientId})`);
