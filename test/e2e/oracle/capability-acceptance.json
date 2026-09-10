@@ -80,6 +80,50 @@
       "implementationFingerprint": "0f37765ba527cc857a503b8ba29702c6dbd74aedb4dde5f860c3ee8525b4365c"
     },
     {
+      "acceptedAt": "2026-09-10T05:19:57.306393Z",
+      "acceptedRevision": "71bdd4863ad30487f4c81029022e9796c9e67a3b",
+      "capabilityId": "drawingml.shape.3d.camera-projected-plane",
+      "caseIds": [
+        "oracle-pypptx-shape3d-0013-camera-projection-matrix",
+        "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
+        "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix"
+      ],
+      "caseInputFingerprints": [
+        "23a154711dd9beb2d78c9033a5a6c77e31b826770cf32d851a232d7aa426778c",
+        "6def7ec046ed633f1b32d94fabcc78286e9edef036d2150088a6431cca637ce2",
+        "424bf37e7342738d61342e7dc10fe9c1298cdc4e46b7d0201b482b047a4f34cb"
+      ],
+      "definitionFingerprint": "976202e531895cde197e799f49e720d7dd98a6109a4a5fd19e5b01fdd0124e20",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "camera-local",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "performance",
+        "package-size",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "1bc3df21cabf2bf9c8bd044c055f47a552c4c6a2cd91875b60d17e53893d64fa",
+        "31fb431f119affa9cb57d2471a37c3df90bbeca493aabfde81f508746ba30c32",
+        "6ca1fa9e2e6ba102891e25790c03a00d7326ee787f498591adf814e91af72588"
+      ],
+      "implementationFingerprint": "21822e80885b6f85875e15a3df10c3ba1755e06227b69fad2116d3614a0b3f63"
+    },
+    {
       "acceptedAt": "2026-09-08T21:07:47.622348Z",
       "acceptedRevision": "452641ee7da127c27f36df1c541e6ed307877380",
       "capabilityId": "drawingml.shape.3d.top-bevel-contour",
