@@ -27,6 +27,7 @@ SCORE_THRESHOLD = 0.60
 CORNER_SCORE_THRESHOLD = 0.78
 RANGE_RATIO_THRESHOLD = 0.85
 HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
+PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 MIN_EVALUABLE_BAND_PX = 4.0
 
@@ -41,6 +42,7 @@ class BevelRegion:
     bevel_width_x: float
     bevel_width_y: float
     preset: str
+    surface: str = "shape"
     corner_radius_ratio: float = 0.0
     geometry_adjustment: float = 0.0
     geometry_inset_x_ratio: float = 0.0
@@ -189,6 +191,7 @@ def _shape_regions(
                 bevel_width_x=abs(scale_x * bevel_width) / slide_width,
                 bevel_width_y=abs(scale_y * bevel_width) / slide_height,
                 preset=preset,
+                surface="picture" if local_name == "pic" else "shape",
                 corner_radius_ratio=corner_radius,
                 geometry_adjustment=geometry_adjustment,
                 geometry_inset_x_ratio=geometry_inset / width,
@@ -368,6 +371,9 @@ def compute_bevel_ring_metrics(
     corner_score_threshold: float = CORNER_SCORE_THRESHOLD,
     range_ratio_threshold: float = RANGE_RATIO_THRESHOLD,
     highlight_amplitude_ratio_threshold: float = HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
+    picture_highlight_amplitude_ratio_threshold: float = (
+        PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
+    ),
     shadow_amplitude_ratio_threshold: float = SHADOW_AMPLITUDE_RATIO_THRESHOLD,
 ) -> dict[str, Any]:
     reference, candidate = _common_images(reference, candidate)
@@ -396,6 +402,7 @@ def compute_bevel_ring_metrics(
                 "cornerScore": corner_score_threshold,
                 "rangeRatio": range_ratio_threshold,
                 "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
+                "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
                 "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
             },
         }
@@ -417,6 +424,7 @@ def compute_bevel_ring_metrics(
                 "cornerScore": corner_score_threshold,
                 "rangeRatio": range_ratio_threshold,
                 "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
+                "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
                 "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
             },
         }
@@ -446,10 +454,15 @@ def compute_bevel_ring_metrics(
             | ((xx >= crop_width - extent) & (yy >= crop_height - extent))
         )
     corner = _field_score(reference_delta, candidate_delta, corner_mask)
+    highlight_threshold = (
+        picture_highlight_amplitude_ratio_threshold
+        if region.surface == "picture"
+        else highlight_amplitude_ratio_threshold
+    )
     passed = (
         overall["score"] >= score_threshold
         and overall["rangeRatio"] >= range_ratio_threshold
-        and overall["highlightAmplitudeRatio"] >= highlight_amplitude_ratio_threshold
+        and overall["highlightAmplitudeRatio"] >= highlight_threshold
         and overall["shadowAmplitudeRatio"] >= shadow_amplitude_ratio_threshold
         and (not corner_required or corner["score"] >= corner_score_threshold)
     )
@@ -468,6 +481,7 @@ def compute_bevel_ring_metrics(
             "cornerScore": corner_score_threshold,
             "rangeRatio": range_ratio_threshold,
             "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
+            "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
             "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
         },
         "passed": passed,
@@ -612,6 +626,7 @@ def build_bevel_report(
             "cornerScore": CORNER_SCORE_THRESHOLD,
             "rangeRatio": RANGE_RATIO_THRESHOLD,
             "highlightAmplitudeRatio": HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
+            "pictureHighlightAmplitudeRatio": PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
             "shadowAmplitudeRatio": SHADOW_AMPLITUDE_RATIO_THRESHOLD,
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),

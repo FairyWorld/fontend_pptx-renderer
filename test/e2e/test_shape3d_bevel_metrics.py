@@ -153,6 +153,24 @@ def test_bevel_ring_metrics_reject_an_overdark_shadow_even_with_a_high_composite
     assert result["passed"] is False
 
 
+def test_bevel_ring_metrics_keep_picture_highlight_threshold_separate_from_solid_materials():
+    reference, _flat, shape_region = _bevel_specimen()
+    base = np.array([50, 126, 196], dtype=np.float32)
+    candidate = reference.astype(np.float32)
+    delta = candidate - base
+    highlight = np.mean(delta, axis=2) > 0
+    candidate[highlight] = base + delta[highlight] * 0.75
+    candidate = np.clip(candidate, 0, 255).astype(np.uint8)
+    picture_region = BevelRegion(**{**shape_region.__dict__, "surface": "picture"})
+
+    shape_result = compute_bevel_ring_metrics(reference, candidate, shape_region)
+    picture_result = compute_bevel_ring_metrics(reference, candidate, picture_region)
+
+    assert 0.70 < shape_result["highlightAmplitudeRatio"] < 0.80
+    assert shape_result["passed"] is False
+    assert picture_result["passed"] is True
+
+
 @pytest.mark.parametrize("preset", ["ellipse", "donut"])
 def test_bevel_ring_metrics_follow_elliptical_silhouettes_and_holes(preset: str):
     reference, flat, region = _elliptical_bevel_specimen(preset)
@@ -216,6 +234,7 @@ def test_bevel_ring_reports_resolution_limited_instead_of_guessing():
             "cornerScore": 0.78,
             "rangeRatio": 0.85,
             "highlightAmplitudeRatio": 0.8,
+            "pictureHighlightAmplitudeRatio": 0.7,
             "shadowAmplitudeRatio": 0.85,
         },
     }

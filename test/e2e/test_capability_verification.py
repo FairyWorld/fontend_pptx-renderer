@@ -119,6 +119,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
             "cornerScore": 0.78,
             "rangeRatio": 0.85,
             "highlightAmplitudeRatio": 0.8,
+            "pictureHighlightAmplitudeRatio": 0.7,
             "shadowAmplitudeRatio": 0.85,
         },
         "applicableCaseCount": 1,
@@ -142,7 +143,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                         "passed": passed,
                         "regions": [
                             {
-                                "region": {"preset": "roundRect"},
+                                "region": {"preset": "roundRect", "surface": "shape"},
                                 "metrics": {
                                     "evaluable": True,
                                     "score": 0.9 if passed else 0.4,
@@ -162,6 +163,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                                         "cornerScore": 0.78,
                                         "rangeRatio": 0.85,
                                         "highlightAmplitudeRatio": 0.8,
+                                        "pictureHighlightAmplitudeRatio": 0.7,
                                         "shadowAmplitudeRatio": 0.85,
                                     },
                                     "passed": passed,

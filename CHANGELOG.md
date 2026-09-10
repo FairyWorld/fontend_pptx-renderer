@@ -25,8 +25,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions.
 - Added a schema-v2 bevel-ring fidelity metric and derived capability gate with independent dynamic
-  range, highlight-amplitude, and shadow-amplitude floors, plus an opt-in ignored eight-case 3D
-  discovery matrix for curved, holed, concave, transformed, and effect-bearing inputs.
+  range and shadow-amplitude floors plus material-specific solid/picture highlight floors, alongside
+  an opt-in ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, and
+  effect-bearing inputs.
 - Added a schema-v4 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,

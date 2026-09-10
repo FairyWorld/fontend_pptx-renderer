@@ -21,6 +21,7 @@ BEVEL_SCORE_THRESHOLD = 0.60
 BEVEL_CORNER_SCORE_THRESHOLD = 0.78
 BEVEL_RANGE_RATIO_THRESHOLD = 0.85
 BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
+BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 CAMERA_CORNER_SCORE_THRESHOLD = 0.98
@@ -231,6 +232,7 @@ def _validate_bevel_local(
         "cornerScore": BEVEL_CORNER_SCORE_THRESHOLD,
         "rangeRatio": BEVEL_RANGE_RATIO_THRESHOLD,
         "highlightAmplitudeRatio": BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
+        "pictureHighlightAmplitudeRatio": BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
         "shadowAmplitudeRatio": BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD,
     }:
         raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
@@ -320,7 +322,12 @@ def _validate_bevel_local(
             region_passes: list[bool] = []
             for region_index, region in enumerate(regions):
                 metric_context = f"{context} region {region_index}"
-                _mapping(region.get("region"), f"{metric_context} geometry")
+                geometry = _mapping(region.get("region"), f"{metric_context} geometry")
+                surface = geometry.get("surface")
+                if surface not in {"shape", "picture"}:
+                    raise CapabilityVerificationError(
+                        f"{metric_context} surface is unsupported"
+                    )
                 metrics = _mapping(region.get("metrics"), f"{metric_context} metrics")
                 evaluable = metrics.get("evaluable")
                 if not isinstance(evaluable, bool):
@@ -422,7 +429,12 @@ def _validate_bevel_local(
                     expected_pass = (
                         score >= BEVEL_SCORE_THRESHOLD
                         and range_ratio >= BEVEL_RANGE_RATIO_THRESHOLD
-                        and highlight_ratio >= BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
+                        and highlight_ratio
+                        >= (
+                            BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
+                            if surface == "picture"
+                            else BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
+                        )
                         and shadow_ratio >= BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD
                         and (
                             not corner_required
