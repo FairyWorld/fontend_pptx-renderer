@@ -331,18 +331,19 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_bevel_metrics.py \
 The metric extracts shape bounds, group transforms, ellipse contours, round-rectangle corners, and
 donut inner/outer radii independently from source OOXML, then compares luminance only in the inward
 bevel ring. Unknown silhouettes and rotated shapes fail as unevaluable instead of being scored with
-a rectangular mask. The schema-v3 gate requires a general field score of at least `0.60`, dynamic
-range ratio `0.85`, and shadow-amplitude ratio `0.85`. Solid-shape highlight amplitude requires
-`0.80`; picture lighting uses its separately verified `0.70` floor. Verified `roundRect` corners
-also require `0.78`. Amplitude ratios are symmetric, so both washed-out and over-dark lighting fail
-even when correlation leaves the composite score high. A zero-thickness
+a rectangular mask. The schema-v4 gate requires a general field score of at least `0.60`, dynamic
+range ratio `0.85`, shadow-amplitude ratio `0.85`, and candidate/native shadow overshoot no greater
+than `1.05`. Solid-shape highlight amplitude requires `0.80`; picture lighting uses its separately
+verified `0.70` floor. Verified `roundRect` corners also require `0.78`. The symmetric amplitude
+ratios catch large weak or excessive lighting, while the directional ceiling rejects a smaller but
+visible over-dark edge even when correlation leaves the composite score high. A zero-thickness
 donut stays in the full-slide native gate because it has no interior bevel surface. A band below
 four output pixels is explicitly recorded as
 resolution-limited and remains covered by full-slide and manual gates rather than guessed from too
 few pixels. The flat control has no applicable region. This local metric complements the full-page
 SSIM/color-histogram gate; it does not replace it. Each native API slide row fingerprints the exact
 reference and HTML rasters. The metric generator rejects a stale or replaced raster before scoring.
-Case 0017 additionally declares three implicit/explicit slide pairs. Schema v3 requires exact
+Case 0017 additionally declares three implicit/explicit slide pairs. Schema v4 requires exact
 reference-raster equality and exact candidate-raster equality for every pair, so a parser-default
 regression cannot hide behind a high full-slide score.
 It is also sensitive to material-specific lighting: the tracked picture case must retain the native

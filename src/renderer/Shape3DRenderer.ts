@@ -262,7 +262,7 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
-const SHAPE3D_LIGHTING_VERSION = 'distance-field-v3';
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v4';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
@@ -300,12 +300,24 @@ export function solidBevelShadowStrength(
   const lowerLog = Math.log(lower.aspect);
   const upperLog = Math.log(upper.aspect);
   const ratio = clamp((Math.log(aspect) - lowerLog) / Math.max(upperLog - lowerLog, 1e-9), 0, 1);
-  const aspectStrength = lower.strength + (upper.strength - lower.strength) * ratio;
+  let aspectStrength = lower.strength + (upper.strength - lower.strength) * ratio;
+
+  // The 10 pt native matrices for wide rect, ellipse, and donut surfaces converge on a weaker
+  // dark-face response at 2.5:1 and above. Rounded rectangles retain the earlier response: their
+  // rounded corners contribute less to the measured dark band and need the stronger material map.
+  if (geometry !== 'roundrect' && aspect > 1.6) {
+    const wideWeight = clamp((aspect - 1.6) / (2.5 - 1.6), 0, 1);
+    aspectStrength += (0.415 - aspectStrength) * wideWeight;
+  }
+  if (geometry === 'rect' && aspect < 0.55) {
+    const tallWeight = clamp((0.55 - aspect) / (0.55 - 0.46875), 0, 1);
+    aspectStrength += (0.646 - aspectStrength) * tallWeight;
+  }
   if (geometry !== 'rect' || Math.abs(aspect - 1) > 1e-6) return aspectStrength;
 
   // The native 6 pt square-rectangle probe has a steeper dark face than the existing 10 pt
   // cohort, while roundRect/ellipse/donut keep the aspect-only response. Interpolate only across
-  // those two native-backed rectangular anchors so the 10 pt donut calibration remains unchanged.
+  // those two native-backed rectangular anchors without changing non-rectangular surfaces.
   const defaultBevelWidth = 8;
   const establishedBevelWidth = 40 / 3;
   const smallBevelWeight = clamp(

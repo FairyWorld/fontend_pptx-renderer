@@ -25,8 +25,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
   omitted/explicit default top-bevel dimensions.
-- Added a schema-v3 bevel-ring fidelity metric and derived capability gate with independent dynamic
-  range and shadow-amplitude floors plus material-specific solid/picture highlight floors, alongside
+- Added a schema-v4 bevel-ring fidelity metric and derived capability gate with independent dynamic
+  range and shadow-amplitude floors, a `1.05` directional shadow-overshoot ceiling, plus
+  material-specific solid/picture highlight floors, alongside
   exact native/renderer slide-equivalence assertions for alternate OOXML encodings and an opt-in
   ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, and effect-bearing
   inputs.
@@ -82,7 +83,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   abort, and cleanup behavior. Picture lighting now uses its native-validated `twoPt:t` direction
   and material intensity independently from solid-shape lighting. Solid highlights retain their
   common material mapping while dark-face attenuation is interpolated across the native square,
-  wide, and tall matrices. Missing circular top-bevel preset/width/height attributes now use the
+  wide, and tall matrices. Wide non-rounded surfaces and the tall-rectangle sentinel now use
+  dedicated native amplitude anchors, eliminating the visible 8.4% shadow overshoot in the wide
+  adjusted-donut row while preserving the independently calibrated wide `roundRect`. Missing
+  circular top-bevel preset/width/height attributes now use the
   DrawingML `circle` and 76200 EMU defaults independently; the native 6 pt square-rectangle row has
   a bounded shadow anchor without changing the accepted 10 pt donut response. Unmatched 3D tuples
   stay flat.

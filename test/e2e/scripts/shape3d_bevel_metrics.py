@@ -29,6 +29,7 @@ RANGE_RATIO_THRESHOLD = 0.85
 HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
 PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
+SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
 MIN_EVALUABLE_BAND_PX = 4.0
 DEFAULT_BEVEL_DIMENSION_EMU = 76200.0
 
@@ -333,6 +334,11 @@ def _field_score(
 
     highlight_amplitude_ratio = amplitude_ratio(reference_highlight, candidate_highlight)
     shadow_amplitude_ratio = amplitude_ratio(reference_shadow, candidate_shadow)
+    shadow_overshoot_ratio = (
+        candidate_shadow / reference_shadow
+        if reference_shadow > 1e-6
+        else 1.0 + candidate_shadow
+    )
     salient = np.abs(reference_values) >= max(3.0, reference_range * 0.15)
     sign_agreement = (
         float(np.mean(np.sign(reference_values[salient]) == np.sign(candidate_values[salient])))
@@ -359,6 +365,7 @@ def _field_score(
         "referenceShadowAmplitude": reference_shadow,
         "candidateShadowAmplitude": candidate_shadow,
         "shadowAmplitudeRatio": float(shadow_amplitude_ratio),
+        "shadowOvershootRatio": float(shadow_overshoot_ratio),
         "meanAbsoluteError": mean_absolute_error,
     }
 
@@ -376,6 +383,7 @@ def compute_bevel_ring_metrics(
         PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
     ),
     shadow_amplitude_ratio_threshold: float = SHADOW_AMPLITUDE_RATIO_THRESHOLD,
+    shadow_overshoot_ratio_threshold: float = SHADOW_OVERSHOOT_RATIO_THRESHOLD,
 ) -> dict[str, Any]:
     reference, candidate = _common_images(reference, candidate)
     image_height, image_width = reference.shape[:2]
@@ -405,6 +413,7 @@ def compute_bevel_ring_metrics(
                 "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
                 "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
                 "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
+                "shadowOvershootRatio": shadow_overshoot_ratio_threshold,
             },
         }
     unsupported_reason = None
@@ -427,6 +436,7 @@ def compute_bevel_ring_metrics(
                 "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
                 "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
                 "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
+                "shadowOvershootRatio": shadow_overshoot_ratio_threshold,
             },
         }
     padded = np.pad(geometry.astype(np.uint8), 1)
@@ -465,6 +475,7 @@ def compute_bevel_ring_metrics(
         and overall["rangeRatio"] >= range_ratio_threshold
         and overall["highlightAmplitudeRatio"] >= highlight_threshold
         and overall["shadowAmplitudeRatio"] >= shadow_amplitude_ratio_threshold
+        and overall["shadowOvershootRatio"] <= shadow_overshoot_ratio_threshold
         and (not corner_required or corner["score"] >= corner_score_threshold)
     )
     return {
@@ -484,6 +495,7 @@ def compute_bevel_ring_metrics(
             "highlightAmplitudeRatio": highlight_amplitude_ratio_threshold,
             "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
             "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
+            "shadowOvershootRatio": shadow_overshoot_ratio_threshold,
         },
         "passed": passed,
     }
@@ -674,7 +686,7 @@ def build_bevel_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "score": SCORE_THRESHOLD,
@@ -683,6 +695,7 @@ def build_bevel_report(
             "highlightAmplitudeRatio": HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
             "pictureHighlightAmplitudeRatio": PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
             "shadowAmplitudeRatio": SHADOW_AMPLITUDE_RATIO_THRESHOLD,
+            "shadowOvershootRatio": SHADOW_OVERSHOOT_RATIO_THRESHOLD,
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),
         "applicableCaseCount": applicable_count,

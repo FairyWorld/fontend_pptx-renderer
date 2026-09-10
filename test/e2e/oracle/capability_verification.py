@@ -23,6 +23,7 @@ BEVEL_RANGE_RATIO_THRESHOLD = 0.85
 BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
 BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
+BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 CAMERA_CORNER_SCORE_THRESHOLD = 0.98
 CAMERA_COLOR_SCORE_THRESHOLD = 0.97
@@ -219,8 +220,8 @@ def _validate_bevel_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 3:
-        raise CapabilityVerificationError("bevel-local report requires schemaVersion=3")
+    if report.get("schemaVersion") != 4:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=4")
     renderer = _mapping(report.get("renderer"), "bevel-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -234,6 +235,7 @@ def _validate_bevel_local(
         "highlightAmplitudeRatio": BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
         "pictureHighlightAmplitudeRatio": BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
         "shadowAmplitudeRatio": BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD,
+        "shadowOvershootRatio": BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD,
     }:
         raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
     values = report.get("caseResults")
@@ -383,6 +385,10 @@ def _validate_bevel_local(
                         metrics.get("shadowAmplitudeRatio"),
                         f"{metric_context} shadow amplitude ratio",
                     )
+                    shadow_overshoot_ratio = _finite_metric(
+                        metrics.get("shadowOvershootRatio"),
+                        f"{metric_context} shadow overshoot ratio",
+                    )
                     if (
                         reference_range < 0
                         or candidate_range < 0
@@ -393,6 +399,7 @@ def _validate_bevel_local(
                         or not 0 <= range_ratio <= 1
                         or not 0 <= highlight_ratio <= 1
                         or not 0 <= shadow_ratio <= 1
+                        or shadow_overshoot_ratio < 0
                     ):
                         raise CapabilityVerificationError(
                             f"{metric_context} metrics are outside their domains"
@@ -414,10 +421,16 @@ def _validate_bevel_local(
                         if max(reference_shadow, candidate_shadow) > 1e-6
                         else 1.0
                     )
+                    expected_shadow_overshoot_ratio = (
+                        candidate_shadow / reference_shadow
+                        if reference_shadow > 1e-6
+                        else 1.0 + candidate_shadow
+                    )
                     if (
                         abs(range_ratio - expected_range_ratio) > 1e-9
                         or abs(highlight_ratio - expected_highlight_ratio) > 1e-9
                         or abs(shadow_ratio - expected_shadow_ratio) > 1e-9
+                        or abs(shadow_overshoot_ratio - expected_shadow_overshoot_ratio) > 1e-9
                     ):
                         raise CapabilityVerificationError(
                             f"{metric_context} amplitude metrics are inconsistent"
@@ -436,6 +449,7 @@ def _validate_bevel_local(
                             else BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
                         )
                         and shadow_ratio >= BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD
+                        and shadow_overshoot_ratio <= BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD
                         and (
                             not corner_required
                             or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD

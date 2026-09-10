@@ -511,6 +511,11 @@ Rules that have proven robust:
 
 If a line/connector looks too thick or “filled in”, inspect `isLineLike` handling in `ShapeRenderer.ts` before changing preset geometry.
 
+For static 3D bevels, do not rely on a symmetric amplitude ratio alone: the `0.85` floor still
+permits a candidate shadow to exceed native by about 17.6%. Schema-v4 bevel evidence also requires
+`candidateShadowAmplitude / referenceShadowAmplitude <= 1.05`; keep that directional ceiling when
+changing material or aspect-response curves.
+
 #### 4. Curved arrows and similar presets are layering problems as much as geometry problems
 
 For curved arrows (`curvedLeftArrow`, `curvedRightArrow`, `curvedUpArrow`, `curvedDownArrow`):

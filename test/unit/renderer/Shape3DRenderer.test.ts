@@ -134,8 +134,20 @@ describe('buildStaticShape3DPlan', () => {
   it('raises only the native-backed small rectangular bevel shadow response', () => {
     expect(solidBevelShadowStrength(200, 200, 'rect', 8)).toBeCloseTo(0.7, 5);
     expect(solidBevelShadowStrength(200, 200, 'rect', 40 / 3)).toBeCloseTo(0.58, 5);
-    expect(solidBevelShadowStrength(200, 200, 'roundRect', 8)).toBeCloseTo(0.58, 5);
+    expect(solidBevelShadowStrength(200, 200, 'roundrect', 8)).toBeCloseTo(0.58, 5);
     expect(solidBevelShadowStrength(200, 200, 'donut', 8)).toBeCloseTo(0.58, 5);
+  });
+
+  it('uses the native-backed weaker shadow response for wide non-rounded surfaces', () => {
+    expect(solidBevelShadowStrength(500, 200, 'rect', 40 / 3)).toBeCloseTo(0.415, 5);
+    expect(solidBevelShadowStrength(500, 200, 'ellipse', 40 / 3)).toBeCloseTo(0.415, 5);
+    expect(solidBevelShadowStrength(500, 200, 'donut', 40 / 3)).toBeCloseTo(0.415, 5);
+    expect(solidBevelShadowStrength(500, 200, 'roundrect', 8)).toBeCloseTo(0.45, 5);
+  });
+
+  it('uses the native-backed weaker shadow response for a tall rectangular surface', () => {
+    expect(solidBevelShadowStrength(93.75, 200, 'rect', 40 / 3)).toBeCloseTo(0.646, 5);
+    expect(solidBevelShadowStrength(93.75, 200, 'ellipse', 40 / 3)).toBeCloseTo(0.72, 5);
   });
 
   it('builds the native-backed flat-plane perspective camera plan', () => {

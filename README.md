@@ -637,9 +637,10 @@ face edges. Shape textures retain the resolved material hue, while picture textu
 black/white lighting so the source pixels stay visible. The supported implicit `twoPt:t` picture
 response uses its native-validated edge direction and a lower material intensity than opaque solid
 shapes; the bevel geometry remains shared. Solid highlights keep their common material mapping,
-while dark-face attenuation is interpolated across the native square, wide, and tall matrices so a
-wide ellipse or donut does not become disproportionately dark. The native 6 pt square-rectangle
-row has its own small-bevel shadow anchor; it does not alter the established 10 pt donut response.
+while dark-face attenuation is interpolated across the native square, wide, and tall matrices. A
+separate wide-surface anchor keeps 2.5:1-and-wider rect, ellipse, and donut shadows within 5% of the
+native amplitude; `roundRect` retains its independently measured response. The native 6 pt
+square-rectangle row and the 10 pt tall-rectangle row also have bounded shadow anchors.
 A six-slide matrix pairs each omitted/default encoding with an explicit equivalent, and the local
 gate requires both PowerPoint and renderer raster pairs to remain byte-identical.
 

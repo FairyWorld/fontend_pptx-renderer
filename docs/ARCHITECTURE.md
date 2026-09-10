@@ -246,10 +246,12 @@ The resulting transparent texture replaces only the fallback lighting after its 
 Solid shapes map light and shadow through material-color lookup tables so highlights retain the
 source hue; pictures use relative black/white overlays so their pixels remain visible. The render
 plan carries material intensity separately from bevel geometry. Solid-shape highlights preserve the
-common material response, while shadow attenuation is interpolated over log aspect ratio from the
-native square, wide, and tall matrices; this avoids making the dark bevel face progressively too
-heavy as the silhouette widens. A separate 6 pt square-rectangle anchor corrects its native dark
-face while leaving the established 10 pt donut and non-rectangular responses unchanged. Native
+common material response, while shadow attenuation starts with a log-aspect curve and then applies
+native-backed geometry anchors: `0.415` at 2.5:1 for wide rect/ellipse/donut surfaces, the prior
+rounded-rectangle response for `roundRect`, and `0.646` at 0.46875:1 for a 10 pt tall rectangle. A
+separate 6 pt square-rectangle anchor corrects its native dark face. The local metric independently
+caps candidate/native shadow amplitude at `1.05`, so a visually over-dark edge cannot pass solely
+through the wider symmetric amplitude budget. Native
 evidence calibrates the implicit `twoPt:t` picture response
 independently from the solid-shape `threePt:t` response. Texture
 work is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry,
