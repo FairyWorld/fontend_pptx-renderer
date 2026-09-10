@@ -2074,7 +2074,7 @@ def _build_shape3d_cases() -> list[CaseDef]:
         paragraph = text_frame.paragraphs[0]
         paragraph.alignment = PP_ALIGN.LEFT
         run = paragraph.add_run()
-        run.text = "透视文本 LEFT 120"
+        run.text = "透视 LEFT 120"
         run.font.name = "Arial"
         run.font.size = Pt(28)
         run.font.bold = True

@@ -837,9 +837,7 @@ def test_static_shape3d_perspective_left_text_matrix_serializes_implicit_camera_
             namespaces=ns,
         )
         visible_text = "".join(target.xpath("p:txBody//a:t/text()", namespaces=ns))
-        assert "透视文本" in visible_text
-        assert "LEFT" in visible_text
-        assert "120" in visible_text
+        assert visible_text == "透视 LEFT 120"
         cx, cy = target.xpath("p:spPr/a:xfrm/a:ext", namespaces=ns)[0].attrib.values()
         extents.append((int(cx), int(cy)))
 
