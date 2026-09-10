@@ -441,7 +441,7 @@ function applySvgDropShadowFilter(
   svgNs: string,
   defs: SVGDefsElement,
   target: SVGElement,
-  bounds: { w: number; h: number },
+  bounds: { x?: number; y?: number; w: number; h: number },
   shadow: {
     dx: number;
     dy: number;
@@ -453,10 +453,12 @@ function applySvgDropShadowFilter(
   const filterId = `shape-shadow-${++gradientIdCounter}`;
   const filter = document.createElementNS(svgNs, 'filter');
   const margin = Math.max(Math.abs(shadow.dx), Math.abs(shadow.dy)) + shadow.blur * 4 + 4;
+  const boundsX = bounds.x ?? 0;
+  const boundsY = bounds.y ?? 0;
   filter.setAttribute('id', filterId);
   filter.setAttribute('filterUnits', 'userSpaceOnUse');
-  filter.setAttribute('x', String(-margin));
-  filter.setAttribute('y', String(-margin));
+  filter.setAttribute('x', String(boundsX - margin));
+  filter.setAttribute('y', String(boundsY - margin));
   filter.setAttribute('width', String(bounds.w + margin * 2));
   filter.setAttribute('height', String(bounds.h + margin * 2));
 
@@ -3221,6 +3223,28 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
   if (effectiveEffectLst.exists()) {
     const outerShdw = effectiveEffectLst.child('outerShdw');
     if (outerShdw.exists()) {
+      // A supported camera plane replaces the ordinary path with a projected polygon. Keep the
+      // resolved OOXML shadow on the visible surface instead of filtering the hidden source path.
+      const outerShadowPath =
+        shape3dPlan?.mode === 'camera-projected-plane'
+          ? (mainSvg?.querySelector<SVGPathElement>('path[data-pptx-shape3d-projected-plane]') ??
+            mainPath)
+          : mainPath;
+      const outerShadowBounds =
+        shape3dPlan?.mode === 'camera-projected-plane'
+          ? (() => {
+              const xs = shape3dPlan.corners.map((point) => point.x);
+              const ys = shape3dPlan.corners.map((point) => point.y);
+              const x = Math.min(...xs);
+              const y = Math.min(...ys);
+              return {
+                x,
+                y,
+                w: Math.max(...xs) - x,
+                h: Math.max(...ys) - y,
+              };
+            })()
+          : mainSvgBounds;
       const dir = outerShdw.numAttr('dir') ?? 0; // direction in 60000ths of degree
       const dist = outerShdw.numAttr('dist') ?? 0; // distance in EMU
       const blurRad = outerShdw.numAttr('blurRad') ?? 0; // blur radius in EMU
@@ -3307,8 +3331,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             shadowRgb = { r: sr2, g: sg2, b: sb2 };
             attenuatedColor = `rgba(${sr2},${sg2},${sb2},${effectiveAlpha.toFixed(4)})`;
           }
-          if (!isLineLike && mainSvgNs && mainDefs && mainPath && mainSvgBounds) {
-            applySvgDropShadowFilter(mainSvgNs, mainDefs, mainPath, mainSvgBounds, {
+          if (!isLineLike && mainSvgNs && mainDefs && outerShadowPath && outerShadowBounds) {
+            applySvgDropShadowFilter(mainSvgNs, mainDefs, outerShadowPath, outerShadowBounds, {
               dx: bsX,
               dy: bsY,
               blur: effectiveBlur,
@@ -3320,8 +3344,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           }
         }
       } else {
-        if (!isLineLike && mainSvgNs && mainDefs && mainPath && mainSvgBounds) {
-          applySvgDropShadowFilter(mainSvgNs, mainDefs, mainPath, mainSvgBounds, {
+        if (!isLineLike && mainSvgNs && mainDefs && outerShadowPath && outerShadowBounds) {
+          applySvgDropShadowFilter(mainSvgNs, mainDefs, outerShadowPath, outerShadowBounds, {
             dx: offsetX,
             dy: offsetY,
             blur: blurPx,

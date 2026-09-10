@@ -59,6 +59,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   text row uses a CSS homography while preserving live DOM text. Text-body/style, stroke, transform,
   depth, bevel, contour, material, effect, camera, light, and paint values outside the accepted
   matrix retain the ordinary flat path with a diagnostic reason.
+- Preserve the scene-only solid camera row's theme `effectRef=2` outer shadow on the visible
+  projected polygon, with a filter region derived from the projected four-corner bounds so wide and
+  tall planes are not clipped back to their pre-projection rectangle.
 - Render the verified `orthographicFront` circular top-bevel subset for opaque solid
   `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures with a
   silhouette-aware interior

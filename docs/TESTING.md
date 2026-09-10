@@ -233,7 +233,8 @@ ellipse matrix, one five-slide donut matrix, two six-slide camera-plane matrices
 camera-plane row covers identity and 20°/30° rotated `orthographicFront`, then square, wide, tall,
 theme-fill, and non-identity-group `perspectiveRelaxedModerately` rendering at the exact verified
 120° field of view and camera rotation. The second proves scene-only implicit zero depth across
-square/wide/tall solid planes and preserves square/wide/tall editable DOM text for the exact
+square/wide/tall solid planes, including the theme `effectRef=2` outer shadow on the projected
+surface without filter clipping, and preserves square/wide/tall editable DOM text for the exact
 `perspectiveContrastingRightFacing` tuple. The third camera matrix isolates the observed
 `perspectiveLeft` camera at a 120-degree field of view with absent explicit rotation, `threePt:t`
 lighting, no fill, `wrap="none"`, default top anchoring, and `spAutoFit` across square, wide, and
@@ -615,8 +616,9 @@ the derived `bevel-local` report, explicit manual verdicts for review rows, and 
 
 The separate `drawingml.shape.3d.camera-projected-plane` cohort uses cases 0013-0015. It
 promotes exact zero-depth solid rectangles and two scene-only no-fill live-text tuples; all exclude
-visible stroke, local transform, backdrop, nonzero `z`, effects, bevel, contour, extrusion color,
-and material. The text row additionally excludes `p:style`, vertical text, independent bounds, and
+visible stroke, local transform, backdrop, nonzero `z`, explicit effect lists, bevel, contour,
+extrusion color, and material. The scene-only solid row retains the exact theme outer-shadow style;
+the text row excludes `p:style`, vertical text, independent bounds, and
 local body properties outside the registry's `wrap`, anchor, and autofit tuples. Its exact cameras, paint values,
 aspect ratios, container rows, and implicit-depth semantics are declared in the registry.
 Verification uses all earlier/current report pairs plus the derived schema-v3

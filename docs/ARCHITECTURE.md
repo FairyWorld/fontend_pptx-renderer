@@ -248,7 +248,7 @@ late DOM writes or cache repopulation.
 
 The camera-plane plan is a separate zero-depth lane with solid SVG and live DOM text modalities.
 Both require a `rect` shape with no visible stroke, local rotation or flip, backdrop, nonzero `z`,
-effect, bevel, contour, extrusion color, material, or extrusion. The solid modality requires an
+explicit effect list, bevel, contour, extrusion color, material, or extrusion. The solid modality requires an
 opaque supported fill and no visible text. The text modality requires no shape fill, an absent line
 element and `p:style`, plus local `bodyPr wrap="none" anchor="ctr"` with `a:spAutoFit`; inherited
 body properties, vertical text, and independent text bounds remain flat. Both modalities reject
@@ -268,7 +268,9 @@ presentation width and field of view; preset constants describe the native-obser
 projected-plane scales. The renderer emits one replacement SVG path and hides the ordinary flat
 path only after that replacement exists. Perspective solid rows receive a vertical `linearRGB`
 material field; identity and rotated orthographic controls use their native-observed flat material
-responses. For the exact text tuples, `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
+responses. The scene-only solid row's theme `effectRef=2` outer shadow is transferred from the
+hidden source path to this projected path; its SVG filter uses the projected four-corner bounds to
+avoid clipping overflow. For the exact text tuples, `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
 homography and applies it after text layout, while preserving the text DOM. This is independent
 planar math and does not introduce a mesh or WebGL dependency.
 

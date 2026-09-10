@@ -663,7 +663,8 @@ be absent so Office's top default applies. Vertical text and independent text bo
 this lane. Both modalities
 exclude shape rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion
 color, material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
-live-text rows omit the entire shape style.
+its resolved `outerShdw` is applied to the visible projected polygon with a filter region covering
+the projected four-corner bounds. Live-text rows omit the entire shape style.
 
 This plane projection uses small independent SVG math rather than a mesh engine: longitude,
 latitude, and revolution rotations are followed by orthographic or perspective division. OOXML

@@ -6820,6 +6820,67 @@ describe('ShapeRenderer', () => {
     expect(gradient?.getAttribute('color-interpolation')).toBe('linearRGB');
   });
 
+  it('moves a theme effectRef outer shadow onto the projected camera plane', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="841" name="Scene-only plane shadow"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:scene3d>
+            <a:camera prst="perspectiveRelaxedModerately" fov="7200000">
+              <a:rot lat="18590633" lon="0" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:spPr>
+        <p:style><a:effectRef idx="2"><a:schemeClr val="accent1"/></a:effectRef></p:style>
+        <p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody>
+      </p:sp>`;
+    const themeEffectStyles = [
+      parseXml(`
+        <a:effectStyle xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:effectLst/>
+        </a:effectStyle>`),
+      parseXml(`
+        <a:effectStyle xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+          <a:effectLst>
+            <a:outerShdw blurRad="40000" dist="23000" dir="5400000" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </a:effectStyle>`),
+    ];
+    const baseContext = createMockRenderContext();
+    const ctx = createMockRenderContext({
+      presentation: { ...baseContext.presentation, width: 1280, height: 720 },
+      theme: { ...baseContext.theme, effectStyles: themeEffectStyles },
+    });
+
+    const el = renderShape(parseShapeNode(parseXml(xml)), ctx);
+    const basePath = el.querySelector('svg > path');
+    const projected = el.querySelector('[data-pptx-shape3d-projected-plane="perspective"]');
+    const shadowFilter = el.querySelector('filter[id^="shape-shadow-"]');
+    const projectedCoordinates = extractPathNumbers(projected?.getAttribute('d') ?? '');
+    const projectedX = projectedCoordinates.filter((_, index) => index % 2 === 0);
+    const projectedY = projectedCoordinates.filter((_, index) => index % 2 === 1);
+    const filterX = Number(shadowFilter?.getAttribute('x'));
+    const filterY = Number(shadowFilter?.getAttribute('y'));
+    const filterRight = filterX + Number(shadowFilter?.getAttribute('width'));
+    const filterBottom = filterY + Number(shadowFilter?.getAttribute('height'));
+
+    expect(projected?.getAttribute('filter')).toMatch(/^url\(#shape-shadow-/);
+    expect(basePath?.getAttribute('filter')).toBeNull();
+    expect(shadowFilter?.querySelector('feDropShadow')).toBeTruthy();
+    expect(filterX).toBeLessThan(Math.min(...projectedX));
+    expect(filterY).toBeLessThan(Math.min(...projectedY));
+    expect(filterRight).toBeGreaterThan(Math.max(...projectedX));
+    expect(filterBottom).toBeGreaterThan(Math.max(...projectedY));
+  });
+
   it('keeps a camera shape with visible text on the ordinary flat renderer', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
