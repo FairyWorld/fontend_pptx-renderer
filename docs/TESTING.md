@@ -331,10 +331,11 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_bevel_metrics.py \
 The metric extracts shape bounds, group transforms, ellipse contours, round-rectangle corners, and
 donut inner/outer radii independently from source OOXML, then compares luminance only in the inward
 bevel ring. Unknown silhouettes and rotated shapes fail as unevaluable instead of being scored with
-a rectangular mask. The schema-v4 gate requires a general field score of at least `0.60`, dynamic
+a rectangular mask. The schema-v5 gate requires a general field score of at least `0.60`, dynamic
 range ratio `0.85`, shadow-amplitude ratio `0.85`, and candidate/native shadow overshoot no greater
-than `1.05`. Solid-shape highlight amplitude requires `0.80`; picture lighting uses its separately
-verified `0.70` floor. Verified `roundRect` corners also require `0.78`. The symmetric amplitude
+than `1.05`; solid donut faces use the tighter native-backed `1.01` ceiling. Solid-shape highlight
+amplitude requires `0.80`; picture lighting uses its separately verified `0.70` floor. Verified
+`roundRect` corners also require `0.78`. The symmetric amplitude
 ratios catch large weak or excessive lighting, while the directional ceiling rejects a smaller but
 visible over-dark edge even when correlation leaves the composite score high. A zero-thickness
 donut stays in the full-slide native gate because it has no interior bevel surface. A band below

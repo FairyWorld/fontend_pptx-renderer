@@ -173,6 +173,25 @@ def test_bevel_ring_metrics_rejects_a_visible_shadow_overshoot_inside_the_symmet
     assert result["passed"] is False
 
 
+def test_bevel_ring_metrics_apply_the_tighter_native_donut_shadow_budget():
+    reference, _flat, region = _elliptical_bevel_specimen("donut")
+    base = np.array([50, 126, 196], dtype=np.float32)
+    candidate = reference.astype(np.float32)
+    delta = candidate - base
+    shadow = np.mean(delta, axis=2) < 0
+    candidate[shadow] = base + delta[shadow] * 1.03
+
+    result = compute_bevel_ring_metrics(
+        reference,
+        np.clip(candidate, 0, 255).astype(np.uint8),
+        region,
+    )
+
+    assert 1.01 < result["shadowOvershootRatio"] < 1.05
+    assert result["thresholds"]["solidDonutShadowOvershootRatio"] == 1.01
+    assert result["passed"] is False
+
+
 def test_bevel_ring_metrics_keep_picture_highlight_threshold_separate_from_solid_materials():
     reference, _flat, shape_region = _bevel_specimen()
     base = np.array([50, 126, 196], dtype=np.float32)
@@ -254,9 +273,10 @@ def test_bevel_ring_reports_resolution_limited_instead_of_guessing():
             "cornerScore": 0.78,
             "rangeRatio": 0.85,
             "highlightAmplitudeRatio": 0.8,
-                "pictureHighlightAmplitudeRatio": 0.7,
-                "shadowAmplitudeRatio": 0.85,
-                "shadowOvershootRatio": 1.05,
+            "pictureHighlightAmplitudeRatio": 0.7,
+            "shadowAmplitudeRatio": 0.85,
+            "shadowOvershootRatio": 1.05,
+            "solidDonutShadowOvershootRatio": 1.01,
         },
     }
 
@@ -601,7 +621,7 @@ def test_bevel_report_enforces_declared_implicit_explicit_slide_equivalence(tmp_
 
     matched = build_bevel_report([native_path], repo, reports_dir)
 
-    assert matched["schemaVersion"] == 4
+    assert matched["schemaVersion"] == 5
     assert matched["caseResults"][0]["equivalencePairs"] == [
         {
             "leftSlideIdx": 0,

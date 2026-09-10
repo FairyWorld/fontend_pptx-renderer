@@ -24,6 +24,7 @@ BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
 BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
+BEVEL_SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.01
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 CAMERA_CORNER_SCORE_THRESHOLD = 0.98
 CAMERA_COLOR_SCORE_THRESHOLD = 0.97
@@ -220,8 +221,8 @@ def _validate_bevel_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 4:
-        raise CapabilityVerificationError("bevel-local report requires schemaVersion=4")
+    if report.get("schemaVersion") != 5:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=5")
     renderer = _mapping(report.get("renderer"), "bevel-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -236,6 +237,9 @@ def _validate_bevel_local(
         "pictureHighlightAmplitudeRatio": BEVEL_PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
         "shadowAmplitudeRatio": BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD,
         "shadowOvershootRatio": BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD,
+        "solidDonutShadowOvershootRatio": (
+            BEVEL_SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD
+        ),
     }:
         raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
     values = report.get("caseResults")
@@ -439,6 +443,11 @@ def _validate_bevel_local(
                         raise CapabilityVerificationError(
                             f"{metric_context} uses unexpected thresholds"
                         )
+                    shadow_overshoot_threshold = (
+                        BEVEL_SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD
+                        if surface == "shape" and geometry.get("preset") == "donut"
+                        else BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD
+                    )
                     expected_pass = (
                         score >= BEVEL_SCORE_THRESHOLD
                         and range_ratio >= BEVEL_RANGE_RATIO_THRESHOLD
@@ -449,7 +458,7 @@ def _validate_bevel_local(
                             else BEVEL_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD
                         )
                         and shadow_ratio >= BEVEL_SHADOW_AMPLITUDE_RATIO_THRESHOLD
-                        and shadow_overshoot_ratio <= BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD
+                        and shadow_overshoot_ratio <= shadow_overshoot_threshold
                         and (
                             not corner_required
                             or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD

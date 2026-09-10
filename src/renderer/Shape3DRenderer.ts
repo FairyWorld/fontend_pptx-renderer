@@ -262,7 +262,7 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
-const SHAPE3D_LIGHTING_VERSION = 'distance-field-v4';
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v5';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
@@ -279,6 +279,16 @@ const SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS = [
   { aspect: 1.6, strength: 0.45 },
 ] as const;
 
+// The square rows in oracle-pypptx-shape3d-0012 measure 42.649/43.393 and
+// 43.154/43.616 native/candidate shadow amplitudes at the generic 0.58 response.
+// Applying their mean native/candidate ratio gives 0.57196; keep the neighboring
+// aspect anchors unchanged so wide and tall donut evidence stays stable.
+const DONUT_BEVEL_SHADOW_STRENGTH_ANCHORS = [
+  { aspect: 0.55, strength: 0.72 },
+  { aspect: 1, strength: 0.572 },
+  { aspect: 1.6, strength: 0.45 },
+] as const;
+
 export function solidBevelShadowStrength(
   width: number,
   height: number,
@@ -286,14 +296,16 @@ export function solidBevelShadowStrength(
   bevelWidth: number,
 ): number {
   const aspect = width / height;
-  let lower: (typeof SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS)[number] =
-    SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[0];
-  let upper: (typeof SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS)[number] =
-    SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS.length - 1];
-  for (let index = 1; index < SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS.length; index += 1) {
-    if (aspect <= SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[index].aspect) {
-      lower = SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[index - 1];
-      upper = SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS[index];
+  const anchors =
+    geometry === 'donut'
+      ? DONUT_BEVEL_SHADOW_STRENGTH_ANCHORS
+      : SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS;
+  let lower: (typeof anchors)[number] = anchors[0];
+  let upper: (typeof anchors)[number] = anchors[anchors.length - 1];
+  for (let index = 1; index < anchors.length; index += 1) {
+    if (aspect <= anchors[index].aspect) {
+      lower = anchors[index - 1];
+      upper = anchors[index];
       break;
     }
   }

@@ -112,7 +112,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
         {"slideIdx": 0, "hidden": False, "renderArtifacts": native_artifacts}
     ]
     return {
-        "schemaVersion": 4,
+        "schemaVersion": 5,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": {
             "score": 0.6,
@@ -122,6 +122,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
             "pictureHighlightAmplitudeRatio": 0.7,
             "shadowAmplitudeRatio": 0.85,
             "shadowOvershootRatio": 1.05,
+            "solidDonutShadowOvershootRatio": 1.01,
         },
         "applicableCaseCount": 1,
         "passed": passed,
@@ -169,6 +170,7 @@ def bevel_report(case: dict, repo: Path, *, passed: bool = True) -> dict:
                                         "pictureHighlightAmplitudeRatio": 0.7,
                                         "shadowAmplitudeRatio": 0.85,
                                         "shadowOvershootRatio": 1.05,
+                                        "solidDonutShadowOvershootRatio": 1.01,
                                     },
                                     "passed": passed,
                                 },
@@ -915,6 +917,29 @@ def test_rejects_tampered_bevel_artifacts_and_inconsistent_metric_results(tmp_pa
             baseline_reports=[baseline],
             passed_gates=("source", "structural", "unit", "browser", "docs"),
             bevel_report=visible_overshoot,
+        )
+
+    donut_overshoot = bevel_report(current, repo)
+    region = donut_overshoot["caseResults"][0]["slides"][0]["regions"][0]
+    region["region"]["preset"] = "donut"
+    metrics = region["metrics"]
+    metrics.update(
+        candidateDynamicRange=80.675,
+        rangeRatio=80.0 / 80.675,
+        candidateShadowAmplitude=45.675,
+        shadowAmplitudeRatio=45.0 / 45.675,
+        shadowOvershootRatio=45.675 / 45.0,
+    )
+
+    with pytest.raises(CapabilityVerificationError, match="metric pass status"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            bevel_report=donut_overshoot,
         )
 
 

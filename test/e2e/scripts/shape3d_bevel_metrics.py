@@ -30,6 +30,7 @@ HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.80
 PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD = 0.70
 SHADOW_AMPLITUDE_RATIO_THRESHOLD = 0.85
 SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
+SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.01
 MIN_EVALUABLE_BAND_PX = 4.0
 DEFAULT_BEVEL_DIMENSION_EMU = 76200.0
 
@@ -384,6 +385,9 @@ def compute_bevel_ring_metrics(
     ),
     shadow_amplitude_ratio_threshold: float = SHADOW_AMPLITUDE_RATIO_THRESHOLD,
     shadow_overshoot_ratio_threshold: float = SHADOW_OVERSHOOT_RATIO_THRESHOLD,
+    solid_donut_shadow_overshoot_ratio_threshold: float = (
+        SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD
+    ),
 ) -> dict[str, Any]:
     reference, candidate = _common_images(reference, candidate)
     image_height, image_width = reference.shape[:2]
@@ -414,6 +418,9 @@ def compute_bevel_ring_metrics(
                 "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
                 "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
                 "shadowOvershootRatio": shadow_overshoot_ratio_threshold,
+                "solidDonutShadowOvershootRatio": (
+                    solid_donut_shadow_overshoot_ratio_threshold
+                ),
             },
         }
     unsupported_reason = None
@@ -437,6 +444,9 @@ def compute_bevel_ring_metrics(
                 "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
                 "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
                 "shadowOvershootRatio": shadow_overshoot_ratio_threshold,
+                "solidDonutShadowOvershootRatio": (
+                    solid_donut_shadow_overshoot_ratio_threshold
+                ),
             },
         }
     padded = np.pad(geometry.astype(np.uint8), 1)
@@ -470,12 +480,17 @@ def compute_bevel_ring_metrics(
         if region.surface == "picture"
         else highlight_amplitude_ratio_threshold
     )
+    shadow_overshoot_threshold = (
+        solid_donut_shadow_overshoot_ratio_threshold
+        if region.surface == "shape" and region.preset == "donut"
+        else shadow_overshoot_ratio_threshold
+    )
     passed = (
         overall["score"] >= score_threshold
         and overall["rangeRatio"] >= range_ratio_threshold
         and overall["highlightAmplitudeRatio"] >= highlight_threshold
         and overall["shadowAmplitudeRatio"] >= shadow_amplitude_ratio_threshold
-        and overall["shadowOvershootRatio"] <= shadow_overshoot_ratio_threshold
+        and overall["shadowOvershootRatio"] <= shadow_overshoot_threshold
         and (not corner_required or corner["score"] >= corner_score_threshold)
     )
     return {
@@ -496,6 +511,7 @@ def compute_bevel_ring_metrics(
             "pictureHighlightAmplitudeRatio": picture_highlight_amplitude_ratio_threshold,
             "shadowAmplitudeRatio": shadow_amplitude_ratio_threshold,
             "shadowOvershootRatio": shadow_overshoot_ratio_threshold,
+            "solidDonutShadowOvershootRatio": solid_donut_shadow_overshoot_ratio_threshold,
         },
         "passed": passed,
     }
@@ -686,7 +702,7 @@ def build_bevel_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 4,
+        "schemaVersion": 5,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "score": SCORE_THRESHOLD,
@@ -696,6 +712,9 @@ def build_bevel_report(
             "pictureHighlightAmplitudeRatio": PICTURE_HIGHLIGHT_AMPLITUDE_RATIO_THRESHOLD,
             "shadowAmplitudeRatio": SHADOW_AMPLITUDE_RATIO_THRESHOLD,
             "shadowOvershootRatio": SHADOW_OVERSHOOT_RATIO_THRESHOLD,
+            "solidDonutShadowOvershootRatio": (
+                SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD
+            ),
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),
         "applicableCaseCount": applicable_count,

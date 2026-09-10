@@ -131,11 +131,13 @@ function installShape3DRasterMocks() {
 }
 
 describe('buildStaticShape3DPlan', () => {
-  it('raises only the native-backed small rectangular bevel shadow response', () => {
+  it('uses the native-backed square bevel shadow response for each geometry', () => {
     expect(solidBevelShadowStrength(200, 200, 'rect', 8)).toBeCloseTo(0.7, 5);
     expect(solidBevelShadowStrength(200, 200, 'rect', 40 / 3)).toBeCloseTo(0.58, 5);
     expect(solidBevelShadowStrength(200, 200, 'roundrect', 8)).toBeCloseTo(0.58, 5);
-    expect(solidBevelShadowStrength(200, 200, 'donut', 8)).toBeCloseTo(0.58, 5);
+    // oracle-pypptx-shape3d-0012 slides 1/3: the generic 0.58 response makes the
+    // square donut dark band 1.01-1.02x stronger than PowerPoint.
+    expect(solidBevelShadowStrength(200, 200, 'donut', 8)).toBeCloseTo(0.572, 5);
   });
 
   it('uses the native-backed weaker shadow response for wide non-rounded surfaces', () => {

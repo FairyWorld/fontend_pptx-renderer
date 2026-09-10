@@ -249,9 +249,11 @@ plan carries material intensity separately from bevel geometry. Solid-shape high
 common material response, while shadow attenuation starts with a log-aspect curve and then applies
 native-backed geometry anchors: `0.415` at 2.5:1 for wide rect/ellipse/donut surfaces, the prior
 rounded-rectangle response for `roundRect`, and `0.646` at 0.46875:1 for a 10 pt tall rectangle. A
-separate 6 pt square-rectangle anchor corrects its native dark face. The local metric independently
-caps candidate/native shadow amplitude at `1.05`, so a visually over-dark edge cannot pass solely
-through the wider symmetric amplitude budget. Native
+separate 6 pt square-rectangle anchor corrects its native dark face, while a `0.572` square-donut
+anchor preserves the native dark-band amplitude without changing the wide or tall endpoints. The
+local metric independently caps candidate/native shadow amplitude at `1.05`, tightened to `1.01`
+for solid donut faces, so a visually over-dark edge cannot pass solely through the wider symmetric
+amplitude budget. Native
 evidence calibrates the implicit `twoPt:t` picture response
 independently from the solid-shape `threePt:t` response. Texture
 work is serialized through the slide's `asyncTasks`, cached in `mediaUrlCache` by geometry,
