@@ -33,6 +33,9 @@ SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
 SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.01
 SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD = 1.05
 SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD = 0.30
+SOLID_DONUT_SHADOW_SECTOR_OVERSHOOT_RATIO_THRESHOLD = 1.60
+DONUT_SHADOW_SECTOR_DEGREES = 30
+MIN_DONUT_SECTOR_REFERENCE_SHADOW = 3.0
 MIN_EVALUABLE_BAND_PX = 4.0
 DEFAULT_BEVEL_DIMENSION_EMU = 76200.0
 
@@ -397,6 +400,83 @@ def _field_score(
     }
 
 
+def _donut_shadow_sector_metrics(
+    reference_delta: np.ndarray,
+    candidate_delta: np.ndarray,
+    ring: np.ndarray,
+    region: BevelRegion,
+) -> dict[str, Any]:
+    if region.preset != "donut":
+        return {"shadowSectorOvershootRatio": 1.0, "shadowSectors": []}
+
+    height, width = ring.shape
+    yy, xx = np.mgrid[:height, :width]
+    center_x = (width - 1) / 2
+    center_y = (height - 1) / 2
+    radius_x = max(width / 2, 1.0)
+    radius_y = max(height / 2, 1.0)
+    outer = ((xx - center_x) / radius_x) ** 2 + ((yy - center_y) / radius_y) ** 2 <= 1
+    inner_radius_x = radius_x - width * region.geometry_inset_x_ratio
+    inner_radius_y = radius_y - height * region.geometry_inset_y_ratio
+    if inner_radius_x <= 0 or inner_radius_y <= 0:
+        return {"shadowSectorOvershootRatio": 1.0, "shadowSectors": []}
+    inner = (
+        ((xx - center_x) / inner_radius_x) ** 2
+        + ((yy - center_y) / inner_radius_y) ** 2
+        < 1
+    )
+    outer_distance = cv2.distanceTransform(
+        np.pad(outer.astype(np.uint8), 1), cv2.DIST_L2, cv2.DIST_MASK_PRECISE
+    )[1:-1, 1:-1]
+    inner_distance = cv2.distanceTransform(
+        np.pad((~inner).astype(np.uint8), 1), cv2.DIST_L2, cv2.DIST_MASK_PRECISE
+    )[1:-1, 1:-1]
+    angle = (
+        np.degrees(
+            np.arctan2(
+                (yy - center_y) / radius_y,
+                (xx - center_x) / radius_x,
+            )
+        )
+        + 360
+    ) % 360
+    sectors: list[dict[str, Any]] = []
+    for contour, contour_mask in (
+        ("outer", ring & (outer_distance <= inner_distance)),
+        ("inner", ring & (inner_distance < outer_distance)),
+    ):
+        for start_angle in range(0, 360, DONUT_SHADOW_SECTOR_DEGREES):
+            mask = (
+                contour_mask
+                & (angle >= start_angle)
+                & (angle < start_angle + DONUT_SHADOW_SECTOR_DEGREES)
+            )
+            pixel_count = int(np.count_nonzero(mask))
+            if pixel_count < 20:
+                continue
+            reference_shadow = float(np.mean(np.maximum(-reference_delta[mask], 0.0)))
+            if reference_shadow < MIN_DONUT_SECTOR_REFERENCE_SHADOW:
+                continue
+            candidate_shadow = float(np.mean(np.maximum(-candidate_delta[mask], 0.0)))
+            sectors.append(
+                {
+                    "contour": contour,
+                    "startAngle": start_angle,
+                    "endAngle": start_angle + DONUT_SHADOW_SECTOR_DEGREES,
+                    "pixelCount": pixel_count,
+                    "referenceShadowEnergy": reference_shadow,
+                    "candidateShadowEnergy": candidate_shadow,
+                    "overshootRatio": candidate_shadow / reference_shadow,
+                }
+            )
+    return {
+        "shadowSectorOvershootRatio": max(
+            (sector["overshootRatio"] for sector in sectors), default=1.0
+        ),
+        "shadowSectors": sectors,
+    }
+
+
 def compute_bevel_ring_metrics(
     reference: np.ndarray,
     candidate: np.ndarray,
@@ -419,6 +499,9 @@ def compute_bevel_ring_metrics(
     ),
     solid_donut_shadow_local_excess_ratio_threshold: float = (
         SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD
+    ),
+    solid_donut_shadow_sector_overshoot_ratio_threshold: float = (
+        SOLID_DONUT_SHADOW_SECTOR_OVERSHOOT_RATIO_THRESHOLD
     ),
 ) -> dict[str, Any]:
     reference, candidate = _common_images(reference, candidate)
@@ -459,6 +542,9 @@ def compute_bevel_ring_metrics(
                 "solidDonutShadowLocalExcessRatio": (
                     solid_donut_shadow_local_excess_ratio_threshold
                 ),
+                "solidDonutShadowSectorOvershootRatio": (
+                    solid_donut_shadow_sector_overshoot_ratio_threshold
+                ),
             },
         }
     unsupported_reason = None
@@ -491,6 +577,9 @@ def compute_bevel_ring_metrics(
                 "solidDonutShadowLocalExcessRatio": (
                     solid_donut_shadow_local_excess_ratio_threshold
                 ),
+                "solidDonutShadowSectorOvershootRatio": (
+                    solid_donut_shadow_sector_overshoot_ratio_threshold
+                ),
             },
         }
     padded = np.pad(geometry.astype(np.uint8), 1)
@@ -504,7 +593,10 @@ def compute_bevel_ring_metrics(
     candidate_luma = cv2.GaussianBlur(_luminance(candidate_crop), (0, 0), sigma)
     reference_delta = reference_luma - float(np.median(reference_luma[core]))
     candidate_delta = candidate_luma - float(np.median(candidate_luma[core]))
-    overall = _field_score(reference_delta, candidate_delta, ring)
+    overall = {
+        **_field_score(reference_delta, candidate_delta, ring),
+        **_donut_shadow_sector_metrics(reference_delta, candidate_delta, ring, region),
+    }
 
     corner_required = region.preset == "roundRect" and region.corner_radius_ratio > 0
     corner_mask = ring
@@ -539,6 +631,11 @@ def compute_bevel_ring_metrics(
         if region.surface == "shape" and region.preset == "donut"
         else math.inf
     )
+    shadow_sector_overshoot_threshold = (
+        solid_donut_shadow_sector_overshoot_ratio_threshold
+        if region.surface == "shape" and region.preset == "donut"
+        else math.inf
+    )
     passed = (
         overall["score"] >= score_threshold
         and overall["rangeRatio"] >= range_ratio_threshold
@@ -547,6 +644,7 @@ def compute_bevel_ring_metrics(
         and overall["shadowOvershootRatio"] <= shadow_overshoot_threshold
         and overall["shadowEnergyOvershootRatio"] <= shadow_energy_overshoot_threshold
         and overall["shadowLocalExcessRatio"] <= shadow_local_excess_threshold
+        and overall["shadowSectorOvershootRatio"] <= shadow_sector_overshoot_threshold
         and (not corner_required or corner["score"] >= corner_score_threshold)
     )
     return {
@@ -573,6 +671,9 @@ def compute_bevel_ring_metrics(
             ),
             "solidDonutShadowLocalExcessRatio": (
                 solid_donut_shadow_local_excess_ratio_threshold
+            ),
+            "solidDonutShadowSectorOvershootRatio": (
+                solid_donut_shadow_sector_overshoot_ratio_threshold
             ),
         },
         "passed": passed,
@@ -764,7 +865,7 @@ def build_bevel_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 7,
+        "schemaVersion": 8,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "score": SCORE_THRESHOLD,
@@ -782,6 +883,9 @@ def build_bevel_report(
             ),
             "solidDonutShadowLocalExcessRatio": (
                 SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD
+            ),
+            "solidDonutShadowSectorOvershootRatio": (
+                SOLID_DONUT_SHADOW_SECTOR_OVERSHOOT_RATIO_THRESHOLD
             ),
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),

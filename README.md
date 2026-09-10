@@ -647,9 +647,14 @@ interpolate a native-backed broad shadow floor and a compressed directional shad
 tall, square, and wide matrices. The intermediate 3×3 native matrix verifies the interpolation
 between and beyond those profile anchors. This better matches PowerPoint's three-point material rim
 without moving the key highlight. `roundRect` retains its independently measured response.
+The native-backed grouped donut row evaluates its circular lighting texture in the child OOXML
+coordinate space and then applies the parent group's non-identity stretch, keeping the stretched
+ring from recomputing a wider, darker lobe. This behavior remains scoped to grouped donuts; the
+grouped rect and ellipse matrices retain their separately verified screen-space response.
 The native 6 pt square-rectangle row and the 10 pt tall-rectangle row also have bounded shadow
 anchors. The bevel-local gate checks peak amplitude, aggregate energy, and non-cancelling per-pixel
-local shadow excess, so an over-dark sector cannot be hidden by an under-dark sector elsewhere.
+local shadow excess. It also checks every salient 30° inner/outer donut contour sector against a
+`1.60` candidate/native ceiling, so an over-dark lobe cannot be hidden by an under-dark sector elsewhere.
 A six-slide matrix pairs each omitted/default encoding with an explicit equivalent, and the local
 gate requires both PowerPoint and renderer raster pairs to remain byte-identical.
 

@@ -11,6 +11,7 @@ from PIL import Image
 
 from scripts.shape3d_bevel_metrics import (
     BevelRegion,
+    _donut_shadow_sector_metrics,
     _field_score,
     build_bevel_report,
     compute_bevel_ring_metrics,
@@ -35,6 +36,50 @@ def test_shadow_local_excess_detects_spatial_overdarkening_hidden_by_equal_total
     assert result["shadowOvershootRatio"] == pytest.approx(1.0)
     assert result["shadowEnergyOvershootRatio"] == pytest.approx(1.0)
     assert result["shadowLocalExcessRatio"] > 0.30
+
+
+def test_donut_shadow_sectors_detect_a_local_lobe_hidden_by_equal_total_energy():
+    size = 120
+    region = BevelRegion(
+        slide_index=0,
+        x=0,
+        y=0,
+        width=1,
+        height=1,
+        bevel_width_x=0.1,
+        bevel_width_y=0.1,
+        preset="donut",
+        geometry_adjustment=0.25,
+        geometry_inset_x_ratio=0.25,
+        geometry_inset_y_ratio=0.25,
+    )
+    yy, xx = np.mgrid[:size, :size]
+    center = (size - 1) / 2
+    outer = ((xx - center) / (size / 2)) ** 2 + ((yy - center) / (size / 2)) ** 2 <= 1
+    inner = ((xx - center) / (size / 4)) ** 2 + ((yy - center) / (size / 4)) ** 2 < 1
+    ring = outer & ~inner
+    angle = (np.degrees(np.arctan2(yy - center, xx - center)) + 360) % 360
+    lobe = ring & (angle >= 60) & (angle < 90)
+    reference_delta = np.zeros((size, size), dtype=np.float32)
+    candidate_delta = np.zeros((size, size), dtype=np.float32)
+    reference_delta[ring] = -10
+    other_count = np.count_nonzero(ring & ~lobe)
+    balanced_shadow = (
+        10 * np.count_nonzero(ring) - 18 * np.count_nonzero(lobe)
+    ) / other_count
+    candidate_delta[ring] = -balanced_shadow
+    candidate_delta[lobe] = -18
+
+    result = _donut_shadow_sector_metrics(reference_delta, candidate_delta, ring, region)
+
+    assert np.mean(np.maximum(-candidate_delta[ring], 0)) == pytest.approx(10)
+    assert result["shadowSectorOvershootRatio"] == pytest.approx(1.8)
+    assert any(
+        sector["contour"] == "outer"
+        and sector["startAngle"] == 60
+        and sector["overshootRatio"] == pytest.approx(1.8)
+        for sector in result["shadowSectors"]
+    )
 
 
 def _rounded_mask(height: int, width: int, bounds: tuple[int, int, int, int], radius: int):
@@ -319,6 +364,7 @@ def test_bevel_ring_reports_resolution_limited_instead_of_guessing():
                 "solidDonutShadowOvershootRatio": 1.01,
                 "solidDonutShadowEnergyOvershootRatio": 1.05,
                 "solidDonutShadowLocalExcessRatio": 0.30,
+                "solidDonutShadowSectorOvershootRatio": 1.60,
         },
     }
 
@@ -663,7 +709,7 @@ def test_bevel_report_enforces_declared_implicit_explicit_slide_equivalence(tmp_
 
     matched = build_bevel_report([native_path], repo, reports_dir)
 
-    assert matched["schemaVersion"] == 7
+    assert matched["schemaVersion"] == 8
     assert matched["caseResults"][0]["equivalencePairs"] == [
         {
             "leftSlideIdx": 0,

@@ -581,6 +581,24 @@ describe('renderGroup — wrapper element', () => {
     expect(observedDepth).toBe(1);
   });
 
+  it('reports the child coordinate scale after a non-identity group transform', () => {
+    const group = makeGroup([makeSpXml()], {
+      w: 160,
+      h: 280,
+      childExtentW: 200,
+      childExtentH: 200,
+    });
+    let observedScale: RenderContext['groupChildScale'];
+
+    renderGroup(group, createMockRenderContext(), (_childNode, childCtx) => {
+      observedScale = childCtx.groupChildScale;
+      return document.createElement('div');
+    });
+
+    expect(observedScale?.x).toBeCloseTo(0.8, 8);
+    expect(observedScale?.y).toBeCloseTo(1.4, 8);
+  });
+
   it('returns an absolutely positioned div with correct position and size', () => {
     const group = makeGroup([], { x: 50, y: 30, w: 300, h: 150 });
     const el = renderGroup(group, createMockRenderContext(), (childNode, childCtx) =>

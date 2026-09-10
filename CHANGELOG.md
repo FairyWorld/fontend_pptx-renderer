@@ -26,16 +26,20 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
   omitted/explicit default top-bevel dimensions. A nine-slide donut matrix independently crosses
   intermediate `0.75|1.25|2.0` aspects with `10000|default25000|40000` adjustments.
-- Added a schema-v7 bevel-ring fidelity metric and derived capability gate with independent dynamic
+- Added a schema-v8 bevel-ring fidelity metric and derived capability gate with independent dynamic
   range and shadow-amplitude floors, a `1.05` general directional shadow-overshoot ceiling, a
   native-backed `1.01` peak ceiling and `1.05` aggregate shadow-energy ceiling for solid donut
-  faces, a `0.30` non-cancelling local-shadow-excess ceiling, plus material-specific solid/picture
+  faces, a `0.30` non-cancelling local-shadow-excess ceiling, and a `1.60` ceiling for every
+  salient 30° donut contour sector, plus material-specific solid/picture
   highlight floors, alongside
   exact native/renderer slide-equivalence assertions for alternate OOXML encodings and an opt-in
   ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, effect-bearing,
   and bottom-bevel inputs. The eleven-slide bottom-bevel case isolates implicit/explicit `relaxedInset`
   dimensions, material and light rotation, live CJK text, transparency, neighboring presets, and
   square/wide/tall geometry, including an exact transparent 3D/flat inverse control.
+- Grouped donuts now rasterize their circular bevel lighting in the child OOXML coordinate space
+  before the non-identity group stretch. This removes the concentrated dark lobe seen on the tall
+  adjustment row while leaving the independently verified grouped rect and ellipse paths unchanged.
 - Added a schema-v5 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,

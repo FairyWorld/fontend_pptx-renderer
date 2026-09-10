@@ -245,6 +245,7 @@ export function renderGroup(
     try {
       const childNode = parseByIndex(index);
       if (!childNode) continue;
+      const originalSize = childNode.size;
 
       // Remap child coordinates from child space to group space
       if (chExt.w > 0 || chExt.h > 0) {
@@ -252,7 +253,6 @@ export function renderGroup(
         const scaleY = chExt.h > 0 ? groupH / chExt.h : 1;
         const swapsAxes = rotationSwapsAxes(childNode.rotation);
         const originalPosition = childNode.position;
-        const originalSize = childNode.size;
         if (swapsAxes) {
           const rotatedBBoxX = originalPosition.x + (originalSize.w - originalSize.h) / 2;
           const rotatedBBoxY = originalPosition.y + (originalSize.h - originalSize.w) / 2;
@@ -317,7 +317,11 @@ export function renderGroup(
         }
       }
 
-      const el = renderNode(childNode, childCtx);
+      const groupChildScale = {
+        x: originalSize.w > 0 ? childNode.size.w / originalSize.w : 1,
+        y: originalSize.h > 0 ? childNode.size.h / originalSize.h : 1,
+      };
+      const el = renderNode(childNode, { ...childCtx, groupChildScale });
       wrapper.appendChild(el);
     } catch {
       // Per-child error handling — create error placeholder

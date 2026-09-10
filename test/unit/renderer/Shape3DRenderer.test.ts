@@ -156,7 +156,7 @@ describe('buildStaticShape3DPlan', () => {
   it('uses the native-backed weaker shadow response for wide non-rounded surfaces', () => {
     expect(solidBevelShadowStrength(500, 200, 'rect', 40 / 3)).toBeCloseTo(0.415, 5);
     expect(solidBevelShadowStrength(500, 200, 'ellipse', 40 / 3)).toBeCloseTo(0.415, 5);
-    expect(solidBevelShadowStrength(500, 200, 'donut', 40 / 3)).toBeCloseTo(0.37, 5);
+    expect(solidBevelShadowStrength(500, 200, 'donut', 40 / 3)).toBeCloseTo(0.382, 5);
     expect(solidBevelShadowStrength(500, 200, 'roundrect', 8)).toBeCloseTo(0.45, 5);
   });
 
@@ -1125,12 +1125,12 @@ describe('buildStaticShape3DPlan', () => {
   });
 
   it.each([
-    [110, 200, 0, 0.9],
-    [200, 200, 0.6, 0.25],
-    [500, 200, 0.7, 0.4],
+    [110, 200, 285, undefined, 0, 0.9],
+    [200, 200, 285, undefined, 0.6, 0.25],
+    [500, 200, 300, 1.02, 0.7, 0.4],
   ])(
     'uses the native-backed broad donut shadow profile at %sx%s',
-    (width, height, shadowFloor, shadowScale) => {
+    (width, height, shadowAzimuth, highlightScale, shadowFloor, shadowScale) => {
       const plan = buildStaticShape3DPlan(
         parseShape3D(supportedScene, supportedShape),
         {
@@ -1146,10 +1146,65 @@ describe('buildStaticShape3DPlan', () => {
 
       expect(plan).toMatchObject({
         mode: 'orthographic-top-bevel',
-        light: { shadowFloor, shadowScale },
+        light: { shadowAzimuth, highlightScale, shadowFloor, shadowScale },
       });
     },
   );
+
+  it('keeps the native-backed split shadow bearing for a grouped stretched donut', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'donut',
+        width: 114,
+        height: 200,
+        sourceBounds: { width: 200, height: 200 },
+        paintKind: 'solid',
+        baseFill: '#70AD47',
+        container: 'group',
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'orthographic-top-bevel',
+      lightingBounds: { width: 200, height: 200 },
+      light: {
+        azimuth: 330,
+        shadowAzimuth: 258,
+        shadowFloor: 0.5,
+        shadowMaterialScale: 1.05,
+        shadowScale: 0.35,
+      },
+    });
+    expect(plan.light.shadowDirectionMix).toBeUndefined();
+  });
+
+  it('does not select child-coordinate calibration when grouped donut source bounds are invalid', () => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'donut',
+        width: 114,
+        height: 200,
+        sourceBounds: { width: 0, height: 200 },
+        paintKind: 'solid',
+        baseFill: '#70AD47',
+        container: 'group',
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'orthographic-top-bevel',
+      lightingBounds: { width: 114, height: 200 },
+      light: { shadowAzimuth: 285 },
+    });
+    expect(plan.light.shadowFloor).not.toBe(0.5);
+    expect(plan.light.shadowMaterialScale).toBeUndefined();
+  });
 
   it('keeps rounded pictures outside the bounded geometry cohort', () => {
     const plan = buildStaticShape3DPlan(
@@ -1224,6 +1279,47 @@ describe('buildStaticShape3DPlan', () => {
 });
 
 describe('appendStaticShape3DEffects', () => {
+  it('rasterizes grouped bevel lighting in child coordinates before stretching the texture', async () => {
+    const mocks = installShape3DRasterMocks();
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const defs = document.createElementNS(ns, 'defs');
+    svg.appendChild(defs);
+    const ctx = createMockRenderContext({ asyncTasks: [] });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(supportedScene, supportedShape),
+      {
+        nodeType: 'shape',
+        presetGeometry: 'donut',
+        width: 114,
+        height: 200,
+        sourceBounds: { width: 200, height: 200 },
+        paintKind: 'solid',
+        baseFill: '#70AD47',
+        container: 'group',
+      },
+      ctx,
+    );
+
+    const result = appendStaticShape3DEffects({
+      svg,
+      defs,
+      pathD: 'M0,0 H114 V200 H0 Z',
+      bounds: { width: 114, height: 200 },
+      plan,
+      ctx,
+    });
+
+    mocks.complete(new Blob([new Uint8Array([1])], { type: 'image/png' }));
+    await Promise.all(ctx.asyncTasks!);
+
+    expect(mocks.maskContext.getImageData).toHaveBeenCalledWith(0, 0, 400, 400);
+    expect(mocks.maskContext.setTransform).toHaveBeenCalledWith(400 / 114, 0, 0, 2, 0, 0);
+    const lighting = result?.group.querySelector('[data-pptx-shape3d-lighting]');
+    expect(lighting?.getAttribute('width')).toBe('114');
+    expect(lighting?.getAttribute('height')).toBe('200');
+  });
+
   it('replaces the flat path with a projected plane and native-backed material gradient', () => {
     const ns = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(ns, 'svg');

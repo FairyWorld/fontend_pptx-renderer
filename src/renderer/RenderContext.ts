@@ -40,6 +40,8 @@ export interface RenderContext {
   /** Template provenance and group depth keep narrowly verified renderer lanes from overclaiming. */
   nodeOrigin?: 'slide' | 'layout' | 'master';
   groupDepth?: number;
+  /** Scale from the current group child's OOXML coordinate space into rendered slide pixels. */
+  groupChildScale?: { x: number; y: number };
   /** Connected root used for hidden text measurement while slide nodes are still detached. */
   measurementRoot?: HTMLElement;
   /** Template rendering skips placeholder descendants inside groups as well as top-level shapes. */

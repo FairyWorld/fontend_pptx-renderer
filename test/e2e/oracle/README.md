@@ -269,13 +269,15 @@ After evaluating top-bevel cases 0001-0012 and 0017-0018, run `../scripts/shape3
 rect, roundRect, ellipse, and donut masks before comparing the native and HTML luminance fields only
 inside the bevel ring. Unknown silhouettes and rotations fail as unevaluable instead of borrowing a
 rectangular mask. It requires a general score of `0.60` and applies an additional `0.78` corner score
-to `roundRect`. Schema v7 additionally requires dynamic-range ratio `0.85`, shadow-amplitude ratio
+to `roundRect`. Schema v8 additionally requires dynamic-range ratio `0.85`, shadow-amplitude ratio
 `0.85`, a directional candidate/native shadow ceiling of `1.05`, a tighter `1.01` ceiling for solid
 donut peak amplitude, a `1.05` ceiling for solid-donut mean negative shadow energy, a `0.30` ceiling
-for its non-cancelling per-pixel local shadow excess relative to native mean shadow energy, solid-shape
-highlight-amplitude ratio `0.80`, and the separately verified picture-
-highlight ratio `0.70`. The local excess ceiling catches an over-dark sector even when a lighter
-sector keeps total energy and the composite correlation score high. Zero-thickness
+for its non-cancelling per-pixel local shadow excess relative to native mean shadow energy, and a
+`1.60` ceiling for candidate/native shadow energy in every salient 30° inner/outer contour sector
+whose native mean shadow is at least 3 luma. Solid-shape highlight-amplitude ratio remains `0.80`,
+with a separately verified `0.70` floor for pictures. The local and sector ceilings catch an
+over-dark lobe even when a lighter sector keeps total energy and the composite correlation score
+high. Zero-thickness
 donuts remain covered by the full-slide gate; bands below four pixels are reported as
 resolution-limited and remain subject to full-slide and manual checks. Pass the resulting JSON to
 `run_capability_loop.py verify --bevel-report ...`; both commands verify the API and on-disk raster
@@ -285,6 +287,9 @@ and tall ellipse. The gate requires byte-identical native references and byte-id
 candidates for each omitted/explicit pair before the case can pass.
 Case 0018 must retain all nine aspect/adjustment cross-product rows; it validates the donut shadow
 profile between existing native anchors without adding theme, group, or camera variables.
+For the native-backed grouped donut in case 0012, the bevel field is rasterized in the child's OOXML
+coordinate space and then stretched with the group. This scope does not extend to grouped rectangles,
+ellipses, or arbitrary nested geometry without their own native matrix.
 
 After evaluating cases 0013 through 0016, run `../scripts/shape3d_camera_metrics.py` with all clean
 native reports. It binds the exact source, ground truth, revision, and per-slide raster hashes. Solid

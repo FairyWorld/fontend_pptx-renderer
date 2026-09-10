@@ -254,6 +254,23 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     group.style.top = '0';
     host.append(group);
 
+    const groupedDonutXml = `
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="21" name="3D donut group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="952500" cy="1905000"/><a:chOff x="0" y="0"/><a:chExt cx="1905000" cy="1905000"/></a:xfrm></p:grpSpPr>
+        ${shapeXml('donut', 200, 200, '70AD47')}
+      </p:grpSp>`;
+    const groupedDonut = renderGroup(
+      parseGroupNode(parseXml(groupedDonutXml)),
+      createMockRenderContext({ asyncTasks: shape3dTasks }),
+      (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
+    );
+    groupedDonut.style.position = 'relative';
+    groupedDonut.style.left = '0';
+    groupedDonut.style.top = '0';
+    host.append(groupedDonut);
+
     const png = Uint8Array.from(
       atob(
         'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z2S8AAAAASUVORK5CYII=',
@@ -315,6 +332,12 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     const groupLighting = group.querySelector(
       '[data-pptx-shape3d-lighting="distance-field"]',
     ) as SVGGraphicsElement;
+    const groupedDonutLighting = groupedDonut.querySelector(
+      '[data-pptx-shape3d-lighting="distance-field"]',
+    ) as SVGImageElement;
+    const groupedDonutTexture = new Image();
+    groupedDonutTexture.src = groupedDonutLighting.getAttribute('href')!;
+    await groupedDonutTexture.decode();
     const ellipseLighting = host.children[3].querySelector(
       '[data-pptx-shape3d-lighting="distance-field"]',
     ) as SVGGraphicsElement;
@@ -352,6 +375,14 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
         width: groupLighting.getBoundingClientRect().width,
         height: groupLighting.getBoundingClientRect().height,
       },
+      groupedDonutLightingBounds: {
+        width: groupedDonutLighting.getBoundingClientRect().width,
+        height: groupedDonutLighting.getBoundingClientRect().height,
+      },
+      groupedDonutTextureSize: {
+        width: groupedDonutTexture.naturalWidth,
+        height: groupedDonutTexture.naturalHeight,
+      },
       disposableHadBevel,
       disposableHadLighting,
       croppedPictureBounds,
@@ -361,8 +392,8 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
 
   expect(result).toEqual(
     expect.objectContaining({
-      bevelCount: 7,
-      lightingCount: 7,
+      bevelCount: 8,
+      lightingCount: 8,
       flatHasBevel: false,
       uniqueIds: true,
       noHorizontalGrowth: true,
@@ -378,6 +409,8 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
   expect(result.donutClipSubpaths).toBe(2);
   expect(result.donutClipFillRule).toBe('evenodd');
   expect(result.groupLightingBounds).toEqual({ width: 100, height: 50 });
+  expect(result.groupedDonutLightingBounds).toEqual({ width: 100, height: 200 });
+  expect(result.groupedDonutTextureSize).toEqual({ width: 400, height: 400 });
   expect(result.croppedPictureBounds).toEqual({
     x: expect.closeTo(-62.857, 2),
     y: expect.closeTo(-25.714, 2),
@@ -649,7 +682,8 @@ test('bottom-bevel front material stays bounded to opaque standalone slide shape
   const host = page.locator('#bottom-bevel-front-host');
   const first = await host.screenshot();
   await page.evaluate(
-    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
   );
   const second = await host.screenshot();
   expect(first.equals(second)).toBe(true);

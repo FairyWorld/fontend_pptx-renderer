@@ -7,10 +7,16 @@ interface CircleBevelLightingOptions {
   heightPx: number;
   /** Clockwise compass bearing: 0 is up and 90 is right. */
   lightAzimuthDeg: number;
+  /** Optional shadow-only bearing for multi-light rigs whose key highlight and dark lobe diverge. */
+  shadowAzimuthDeg?: number;
+  /** Mix from the key-light shadow (0) to the shadow-only bearing (1). */
+  shadowDirectionMix?: number;
   /** Optional edge-opacity floor used to approximate the broad shadow rim of a multi-light rig. */
   shadowFloor?: number;
   /** Optional multiplier that compresses the directional shadow lobe above the floor. */
   shadowScale?: number;
+  /** Optional key-light multiplier that leaves the independently modelled shadow unchanged. */
+  highlightScale?: number;
   /** Light elevation above the slide plane. */
   lightElevationDeg: number;
   /** Material-specific response strength applied to the signed Lambert delta. */
@@ -82,8 +88,20 @@ function assertLightingOptions(options: CircleBevelLightingOptions): void {
   ) {
     throw new RangeError('bandPx and heightPx must be positive finite numbers');
   }
-  if (!Number.isFinite(options.lightAzimuthDeg) || !Number.isFinite(options.lightElevationDeg)) {
+  if (
+    !Number.isFinite(options.lightAzimuthDeg) ||
+    (options.shadowAzimuthDeg !== undefined && !Number.isFinite(options.shadowAzimuthDeg)) ||
+    !Number.isFinite(options.lightElevationDeg)
+  ) {
     throw new RangeError('light angles must be finite numbers');
+  }
+  if (
+    options.shadowDirectionMix !== undefined &&
+    (!Number.isFinite(options.shadowDirectionMix) ||
+      options.shadowDirectionMix < 0 ||
+      options.shadowDirectionMix > 1)
+  ) {
+    throw new RangeError('shadow direction mix must be a finite normalized value');
   }
   if (!Number.isFinite(options.intensity) || options.intensity < 0) {
     throw new RangeError('intensity must be a non-negative finite number');
@@ -94,7 +112,13 @@ function assertLightingOptions(options: CircleBevelLightingOptions): void {
         options.shadowFloor < 0 ||
         options.shadowFloor > 0.72)) ||
     (options.shadowScale !== undefined &&
-      (!Number.isFinite(options.shadowScale) || options.shadowScale < 0 || options.shadowScale > 1))
+      (!Number.isFinite(options.shadowScale) ||
+        options.shadowScale < 0 ||
+        options.shadowScale > 1)) ||
+    (options.highlightScale !== undefined &&
+      (!Number.isFinite(options.highlightScale) ||
+        options.highlightScale < 0 ||
+        options.highlightScale > 2))
   ) {
     throw new RangeError('shadow floor and scale must be finite normalized values');
   }
@@ -125,6 +149,9 @@ export function renderCircleBevelOverlay(
   const lightX = Math.sin(azimuth) * horizontalLight;
   const lightY = -Math.cos(azimuth) * horizontalLight;
   const lightZ = Math.sin(elevation);
+  const shadowAzimuth = ((options.shadowAzimuthDeg ?? options.lightAzimuthDeg) * Math.PI) / 180;
+  const shadowLightX = Math.sin(shadowAzimuth) * horizontalLight;
+  const shadowLightY = -Math.cos(shadowAzimuth) * horizontalLight;
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
@@ -160,11 +187,21 @@ export function renderCircleBevelOverlay(
       normalZ /= normalLength;
 
       const bevelResponse = Math.max(0, normalX * lightX + normalY * lightY + normalZ * lightZ);
-      const lightingDelta = bevelResponse - Math.max(0, lightZ);
+      const highlightDelta = bevelResponse - Math.max(0, lightZ);
+      const shadowResponse = Math.max(
+        0,
+        normalX * shadowLightX + normalY * shadowLightY + normalZ * lightZ,
+      );
+      const shadowDelta = shadowResponse - Math.max(0, lightZ);
+      const coupledShadow = Math.max(-highlightDelta, 0);
+      const steeredShadow = Math.max(-shadowDelta, 0);
+      const shadowDirectionMix = options.shadowDirectionMix ?? 1;
+      const shadowMagnitude = coupledShadow + (steeredShadow - coupledShadow) * shadowDirectionMix;
+      const lightingDelta = highlightDelta > 0 ? highlightDelta : -shadowMagnitude;
       const directionalOpacity = Math.abs(lightingDelta) * options.intensity;
       const materialOpacity =
         lightingDelta > 0
-          ? directionalOpacity
+          ? directionalOpacity * (options.highlightScale ?? 1)
           : directionalOpacity * (options.shadowScale ?? 1) +
             (options.shadowFloor ?? 0) * remainingRadius;
       const opacity = Math.round(clamp(materialOpacity * coverage, 0, 0.72) * 255);

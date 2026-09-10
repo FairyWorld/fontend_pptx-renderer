@@ -518,12 +518,15 @@ Rules that have proven robust:
 If a line/connector looks too thick or “filled in”, inspect `isLineLike` handling in `ShapeRenderer.ts` before changing preset geometry.
 
 For static 3D bevels, do not rely on a symmetric amplitude ratio alone: the `0.85` floor still
-permits a candidate shadow to exceed native by about 17.6%. Schema-v7 bevel evidence also requires
+permits a candidate shadow to exceed native by about 17.6%. Schema-v8 bevel evidence also requires
 `candidateShadowAmplitude / referenceShadowAmplitude <= 1.05`, tightened to `1.01` for solid
 donuts. Solid donuts additionally require mean negative shadow-energy overshoot `<= 1.05` and
-non-cancelling local shadow excess `<= 0.30` of native mean shadow energy; keep all three checks when
-changing material, light-bearing, or aspect-response curves. Total shadow energy can stay equal
-while one sector becomes visibly too dark and another too light.
+non-cancelling local shadow excess `<= 0.30` of native mean shadow energy. Every salient 30°
+inner/outer donut contour sector, with native mean shadow at least 3 luma, must remain `<= 1.60`
+candidate/native shadow energy. Keep all four checks when changing material, light-bearing,
+coordinate space, or aspect-response curves. Total shadow energy can stay equal while one sector
+becomes visibly too dark and another too light. Group child-coordinate lighting is currently verified
+only for the grouped donut tuple; do not generalize it to other grouped shapes without native evidence.
 
 #### 4. Curved arrows and similar presets are layering problems as much as geometry problems
 

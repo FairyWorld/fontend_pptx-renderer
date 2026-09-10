@@ -252,7 +252,7 @@
         "bevelDefaultRows": ["rect:square:w+h+prst", "roundRect:wide:w", "ellipse:tall:h"],
         "bevelWidthSemantics": ["inward-face-extent"],
         "bevelHeightSemantics": ["lighting-contrast"],
-        "bevelShading": ["circle-cross-section", "continuous-perimeter-normals", "silhouette-interior-distance-field"],
+        "bevelShading": ["circle-cross-section", "continuous-perimeter-normals", "silhouette-interior-distance-field", "grouped-donut-child-coordinate-raster"],
         "backdrop": ["absent"],
         "camera": ["orthographicFront"],
         "cameraRotation": ["absent"],
@@ -260,7 +260,7 @@
         "contour": ["absent-or-zero", "positive-with-resolvable-color"],
         "donutInterpolationAspectRatios": [0.75, 1.25, 2.0],
         "donutInterpolationAdjustments": [10000, 25000, 40000],
-        "donutShadowGate": ["mean-negative-energy-overshoot-lte-1.05", "p05-amplitude-overshoot-lte-1.01", "local-excess-relative-to-native-mean-shadow-energy-lte-0.30"],
+        "donutShadowGate": ["mean-negative-energy-overshoot-lte-1.05", "p05-amplitude-overshoot-lte-1.01", "local-excess-relative-to-native-mean-shadow-energy-lte-0.30", "salient-30deg-sector-overshoot-lte-1.60"],
         "extrusionColor": ["absent"],
         "extrusionHeight": [0],
         "lightDirection": ["t"],
@@ -281,7 +281,7 @@
         "zPosition": [0]
       },
       "fallback": "Render the existing flat two-dimensional shape or picture when any camera, light, bevel, material, extrusion, effect, geometry, paint, or source-crop value falls outside this bounded tuple.",
-      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/export/serializePresentation.ts", "src/index.ts", "src/model/nodes/PicNode.ts", "src/model/nodes/Shape3D.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/ImageRenderer.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/shape3d/*.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_verification.py", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/scripts/shape3d_bevel_metrics.py", "test/e2e/server.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/e2e/test_shape3d_bevel_metrics.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/model/nodes/ShapeNode.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/shape3d/*.test.ts"],
+      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/export/serializePresentation.ts", "src/index.ts", "src/model/nodes/PicNode.ts", "src/model/nodes/Shape3D.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/GroupRenderer.ts", "src/renderer/ImageRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/shape3d/*.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_verification.py", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/scripts/shape3d_bevel_metrics.py", "test/e2e/server.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/e2e/test_shape3d_bevel_metrics.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/model/nodes/ShapeNode.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/shape3d/*.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "bevel-local", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
       "issueUrls": []
     },

@@ -27,6 +27,9 @@ BEVEL_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.05
 BEVEL_SOLID_DONUT_SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.01
 BEVEL_SOLID_DONUT_SHADOW_ENERGY_OVERSHOOT_RATIO_THRESHOLD = 1.05
 BEVEL_SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD = 0.30
+BEVEL_SOLID_DONUT_SHADOW_SECTOR_OVERSHOOT_RATIO_THRESHOLD = 1.60
+BEVEL_DONUT_SHADOW_SECTOR_DEGREES = 30
+BEVEL_MIN_DONUT_SECTOR_REFERENCE_SHADOW = 3.0
 BEVEL_MINIMUM_BAND_WIDTH_PX = 4.0
 CAMERA_CORNER_SCORE_THRESHOLD = 0.98
 CAMERA_COLOR_SCORE_THRESHOLD = 0.97
@@ -242,8 +245,8 @@ def _validate_bevel_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 7:
-        raise CapabilityVerificationError("bevel-local report requires schemaVersion=7")
+    if report.get("schemaVersion") != 8:
+        raise CapabilityVerificationError("bevel-local report requires schemaVersion=8")
     renderer = _mapping(report.get("renderer"), "bevel-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -266,6 +269,9 @@ def _validate_bevel_local(
         ),
         "solidDonutShadowLocalExcessRatio": (
             BEVEL_SOLID_DONUT_SHADOW_LOCAL_EXCESS_RATIO_THRESHOLD
+        ),
+        "solidDonutShadowSectorOvershootRatio": (
+            BEVEL_SOLID_DONUT_SHADOW_SECTOR_OVERSHOOT_RATIO_THRESHOLD
         ),
     }:
         raise CapabilityVerificationError("bevel-local report uses unexpected thresholds")
@@ -436,6 +442,94 @@ def _validate_bevel_local(
                         metrics.get("shadowLocalExcessRatio"),
                         f"{metric_context} shadow local excess ratio",
                     )
+                    shadow_sector_overshoot_ratio = _finite_metric(
+                        metrics.get("shadowSectorOvershootRatio"),
+                        f"{metric_context} shadow sector overshoot ratio",
+                    )
+                    shadow_sector_values = metrics.get("shadowSectors")
+                    if not isinstance(shadow_sector_values, list) or any(
+                        not isinstance(sector, Mapping) for sector in shadow_sector_values
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{metric_context} shadow sectors must be objects"
+                        )
+                    is_solid_donut = surface == "shape" and geometry.get("preset") == "donut"
+                    sector_ratios: list[float] = []
+                    seen_sectors: set[tuple[str, int]] = set()
+                    for sector_index, sector in enumerate(shadow_sector_values):
+                        sector_context = f"{metric_context} shadow sector {sector_index}"
+                        contour = sector.get("contour")
+                        start_angle = sector.get("startAngle")
+                        end_angle = sector.get("endAngle")
+                        pixel_count = sector.get("pixelCount")
+                        if contour not in {"outer", "inner"}:
+                            raise CapabilityVerificationError(
+                                f"{sector_context} contour is invalid"
+                            )
+                        if (
+                            not isinstance(start_angle, int)
+                            or isinstance(start_angle, bool)
+                            or start_angle < 0
+                            or start_angle >= 360
+                            or start_angle % BEVEL_DONUT_SHADOW_SECTOR_DEGREES != 0
+                            or end_angle != start_angle + BEVEL_DONUT_SHADOW_SECTOR_DEGREES
+                        ):
+                            raise CapabilityVerificationError(
+                                f"{sector_context} angles are invalid"
+                            )
+                        if (
+                            not isinstance(pixel_count, int)
+                            or isinstance(pixel_count, bool)
+                            or pixel_count < 20
+                        ):
+                            raise CapabilityVerificationError(
+                                f"{sector_context} pixel count is invalid"
+                            )
+                        sector_key = (contour, start_angle)
+                        if sector_key in seen_sectors:
+                            raise CapabilityVerificationError(
+                                f"{metric_context} shadow sectors are duplicated"
+                            )
+                        seen_sectors.add(sector_key)
+                        sector_reference = _finite_metric(
+                            sector.get("referenceShadowEnergy"),
+                            f"{sector_context} reference shadow energy",
+                        )
+                        sector_candidate = _finite_metric(
+                            sector.get("candidateShadowEnergy"),
+                            f"{sector_context} candidate shadow energy",
+                        )
+                        sector_ratio = _finite_metric(
+                            sector.get("overshootRatio"),
+                            f"{sector_context} overshoot ratio",
+                        )
+                        if (
+                            sector_reference < BEVEL_MIN_DONUT_SECTOR_REFERENCE_SHADOW
+                            or sector_candidate < 0
+                            or sector_ratio < 0
+                            or abs(sector_ratio - sector_candidate / sector_reference) > 1e-9
+                        ):
+                            raise CapabilityVerificationError(
+                                f"{sector_context} metrics are inconsistent"
+                            )
+                        sector_ratios.append(sector_ratio)
+                    if not is_solid_donut and (
+                        shadow_sector_values or abs(shadow_sector_overshoot_ratio - 1.0) > 1e-9
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{metric_context} has unexpected donut shadow sectors"
+                        )
+                    expected_sector_overshoot_ratio = max(sector_ratios, default=1.0)
+                    if (
+                        is_solid_donut
+                        and abs(
+                            shadow_sector_overshoot_ratio - expected_sector_overshoot_ratio
+                        )
+                        > 1e-9
+                    ):
+                        raise CapabilityVerificationError(
+                            f"{metric_context} shadow sector summary is inconsistent"
+                        )
                     if (
                         reference_range < 0
                         or candidate_range < 0
@@ -451,6 +545,7 @@ def _validate_bevel_local(
                         or shadow_overshoot_ratio < 0
                         or shadow_energy_overshoot_ratio < 0
                         or shadow_local_excess_ratio < 0
+                        or shadow_sector_overshoot_ratio < 0
                     ):
                         raise CapabilityVerificationError(
                             f"{metric_context} metrics are outside their domains"
@@ -515,6 +610,11 @@ def _validate_bevel_local(
                         if surface == "shape" and geometry.get("preset") == "donut"
                         else math.inf
                     )
+                    shadow_sector_overshoot_threshold = (
+                        BEVEL_SOLID_DONUT_SHADOW_SECTOR_OVERSHOOT_RATIO_THRESHOLD
+                        if is_solid_donut
+                        else math.inf
+                    )
                     expected_pass = (
                         score >= BEVEL_SCORE_THRESHOLD
                         and range_ratio >= BEVEL_RANGE_RATIO_THRESHOLD
@@ -529,6 +629,8 @@ def _validate_bevel_local(
                         and shadow_energy_overshoot_ratio
                         <= shadow_energy_overshoot_threshold
                         and shadow_local_excess_ratio <= shadow_local_excess_threshold
+                        and shadow_sector_overshoot_ratio
+                        <= shadow_sector_overshoot_threshold
                         and (
                             not corner_required
                             or corner_score >= BEVEL_CORNER_SCORE_THRESHOLD

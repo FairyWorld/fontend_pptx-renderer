@@ -120,6 +120,100 @@ describe('renderCircleBevelOverlay', () => {
     expect(sample(broadened, 150)).toBeLessThan(sample(coupled, 150));
   });
 
+  it('can steer a three-point shadow lobe independently from its key highlight', () => {
+    const size = 101;
+    const center = 50;
+    const alpha = diskMask(size, 40);
+    const coupled = renderCircleBevelOverlay(alpha, size, size, {
+      ...defaultOptions,
+      lightAzimuthDeg: 330,
+      shadowFloor: 0.6,
+      shadowScale: 0.25,
+    });
+    const split = renderCircleBevelOverlay(alpha, size, size, {
+      ...defaultOptions,
+      lightAzimuthDeg: 330,
+      shadowAzimuthDeg: 285,
+      shadowFloor: 0.6,
+      shadowScale: 0.25,
+    });
+    const sample = (rgba: Uint8ClampedArray, degrees: number) => {
+      const angle = (degrees * Math.PI) / 180;
+      const x = Math.round(center + Math.cos(angle) * 36);
+      const y = Math.round(center + Math.sin(angle) * 36);
+      return signedLighting(rgba, y * size + x);
+    };
+
+    expect(sample(split, 240)).toBe(sample(coupled, 240));
+    expect(sample(split, 15)).toBeLessThan(sample(split, 75));
+    expect(sample(coupled, 15)).toBeGreaterThan(sample(coupled, 75));
+  });
+
+  it('can partially steer a shadow without applying the full shifted lobe', () => {
+    const size = 101;
+    const center = 50;
+    const alpha = diskMask(size, 40);
+    const options = {
+      ...defaultOptions,
+      lightAzimuthDeg: 350,
+      shadowAzimuthDeg: 285,
+      shadowFloor: 0.03,
+      shadowScale: 0.87,
+    };
+    const coupled = renderCircleBevelOverlay(alpha, size, size, {
+      ...options,
+      shadowDirectionMix: 0,
+    });
+    const partial = renderCircleBevelOverlay(alpha, size, size, {
+      ...options,
+      shadowDirectionMix: 0.5,
+    });
+    const split = renderCircleBevelOverlay(alpha, size, size, {
+      ...options,
+      shadowDirectionMix: 1,
+    });
+    const sample = (rgba: Uint8ClampedArray, degrees: number) => {
+      const angle = (degrees * Math.PI) / 180;
+      const x = Math.round(center + Math.cos(angle) * 36);
+      const y = Math.round(center + Math.sin(angle) * 36);
+      return signedLighting(rgba, y * size + x);
+    };
+
+    expect(sample(partial, 15)).toBeLessThan(sample(coupled, 15));
+    expect(sample(partial, 15)).toBeGreaterThan(sample(split, 15));
+    expect(sample(partial, 260)).toBe(sample(coupled, 260));
+  });
+
+  it('can lift the key highlight without deepening the shadow lobe', () => {
+    const size = 101;
+    const center = 50;
+    const alpha = diskMask(size, 40);
+    const base = renderCircleBevelOverlay(alpha, size, size, {
+      ...defaultOptions,
+      lightAzimuthDeg: 330,
+      shadowAzimuthDeg: 300,
+      shadowFloor: 0.7,
+      shadowScale: 0.4,
+    });
+    const lifted = renderCircleBevelOverlay(alpha, size, size, {
+      ...defaultOptions,
+      lightAzimuthDeg: 330,
+      shadowAzimuthDeg: 300,
+      shadowFloor: 0.7,
+      shadowScale: 0.4,
+      highlightScale: 1.2,
+    });
+    const sample = (rgba: Uint8ClampedArray, degrees: number) => {
+      const angle = (degrees * Math.PI) / 180;
+      const x = Math.round(center + Math.cos(angle) * 36);
+      const y = Math.round(center + Math.sin(angle) * 36);
+      return signedLighting(rgba, y * size + x);
+    };
+
+    expect(sample(lifted, 240)).toBeGreaterThan(sample(base, 240));
+    expect(sample(lifted, 30)).toBe(sample(base, 30));
+  });
+
   it('uses bevel width for band extent and bevel height for lighting contrast', () => {
     const width = 51;
     const height = 31;
@@ -185,6 +279,12 @@ describe('renderCircleBevelOverlay', () => {
         intensity: Number.NaN,
       }),
     ).toThrow(/intensity must be a non-negative finite number/);
+    expect(() =>
+      renderCircleBevelOverlay(filledRect(2, 2), 2, 2, {
+        ...defaultOptions,
+        shadowDirectionMix: 1.1,
+      }),
+    ).toThrow(/shadow direction mix must be a finite normalized value/);
   });
 });
 

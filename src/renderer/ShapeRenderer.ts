@@ -2554,6 +2554,15 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       const shape3dAutofit = (['spAutoFit', 'normAutofit', 'noAutofit'] as const).find((mode) =>
         ownShape3dBodyPr?.child(mode).exists(),
       );
+      const groupChildScale = ctx.groupChildScale;
+      const hasNonIdentityGroupScale = Boolean(
+        groupChildScale &&
+        Number.isFinite(groupChildScale.x) &&
+        Number.isFinite(groupChildScale.y) &&
+        groupChildScale.x > 0 &&
+        groupChildScale.y > 0 &&
+        (Math.abs(groupChildScale.x - 1) > 1e-6 || Math.abs(groupChildScale.y - 1) > 1e-6),
+      );
       shape3dPlan = buildStaticShape3DPlan(
         node.shape3d,
         {
@@ -2561,6 +2570,12 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           presetGeometry: node.presetGeometry,
           width: svgW,
           height: svgH,
+          sourceBounds: hasNonIdentityGroupScale
+            ? {
+                width: svgW / groupChildScale!.x,
+                height: svgH / groupChildScale!.y,
+              }
+            : undefined,
           isLineLike,
           paintKind: shape3dPaintKind,
           baseFill: /^#[0-9a-f]{6}$/i.test(fillCss) ? fillCss : undefined,

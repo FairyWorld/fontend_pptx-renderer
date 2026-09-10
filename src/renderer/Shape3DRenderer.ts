@@ -84,6 +84,8 @@ interface StaticShape3DTarget {
   presetGeometry?: string;
   width: number;
   height: number;
+  /** Bounds before a parent group maps the child coordinate system into slide space. */
+  sourceBounds?: { width: number; height: number };
   isLineLike?: boolean;
   hasVisibleText?: boolean;
   /** Provenance of the rendered node; bounded lanes may require a standalone slide shape. */
@@ -130,6 +132,8 @@ export interface StaticShape3DSupportedPlan {
   geometry: StaticShape3DGeometry;
   faceColor?: string;
   bounds: { width: number; height: number };
+  /** Coordinate space where the child bevel and lighting are evaluated before group stretching. */
+  lightingBounds: { width: number; height: number };
   bevel: {
     preset: 'circle';
     width: number;
@@ -145,8 +149,12 @@ export interface StaticShape3DSupportedPlan {
     direction: 't';
     rotation?: Shape3DRotation;
     azimuth: number;
+    shadowAzimuth?: number;
+    shadowDirectionMix?: number;
+    highlightScale?: number;
     shadowFloor?: number;
     shadowScale?: number;
+    shadowMaterialScale?: number;
     elevation: number;
     intensity: number;
   };
@@ -269,7 +277,7 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
-const SHAPE3D_LIGHTING_VERSION = 'distance-field-v7';
+const SHAPE3D_LIGHTING_VERSION = 'distance-field-v8';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
@@ -302,7 +310,20 @@ const DONUT_BEVEL_SHADOW_PROFILE_ANCHORS = [
   { aspect: 1.6, floor: 0.7, scale: 0.4 },
 ] as const;
 
-function solidDonutShadowProfile(width: number, height: number): { floor: number; scale: number } {
+// The tall grouped row in oracle-pypptx-shape3d-0012 starts as a square child and is stretched by
+// its parent group. Native PowerPoint preserves the child's circular light field through that
+// transform. These values are intentionally isolated from standalone and other grouped geometries.
+const GROUPED_DONUT_SHADOW_PROFILE = {
+  azimuth: 258,
+  floor: 0.5,
+  scale: 0.35,
+  materialScale: 1.05,
+} as const;
+
+function solidDonutShadowProfile(
+  width: number,
+  height: number,
+): { floor: number; scale: number; highlightScale?: number } {
   const aspect = width / height;
   let lower: (typeof DONUT_BEVEL_SHADOW_PROFILE_ANCHORS)[number] =
     DONUT_BEVEL_SHADOW_PROFILE_ANCHORS[0];
@@ -324,6 +345,7 @@ function solidDonutShadowProfile(width: number, height: number): { floor: number
   return {
     floor: lower.floor + (upper.floor - lower.floor) * ratio,
     scale: lower.scale + (upper.scale - lower.scale) * ratio,
+    highlightScale: aspect > 1.6 ? 1.02 : undefined,
   };
 }
 
@@ -353,12 +375,13 @@ export function solidBevelShadowStrength(
   let aspectStrength = lower.strength + (upper.strength - lower.strength) * ratio;
 
   // The 10 pt native matrices for wide non-rounded surfaces need a weaker dark-face response at
-  // 2.5:1 and above. The donut endpoint is lower because its two contours produced native-matched
-  // peak darkness but 1.108x aggregate shadow energy at the shared 0.415 response. Rounded
-  // rectangles retain the earlier response: their corners contribute less to the measured band.
+  // 2.5:1 and above. The donut endpoint remains lower than the shared surface response, while the
+  // split three-point shadow bearing needs a little more peak contrast after removing the broad,
+  // misplaced dark sector. Rounded rectangles retain the earlier response: their corners
+  // contribute less to the measured band.
   if (geometry !== 'roundrect' && aspect > 1.6) {
     const wideWeight = clamp((aspect - 1.6) / (2.5 - 1.6), 0, 1);
-    const wideStrength = geometry === 'donut' ? 0.37 : 0.415;
+    const wideStrength = geometry === 'donut' ? 0.382 : 0.415;
     aspectStrength += (wideStrength - aspectStrength) * wideWeight;
   }
   if (geometry === 'rect' && aspect < 0.55) {
@@ -885,6 +908,20 @@ export function buildStaticShape3DPlan(
   ) {
     return flat('invalid-bounds');
   }
+  const candidateSourceLightingBounds =
+    target.container === 'group' && target.presetGeometry?.toLowerCase() === 'donut'
+      ? target.sourceBounds
+      : undefined;
+  const usesGroupedDonutChildSpace = Boolean(
+    candidateSourceLightingBounds &&
+    Number.isFinite(candidateSourceLightingBounds.width) &&
+    Number.isFinite(candidateSourceLightingBounds.height) &&
+    candidateSourceLightingBounds.width > 0 &&
+    candidateSourceLightingBounds.height > 0,
+  );
+  const lightingBounds = usesGroupedDonutChildSpace
+    ? candidateSourceLightingBounds!
+    : { width: target.width, height: target.height };
   if (target.isLineLike) return flat('line-like');
   if (target.isTiledPicture) return flat('tiled-picture');
   if (target.nodeType === 'picture' && !hasSupportedPictureSourceCrop(target.sourceCrop)) {
@@ -948,8 +985,8 @@ export function buildStaticShape3DPlan(
     return flat('contour-paint');
   }
 
-  const width = Math.min(bevel.width!, target.width / 2);
-  const height = Math.min(bevel.height!, target.height / 2);
+  const width = Math.min(bevel.width!, lightingBounds.width / 2);
+  const height = Math.min(bevel.height!, lightingBounds.height / 2);
   if (!(width > 0) || !(height > 0)) return flat('invalid-bounds');
 
   const rig = scene.lightRig;
@@ -961,15 +998,26 @@ export function buildStaticShape3DPlan(
   const rotatedPictureSentinel = rig === 'twoPt' && rotation?.revolution === 120;
   const azimuth =
     rig === 'threePt'
-      ? solidBevelLightAzimuth(target.width, target.height, preset as StaticShape3DGeometry)
+      ? solidBevelLightAzimuth(
+          lightingBounds.width,
+          lightingBounds.height,
+          preset as StaticShape3DGeometry,
+        )
       : rotatedPictureSentinel
         ? 285
         : 225;
   const elevation = rig === 'threePt' ? 50 : rotatedPictureSentinel ? 45 : 60;
   const donutShadowProfile =
     rig === 'threePt' && preset === 'donut'
-      ? solidDonutShadowProfile(target.width, target.height)
+      ? solidDonutShadowProfile(lightingBounds.width, lightingBounds.height)
       : undefined;
+  const donutShadowAzimuth = donutShadowProfile
+    ? usesGroupedDonutChildSpace
+      ? GROUPED_DONUT_SHADOW_PROFILE.azimuth
+      : lightingBounds.width / lightingBounds.height > 1.6
+        ? 300
+        : 285
+    : undefined;
 
   return {
     mode: 'orthographic-top-bevel',
@@ -980,6 +1028,7 @@ export function buildStaticShape3DPlan(
         ? applySatMod(applyLumOff(target.baseFill, 3500), 102000)
         : undefined,
     bounds: { width: target.width, height: target.height },
+    lightingBounds,
     bevel: { preset: 'circle', width, height },
     contour,
     light: {
@@ -987,8 +1036,18 @@ export function buildStaticShape3DPlan(
       direction: 't',
       rotation,
       azimuth,
-      shadowFloor: donutShadowProfile?.floor,
-      shadowScale: donutShadowProfile?.scale,
+      shadowAzimuth: donutShadowAzimuth,
+      highlightScale: donutShadowProfile?.highlightScale,
+      shadowFloor: usesGroupedDonutChildSpace
+        ? GROUPED_DONUT_SHADOW_PROFILE.floor
+        : donutShadowProfile?.floor,
+      shadowScale: usesGroupedDonutChildSpace
+        ? GROUPED_DONUT_SHADOW_PROFILE.scale
+        : donutShadowProfile?.scale,
+      shadowMaterialScale:
+        donutShadowProfile && usesGroupedDonutChildSpace
+          ? GROUPED_DONUT_SHADOW_PROFILE.materialScale
+          : undefined,
       elevation,
       intensity: target.nodeType === 'picture' ? 0.8 : 1.75,
     },
@@ -1127,9 +1186,10 @@ function shape3DLightingCacheKey(
     plan.surface,
     plan.geometry,
     `${plan.bounds.width}x${plan.bounds.height}`,
+    `${plan.lightingBounds.width}x${plan.lightingBounds.height}`,
     `${rasterWidth}x${rasterHeight}`,
     `${plan.bevel.width}:${plan.bevel.height}`,
-    `${plan.light.rig}:${plan.light.azimuth}:${plan.light.shadowFloor ?? 0}:${plan.light.shadowScale ?? 1}:${plan.light.elevation}:${plan.light.intensity}`,
+    `${plan.light.rig}:${plan.light.azimuth}:${plan.light.shadowAzimuth ?? plan.light.azimuth}:${plan.light.shadowDirectionMix ?? 1}:${plan.light.highlightScale ?? 1}:${plan.light.shadowFloor ?? 0}:${plan.light.shadowScale ?? 1}:${plan.light.shadowMaterialScale ?? 1}:${plan.light.elevation}:${plan.light.intensity}`,
     pathD,
   ].join('|');
 }
@@ -1242,14 +1302,14 @@ async function renderDistanceFieldLighting(
   if (ctx.signal?.aborted || typeof Path2D !== 'function') return;
 
   const scale = fitShape3DRasterScale(
-    plan.bounds.width,
-    plan.bounds.height,
+    plan.lightingBounds.width,
+    plan.lightingBounds.height,
     TARGET_SHAPE3D_RASTER_SCALE,
     MAX_SHAPE3D_RASTER_PIXELS,
   );
   if (scale < 0.25) return;
-  const rasterWidth = Math.max(1, Math.ceil(plan.bounds.width * scale));
-  const rasterHeight = Math.max(1, Math.ceil(plan.bounds.height * scale));
+  const rasterWidth = Math.max(1, Math.ceil(plan.lightingBounds.width * scale));
+  const rasterHeight = Math.max(1, Math.ceil(plan.lightingBounds.height * scale));
   const cacheKey = shape3DLightingCacheKey(pathD, plan, rasterWidth, rasterHeight);
   const cachedUrl = ctx.mediaUrlCache.get(cacheKey);
   if (cachedUrl) {
@@ -1281,12 +1341,15 @@ async function renderDistanceFieldLighting(
     alpha[pixel] = rgba[offset];
   }
   const effectiveScale = Math.sqrt(
-    (rasterWidth / plan.bounds.width) * (rasterHeight / plan.bounds.height),
+    (rasterWidth / plan.lightingBounds.width) * (rasterHeight / plan.lightingBounds.height),
   );
   let lighting = renderCircleBevelOverlay(alpha, rasterWidth, rasterHeight, {
     bandPx: plan.bevel.width * effectiveScale,
     heightPx: plan.bevel.height * effectiveScale,
     lightAzimuthDeg: plan.light.azimuth,
+    shadowAzimuthDeg: plan.light.shadowAzimuth,
+    shadowDirectionMix: plan.light.shadowDirectionMix,
+    highlightScale: plan.light.highlightScale,
     shadowFloor: plan.light.shadowFloor,
     shadowScale: plan.light.shadowScale,
     lightElevationDeg: plan.light.elevation,
@@ -1301,7 +1364,7 @@ async function renderDistanceFieldLighting(
         plan.bounds.height,
         plan.geometry,
         plan.bevel.width,
-      ),
+      ) * (plan.light.shadowMaterialScale ?? 1),
     );
   }
 
