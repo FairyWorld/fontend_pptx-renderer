@@ -254,8 +254,9 @@ a `0.572` square-donut anchor preserves the native peak amplitude. Square ellips
 effective 330° three-point bearing fitted from their native directional fields; non-square verified
 rows retain 350°, with a continuous transition near square. Solid donuts also use a log-aspect
 profile that combines a broad edge-opacity floor with a compressed directional shadow lobe. The
-profile is bounded by the native tall, square, and wide matrices and leaves positive key highlights
-on the common material response. The schema-v7 local metric caps general
+profile is bounded by the native tall, square, and wide matrices, then verified between those anchors
+by a nine-slide `0.75|1.25|2.0` aspect × `10000|default25000|40000` adjustment matrix. It leaves
+positive key highlights on the common material response. The schema-v7 local metric caps general
 candidate/native shadow amplitude at `1.05`, tightened to `1.01` for solid donut faces, and also
 caps the donut's mean negative shadow energy at `1.05` and non-cancelling per-pixel local shadow
 excess at `0.30` of native mean shadow energy. This prevents a locally over-dark sector from passing

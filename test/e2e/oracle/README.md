@@ -186,7 +186,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 176 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 177 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -196,7 +196,7 @@ ground-truth export. It defines 176 cases under `oracle/cases-pypptx/` with the
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Zero-adjustment flowcharts** (28 cases, 84 slides): presets in shape IDs 61-88, each with
   square explicit paint, wide theme-reference paint, and grouped-tall rendering
-- **Static DrawingML 3D** (17 cases, 43 slides): flat picture opt-out plus a bounded
+- **Static DrawingML 3D** (18 cases, 52 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
   `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
@@ -210,7 +210,9 @@ ground-truth export. It defines 176 cases under `oracle/cases-pypptx/` with the
   field-of-view tuple with implicit camera rotation and default top anchoring; case 16 adds
   square/wide/tall PNG picture planes for the observed `perspectiveRight`, 95-degree field of view,
   including absent, horizontal, vertical, and real-corpus asymmetric source crops; case 17 pairs
-  omitted top-bevel preset/width/height attributes with explicit `circle`/76200-EMU values
+  omitted top-bevel preset/width/height attributes with explicit `circle`/76200-EMU values; case 18
+  crosses donut aspect ratios `0.75`, `1.25`, and `2.0` with adjustments `10000`, default `25000`,
+  and `40000` while holding paint, container, camera, light, and bevel constant
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -249,7 +251,7 @@ matrix. The bottom-bevel rows isolate default encoding, material, light rotation
 transparent overlay composition plus an exact transparent flat control, a neighboring `circle`
 preset, and aspect ratio. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
-ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 176-case matrix.
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 177-case matrix.
 The current macOS PowerPoint oracle produces byte-identical native rasters for the implicit/explicit
 dimension pair, the explicit/omitted light-rotation pair, and the `relaxedInset`/`circle` pair. The
 opaque material opt-out is deliberately distinct. The exact standalone rectangle rows now back
@@ -257,11 +259,12 @@ opaque material opt-out is deliberately distinct. The exact standalone rectangle
 inventing a visible bottom edge. Other parent, paint, scene, and bottom-bevel combinations remain
 discovery evidence.
 The original one-slide ellipse and donut probes remain useful for preflight comparisons, while the
-tracked three-slide ellipse and five-slide donut matrices bound the public
+tracked three-slide ellipse, five-slide donut endpoint/context, and nine-slide donut interpolation
+matrices bound the public
 `drawingml.shape.3d.top-bevel-contour` claim. That tuple also requires an absent scene backdrop,
 zero or omitted shape `z`, and no extrusion color.
 
-After evaluating top-bevel cases 0001-0012 and 0017, run `../scripts/shape3d_bevel_metrics.py` with one
+After evaluating top-bevel cases 0001-0012 and 0017-0018, run `../scripts/shape3d_bevel_metrics.py` with one
 `--case-report` per case. It reads the source OOXML to locate supported regions and builds independent
 rect, roundRect, ellipse, and donut masks before comparing the native and HTML luminance fields only
 inside the bevel ring. Unknown silhouettes and rotations fail as unevaluable instead of borrowing a
@@ -280,6 +283,8 @@ hashes, and callers cannot self-attest `bevel-local`.
 Case 0017 declares three `assertions.equivalentSlidePairs` rows across square rect, wide roundRect,
 and tall ellipse. The gate requires byte-identical native references and byte-identical renderer
 candidates for each omitted/explicit pair before the case can pass.
+Case 0018 must retain all nine aspect/adjustment cross-product rows; it validates the donut shadow
+profile between existing native anchors without adding theme, group, or camera variables.
 
 After evaluating cases 0013 through 0016, run `../scripts/shape3d_camera_metrics.py` with all clean
 native reports. It binds the exact source, ground truth, revision, and per-slide raster hashes. Solid

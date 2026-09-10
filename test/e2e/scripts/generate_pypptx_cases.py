@@ -2272,6 +2272,48 @@ def _build_shape3d_cases() -> list[CaseDef]:
         },
     )
 
+    def _build_donut_shadow_interpolation_matrix(prs) -> None:
+        for aspect_label, width, height in (
+            ("0.75", 3.75, 5.0),
+            ("1.25", 5.0, 4.0),
+            ("2.0", 7.0, 3.5),
+        ):
+            for adjustment_label, adjustment in (
+                ("10000", 0.10),
+                ("default25000", None),
+                ("40000", 0.40),
+            ):
+                slide = prs.slides.add_slide(prs.slide_layouts[6])
+                donut = slide.shapes.add_shape(
+                    MSO_SHAPE.DONUT,
+                    _emu((13.333 - width) / 2),
+                    _emu((7.5 - height) / 2),
+                    _emu(width),
+                    _emu(height),
+                )
+                donut.name = (
+                    f"Static 3D donut aspect {aspect_label} adjustment {adjustment_label}"
+                )
+                _style_donut(donut, adjustment)
+
+    _add(
+        "donut-shadow-interpolation-matrix",
+        _build_donut_shadow_interpolation_matrix,
+        slide_count=9,
+        features=[
+            "p:sp.prstGeom=donut",
+            "geometry.adjustment=10000|default25000|40000",
+            "geometry.aspect=0.75|1.25|2.0",
+            "matrix=crossProduct(3x3)",
+            "container=standalone",
+            "paint=explicitSolid",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT=circle",
+        ],
+    )
+
     return cases
 
 

@@ -217,8 +217,8 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, zero-adjustment flowchart, bounded static DrawingML 3D, composite, and
-chart interaction cases, use the python-pptx generator. It currently defines 176 cases: 59 text,
-31 shape-adjustment, 28 flowchart, 17 static 3D, 20 composite, and 21 chart cases. Each flowchart
+chart interaction cases, use the python-pptx generator. It currently defines 177 cases: 59 text,
+31 shape-adjustment, 28 flowchart, 18 static 3D, 20 composite, and 21 chart cases. Each flowchart
 case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
 square explicit paint, wide theme-reference paint, and grouped tall explicit paint. The group uses
 a non-identity child coordinate space, and every source keeps an empty `a:avLst` with no adjustment
@@ -227,8 +227,9 @@ shape containers, `twoPt:t` and `threePt:t` lighting, donut/ellipse/rect/roundRe
 wide/tall aspect ratios, a non-identity group, and the light rotation plus implicit defaults
 observed in the local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
 outline and outer shadow so the 3D effect is not tested in isolation from its actual container.
-The seventeen cases are one opt-out control, nine single-slide positive bevel cases, one three-slide
-ellipse matrix, one five-slide donut matrix, one six-slide omitted/explicit bevel-default matrix,
+The eighteen cases are one opt-out control, nine single-slide positive bevel cases, one three-slide
+ellipse matrix, one five-slide donut endpoint/context matrix, one nine-slide donut
+aspect/adjustment interpolation matrix, one six-slide omitted/explicit bevel-default matrix,
 two six-slide camera-plane matrices, one three-slide
 `perspectiveLeft` editable-text matrix, and one four-slide `perspectiveRight` picture matrix. The first
 camera-plane row covers identity and 20°/30° rotated `orthographicFront`, then square, wide, tall,
@@ -312,10 +313,10 @@ per-slide PNG. The generator refreshes tracked case metadata even when cached lo
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
 The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
-into tracked `oracle/cases-pypptx/` and do not change the 176-case default matrix.
+into tracked `oracle/cases-pypptx/` and do not change the 177-case default matrix.
 
 The top-bevel capability also has a region-level lighting gate. After clean native API reports for
-cases 0001-0012 and 0017 have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
+cases 0001-0012 and 0017-0018 have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
 
 ```bash
 # Run from the repository root; report paths are repository-relative.
@@ -333,6 +334,7 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_bevel_metrics.py \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0011-ellipse-circle-bevel-matrix.json \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0012-donut-circle-bevel-adjustment-matrix.json \
   --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix.json \
+  --case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0018-donut-shadow-interpolation-matrix.json \
   --out test/e2e/reports/capability-loop/shape3d-bevel-local-<revision>.json
 ```
 
@@ -358,6 +360,9 @@ reference and HTML rasters. The metric generator rejects a stale or replaced ras
 Case 0017 additionally declares three implicit/explicit slide pairs. The same report requires exact
 reference-raster equality and exact candidate-raster equality for every pair, so a parser-default
 regression cannot hide behind a high full-slide score.
+Case 0018 keeps paint, container, camera, light, and bevel fixed while crossing three intermediate
+aspect ratios with three donut adjustments. All nine rows must pass both the full-slide and
+schema-v7 bevel-local gates.
 It is also sensitive to material-specific lighting: the tracked picture case must retain the native
 top/right shadow and bottom/left relief instead of passing only because its rectangular bounds match.
 
@@ -654,7 +659,7 @@ that `bevelT@w` controls the inward edge width,
 corners follow continuous silhouette normals. The default-value matrix additionally requires
 omitted `prst`, `w`, or `h` to match explicit `circle`/76200-EMU encodings exactly. The picture row additionally verifies the lower
 relative-overlay response and native `twoPt:t` edge ordering. Verification
-uses cases 0001-0012 plus 0017 and the same thirteen earlier-revision baselines,
+uses cases 0001-0012 plus 0017-0018 and the same fourteen earlier-revision baselines,
 the derived `bevel-local` report, explicit manual verdicts for review rows, and the `source`,
 `structural`, `unit`, `browser`, `performance`, `package-size`, and `docs` caller-run gates.
 

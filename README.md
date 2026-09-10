@@ -617,7 +617,9 @@ orthographic circular top bevel and optional contour with silhouette-aware light
 - shape lane: opaque resolved solid-fill `donut`, `ellipse`, `rect`, and `roundRect`; ellipse
   coverage spans square explicit paint, wide theme-reference paint, and tall rendering through a
   non-identity group transform; donut coverage adds the `0..50000` adjustment bounds, the `25000`
-  default, a representative `32000` hole, and grouped/aspect-ratio variants; omitted `bevelT@w`,
+  default, a representative `32000` hole, and grouped/aspect-ratio variants. A separate nine-slide
+  interpolation matrix crosses aspect ratios `0.75`, `1.25`, and `2.0` with adjustment values
+  `10000`, default `25000`, and `40000`; omitted `bevelT@w`,
   `bevelT@h`, and `bevelT@prst` use the DrawingML defaults of 76200 EMU per dimension and `circle`
   for the native-verified rect/roundRect/ellipse rows;
 - picture lane: rectangular, stretch-filled pictures with no `a:srcRect`, or nonnegative source
@@ -642,8 +644,9 @@ Square ellipse/donut rows use the native-fitted effective 330° light bearing; o
 three-point rows retain 350°, with a smooth near-square transition for those curved presets. Wide
 rect/ellipse rows keep the native-backed `0.415` dark-face response, while solid donuts additionally
 interpolate a native-backed broad shadow floor and a compressed directional shadow lobe across the
-tall, square, and wide matrices. This better matches PowerPoint's three-point material rim without
-moving the key highlight. `roundRect` retains its independently measured response.
+tall, square, and wide matrices. The intermediate 3×3 native matrix verifies the interpolation
+between and beyond those profile anchors. This better matches PowerPoint's three-point material rim
+without moving the key highlight. `roundRect` retains its independently measured response.
 The native 6 pt square-rectangle row and the 10 pt tall-rectangle row also have bounded shadow
 anchors. The bevel-local gate checks peak amplitude, aggregate energy, and non-cancelling per-pixel
 local shadow excess, so an over-dark sector cannot be hidden by an under-dark sector elsewhere.

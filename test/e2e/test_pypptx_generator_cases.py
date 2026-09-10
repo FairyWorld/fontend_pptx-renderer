@@ -556,6 +556,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix",
         "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
         "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
+        "oracle-pypptx-shape3d-0018-donut-shadow-interpolation-matrix",
     }
 
 
@@ -1187,6 +1188,85 @@ def test_static_shape3d_donut_case_json_records_all_five_slides(tmp_path: Path):
             "geometry.aspect=square|wide|tall",
             "container=standalone|nonIdentityGroup",
             "paint=explicitSolid|themeStyleReference",
+            "a:scene3d.camera=orthographicFront",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d.extrusionH=0",
+            "a:sp3d.bevelT=circle",
+        ],
+    }
+
+
+def test_static_shape3d_donut_shadow_interpolation_matrix_crosses_aspect_and_adjustment(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"]
+        == "oracle-pypptx-shape3d-0018-donut-shadow-interpolation-matrix"
+    )
+    assert case["slide_count"] == 9
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        roots = [
+            etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 10)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    expected_aspects = [(3, 4)] * 3 + [(5, 4)] * 3 + [(2, 1)] * 3
+    expected_adjustments = ["val 10000", "", "val 40000"] * 3
+    for root, (aspect_width, aspect_height), adjustment in zip(
+        roots, expected_aspects, expected_adjustments, strict=True
+    ):
+        ext = root.xpath(".//p:sp/p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+        width = int(ext.get("cx"))
+        height = int(ext.get("cy"))
+        assert width * aspect_height == height * aspect_width
+        assert not root.xpath(".//p:grpSp", namespaces=ns)
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:solidFill/a:srgbClr[@val='2F75B5'])",
+            namespaces=ns,
+        )
+        assert (
+            root.xpath(
+                "string(.//p:sp/p:spPr/a:prstGeom/a:avLst/a:gd[@name='adj']/@fmla)",
+                namespaces=ns,
+            )
+            == adjustment
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:scene3d/a:camera[@prst='orthographicFront'])",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'])",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//p:sp/p:spPr/a:sp3d[@extrusionH='0']/a:bevelT"
+            "[@w='127000'][@h='127000'][@prst='circle'])",
+            namespaces=ns,
+        )
+
+    path = generator._write_case_json(case, tmp_path)
+    payload = __import__("json").loads(path.read_text(encoding="utf-8"))
+    assert len(payload["slides"]) == 9
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "features": [
+            "p:sp.prstGeom=donut",
+            "geometry.adjustment=10000|default25000|40000",
+            "geometry.aspect=0.75|1.25|2.0",
+            "matrix=crossProduct(3x3)",
+            "container=standalone",
+            "paint=explicitSolid",
             "a:scene3d.camera=orthographicFront",
             "a:scene3d.lightRig=threePt:t",
             "a:sp3d.extrusionH=0",

@@ -258,6 +258,8 @@
         "cameraRotation": ["absent"],
         "coexistingEffects": ["outerShdw"],
         "contour": ["absent-or-zero", "positive-with-resolvable-color"],
+        "donutInterpolationAspectRatios": [0.75, 1.25, 2.0],
+        "donutInterpolationAdjustments": [10000, 25000, 40000],
         "donutShadowGate": ["mean-negative-energy-overshoot-lte-1.05", "p05-amplitude-overshoot-lte-1.01", "local-excess-relative-to-native-mean-shadow-energy-lte-0.30"],
         "extrusionColor": ["absent"],
         "extrusionHeight": [0],
@@ -275,7 +277,7 @@
         "shapeFill": ["resolved-opaque-solid"],
         "shapeFillSource": ["explicit-solid", "theme-style-reference"],
         "shapePresets": ["donut", "ellipse", "rect", "roundRect"],
-        "shapeAdjustmentValues": ["donut:0", "donut:10000", "donut:25000-default", "donut:32000", "donut:50000"],
+        "shapeAdjustmentValues": ["donut:0", "donut:10000", "donut:25000-default", "donut:32000", "donut:40000", "donut:50000"],
         "zPosition": [0]
       },
       "fallback": "Render the existing flat two-dimensional shape or picture when any camera, light, bevel, material, extrusion, effect, geometry, paint, or source-crop value falls outside this bounded tuple.",

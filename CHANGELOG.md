@@ -18,13 +18,14 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus a seventeen-case, forty-three-slide
+  shapes and pictures, with stable renderer fallback reasons, plus an eighteen-case, fifty-two-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
   ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
   vertical and combined source crops, plus explicit- and implicit-depth camera planes, editable-text
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
-  omitted/explicit default top-bevel dimensions.
+  omitted/explicit default top-bevel dimensions. A nine-slide donut matrix independently crosses
+  intermediate `0.75|1.25|2.0` aspects with `10000|default25000|40000` adjustments.
 - Added a schema-v7 bevel-ring fidelity metric and derived capability gate with independent dynamic
   range and shadow-amplitude floors, a `1.05` general directional shadow-overshoot ceiling, a
   native-backed `1.01` peak ceiling and `1.05` aggregate shadow-energy ceiling for solid donut
@@ -110,7 +111,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Validate donut bevels across the `0..50000` adjustment bounds, the `25000` default, square/wide/tall
   extents, a theme fill, and a non-identity group. Multi-contour lighting now preserves the hole
   with explicit even-odd clipping, normalizes floating-point residue at a clamped zero arc radius,
-  and recognizes resolved solid theme fills without admitting theme gradients.
+  and recognizes resolved solid theme fills without admitting theme gradients. A separate 3×3
+  native matrix validates the aspect shadow interpolation at `0.75`, `1.25`, and `2.0` across thin,
+  default, and thick ring adjustments.
 - Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
   runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
   renderer, browser, picture-clip, and native PowerPoint comparison gates. A reproducible 28-case,
