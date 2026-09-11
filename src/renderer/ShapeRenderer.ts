@@ -159,6 +159,92 @@ const ooxmlRuntimeMultiPathShapeNameSet = new Set(
   ooxmlPresetRuntimeMultiPathShapeNames.map((name) => name.toLowerCase()),
 );
 
+function classifyShape3DCustomGeometry(
+  customGeometry: SafeXmlNode | undefined,
+): 'multi-contour-cubic' | undefined {
+  if (!customGeometry?.exists()) return undefined;
+  for (const listName of ['avLst', 'gdLst', 'ahLst', 'cxnLst']) {
+    const list = customGeometry.child(listName);
+    if (!list.exists() || list.allChildren().length > 0) return undefined;
+  }
+  const textRect = customGeometry.child('rect');
+  if (
+    !textRect.exists() ||
+    textRect.element?.attributes.length !== 4 ||
+    textRect.attr('l') !== 'l' ||
+    textRect.attr('t') !== 't' ||
+    textRect.attr('r') !== 'r' ||
+    textRect.attr('b') !== 'b'
+  ) {
+    return undefined;
+  }
+  const paths = customGeometry.child('pathLst').children('path');
+  if (paths.length !== 1) return undefined;
+  const path = paths[0];
+  const coordinateWidth = path.numAttr('w');
+  const coordinateHeight = path.numAttr('h');
+  if (
+    coordinateWidth !== 1000 ||
+    coordinateHeight !== 1000 ||
+    path.element?.attributes.length !== 2 ||
+    path.attr('fill') !== undefined ||
+    path.attr('stroke') !== undefined
+  ) {
+    return undefined;
+  }
+
+  const commands = path.allChildren();
+  const allowedCommands = new Set(['moveTo', 'lnTo', 'cubicBezTo', 'close']);
+  let moveCount = 0;
+  let closeCount = 0;
+  let cubicCount = 0;
+  let contourOpen = false;
+  for (const command of commands) {
+    if (!allowedCommands.has(command.localName)) return undefined;
+    if (command.localName === 'close') {
+      if (!contourOpen || command.allChildren().length > 0) return undefined;
+      contourOpen = false;
+      closeCount += 1;
+      continue;
+    }
+    if (command.localName === 'moveTo') {
+      if (contourOpen) return undefined;
+      contourOpen = true;
+    } else if (!contourOpen) {
+      return undefined;
+    }
+    const points = command.children('pt');
+    const expectedPoints = command.localName === 'cubicBezTo' ? 3 : 1;
+    if (
+      points.length !== expectedPoints ||
+      command.allChildren().length !== expectedPoints ||
+      points.some((point) => {
+        const x = point.attr('x');
+        const y = point.attr('y');
+        const numericX = Number(x);
+        const numericY = Number(y);
+        return (
+          x === undefined ||
+          y === undefined ||
+          !Number.isFinite(numericX) ||
+          !Number.isFinite(numericY) ||
+          numericX < 0 ||
+          numericX > 1000 ||
+          numericY < 0 ||
+          numericY > 1000
+        );
+      })
+    ) {
+      return undefined;
+    }
+    if (command.localName === 'moveTo') moveCount += 1;
+    if (command.localName === 'cubicBezTo') cubicCount += 1;
+  }
+  return !contourOpen && moveCount >= 2 && closeCount === moveCount && cubicCount >= 1
+    ? 'multi-contour-cubic'
+    : undefined;
+}
+
 function appendTransform(el: HTMLElement, transform: string): void {
   el.style.transform = `${el.style.transform || ''} ${transform}`.trim();
 }
@@ -2594,6 +2680,8 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
                     ? 'placeholder'
                     : 'standalone-slide',
           hasStyleReference: styleNode.exists(),
+          hasCustomGeometry: node.customGeometry?.exists() ?? false,
+          customGeometryProfile: classifyShape3DCustomGeometry(node.customGeometry),
           hasVisibleStroke: path.getAttribute('stroke') !== 'none',
           rotation: node.rotation,
           flipH: node.flipH,

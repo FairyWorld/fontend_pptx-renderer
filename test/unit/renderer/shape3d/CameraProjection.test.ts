@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  projectAbsoluteMoveLineCubicPath,
   projectFlatPlane,
   projectiveTransformToCssMatrix3d,
 } from '../../../../src/renderer/shape3d/CameraProjection';
@@ -131,5 +132,52 @@ describe('projectFlatPlane', () => {
         { x: 0, y: 0 },
       ]),
     ).toBeUndefined();
+  });
+});
+
+describe('projectAbsoluteMoveLineCubicPath', () => {
+  const corners = [
+    { x: 10, y: 20 },
+    { x: 190, y: 0 },
+    { x: 220, y: 120 },
+    { x: -20, y: 100 },
+  ] as const;
+
+  it('projects rectangle corners exactly into the target camera quadrilateral', () => {
+    const projected = projectAbsoluteMoveLineCubicPath(
+      'M0,0 L200,0 L200,100 L0,100 Z',
+      200,
+      100,
+      corners,
+    );
+
+    expect(projected).toBe('M10,20 L190,0 L220,120 L-20,100 Z');
+  });
+
+  it('preserves two closed contours while adaptively flattening projected cubics', () => {
+    const projected = projectAbsoluteMoveLineCubicPath(
+      'M0,50 C0,10 40,0 80,30 L0,90 Z M110,20 C160,0 200,30 180,80 C160,100 120,90 110,20 Z',
+      200,
+      100,
+      corners,
+    );
+
+    expect(projected).toBeDefined();
+    expect(projected!.match(/M/g)).toHaveLength(2);
+    expect(projected!.match(/Z/g)).toHaveLength(2);
+    expect(projected).not.toContain('C');
+    expect(projected!.match(/L/g)!.length).toBeGreaterThan(8);
+    expect(projected).not.toMatch(/NaN|Infinity/);
+  });
+
+  it.each([
+    ['relative commands', 'm0,0 l10,10 z'],
+    ['quadratic commands', 'M0,0 Q5,5 10,10 Z'],
+    ['arc commands', 'M0,0 A10,10 0 0 1 20,20 Z'],
+    ['ignored punctuation', 'M0,@0 L10,0 L10,10 Z'],
+    ['open contours', 'M0,0 L10,10'],
+    ['coordinates outside the source plane', 'M-1,0 L10,0 L10,10 Z'],
+  ])('rejects %s', (_label, pathD) => {
+    expect(projectAbsoluteMoveLineCubicPath(pathD, 200, 100, corners)).toBeUndefined();
   });
 });

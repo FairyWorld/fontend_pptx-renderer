@@ -585,6 +585,115 @@ test('bounded camera planes project in a browser and preserve text opt-out and g
   });
 });
 
+test('perspective camera preserves a bounded multi-contour cubic custom silhouette', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const scene = `<a:scene3d>
+      <a:camera prst="perspectiveRelaxedModerately" fov="7200000">
+        <a:rot lat="18590633" lon="0" rev="0"/>
+      </a:camera>
+      <a:lightRig rig="threePt" dir="t"/>
+    </a:scene3d>`;
+    const geometry = (secondContour: boolean) => `<a:custGeom>
+      <a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/>
+      <a:pathLst><a:path w="1000" h="1000">
+        <a:moveTo><a:pt x="0" y="500"/></a:moveTo>
+        <a:cubicBezTo><a:pt x="0" y="120"/><a:pt x="280" y="0"/><a:pt x="450" y="160"/></a:cubicBezTo>
+        <a:cubicBezTo><a:pt x="560" y="270"/><a:pt x="480" y="500"/><a:pt x="300" y="580"/></a:cubicBezTo>
+        <a:lnTo><a:pt x="0" y="720"/></a:lnTo><a:close/>
+        ${
+          secondContour
+            ? `<a:moveTo><a:pt x="560" y="180"/></a:moveTo>
+               <a:cubicBezTo><a:pt x="700" y="20"/><a:pt x="1000" y="120"/><a:pt x="950" y="430"/></a:cubicBezTo>
+               <a:cubicBezTo><a:pt x="920" y="680"/><a:pt x="680" y="900"/><a:pt x="520" y="720"/></a:cubicBezTo>
+               <a:cubicBezTo><a:pt x="410" y="590"/><a:pt x="450" y="320"/><a:pt x="560" y="180"/></a:cubicBezTo><a:close/>`
+            : ''
+        }
+      </a:path></a:pathLst>
+    </a:custGeom>`;
+    const shapeXml = (secondContour: boolean) => `<p:sp
+      xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <p:nvSpPr><p:cNvPr id="1" name="Custom camera plane"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+      <p:spPr>
+        <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+        ${geometry(secondContour)}
+        <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill>
+        <a:ln><a:noFill/></a:ln>${scene}
+      </p:spPr>
+    </p:sp>`;
+    const baseContext = createMockRenderContext();
+    const presentation = { ...baseContext.presentation, width: 1280, height: 720 };
+    const supported = renderShape(
+      parseShapeNode(parseXml(shapeXml(true))),
+      createMockRenderContext({ presentation }),
+    );
+    const inverse = renderShape(
+      parseShapeNode(parseXml(shapeXml(false))),
+      createMockRenderContext({ presentation }),
+    );
+    const wrongCoordinateSpace = renderShape(
+      parseShapeNode(parseXml(shapeXml(true).replace('w="1000" h="1000"', 'w="2000" h="1000"'))),
+      createMockRenderContext({ presentation }),
+    );
+    const wrongTextRect = renderShape(
+      parseShapeNode(
+        parseXml(
+          shapeXml(true).replace(
+            '<a:rect l="l" t="t" r="r" b="b"/>',
+            '<a:rect l="0" t="t" r="r" b="b"/>',
+          ),
+        ),
+      ),
+      createMockRenderContext({ presentation }),
+    );
+    document.body.append(supported, inverse, wrongCoordinateSpace, wrongTextRect);
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    const base = supported.querySelector('svg > path') as SVGPathElement;
+    const projected = supported.querySelector(
+      '[data-pptx-shape3d-projected-custom-plane="perspective"]',
+    ) as SVGPathElement | null;
+    const projectedBounds = projected?.getBoundingClientRect();
+    return {
+      baseVisibility: base.getAttribute('visibility'),
+      projectedPath: projected?.getAttribute('d'),
+      projectedTransform: projected?.style.transform,
+      projectedBounds: projectedBounds
+        ? { width: projectedBounds.width, height: projectedBounds.height }
+        : null,
+      inverseProjected: !!inverse.querySelector('[data-pptx-shape3d-projected-custom-plane]'),
+      inverseBaseVisibility: inverse.querySelector('svg > path')?.getAttribute('visibility'),
+      wrongCoordinateSpaceProjected: !!wrongCoordinateSpace.querySelector(
+        '[data-pptx-shape3d-projected-custom-plane]',
+      ),
+      wrongTextRectProjected: !!wrongTextRect.querySelector(
+        '[data-pptx-shape3d-projected-custom-plane]',
+      ),
+    };
+  });
+
+  expect(result.baseVisibility).toBe('hidden');
+  expect(result.projectedPath?.match(/M/g)).toHaveLength(2);
+  expect(result.projectedPath?.match(/Z/g)).toHaveLength(2);
+  expect(result.projectedPath).not.toContain('C');
+  expect(result.projectedPath?.match(/L/g)?.length).toBeGreaterThan(16);
+  expect(result.projectedTransform).toBe('');
+  expect(result.projectedBounds?.width).toBeGreaterThan(300);
+  expect(result.projectedBounds?.height).toBeGreaterThan(100);
+  expect(result.inverseProjected).toBe(false);
+  expect(result.inverseBaseVisibility).toBeNull();
+  expect(result.wrongCoordinateSpaceProjected).toBe(false);
+  expect(result.wrongTextRectProjected).toBe(false);
+});
+
 test('bottom-bevel front material stays bounded to opaque standalone slide shapes', async ({
   page,
 }) => {

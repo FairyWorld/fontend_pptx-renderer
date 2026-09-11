@@ -259,6 +259,74 @@ describe('buildStaticShape3DPlan', () => {
     },
   );
 
+  it.each([
+    ['Office blue', '#2F75B5', { top: '#4b94d6', middle: '#438bce', bottom: '#3c85c7' }],
+    ['white', '#FFFFFF', { top: '#ffffff', bottom: '#ffffff' }],
+  ])(
+    'builds the bounded multi-contour cubic custom camera plane with %s paint',
+    (_label, baseFill, fill) => {
+      const plan = buildStaticShape3DPlan(
+        parseShape3D(perspectiveCameraScene, ''),
+        {
+          nodeType: 'shape',
+          width: 403.2,
+          height: 403.2,
+          paintKind: 'solid',
+          baseFill,
+          hasVisibleStroke: false,
+          hasVisibleText: false,
+          hasCustomGeometry: true,
+          customGeometryProfile: 'multi-contour-cubic',
+          container: 'standalone-slide',
+          hasStyleReference: false,
+        },
+        createMockRenderContext({
+          presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+        }),
+      );
+
+      expect(plan).toMatchObject({
+        mode: 'camera-projected-plane',
+        geometry: 'custom',
+        camera: { preset: 'perspectiveRelaxedModerately' },
+        fill,
+      });
+      if (plan.mode !== 'camera-projected-plane') throw new Error('expected custom camera plan');
+      expect(plan.corners[0].x).toBeCloseTo(41.0, 1);
+      expect(plan.corners[0].y).toBeCloseTo(98.7, 1);
+      expect(plan.corners[2].x).toBeCloseTo(559.8, 1);
+      expect(plan.corners[2].y).toBeCloseTo(431.1, 1);
+    },
+  );
+
+  it.each([
+    ['unclassified path commands', { customGeometryProfile: 'other' }, 'geometry-preset'],
+    ['group container', { container: 'group' }, 'parent-container'],
+    ['style reference', { hasStyleReference: true }, 'style-reference'],
+    ['unverified physical extent', { width: 500 }, 'invalid-bounds'],
+  ])('keeps a bounded custom camera plane with %s flat', (_label, patch, reason) => {
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveCameraScene, ''),
+      {
+        nodeType: 'shape',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+        hasVisibleStroke: false,
+        hasVisibleText: false,
+        hasCustomGeometry: true,
+        customGeometryProfile: 'multi-contour-cubic',
+        container: 'standalone-slide',
+        hasStyleReference: false,
+        ...patch,
+      },
+      createMockRenderContext(),
+    );
+
+    expect(plan).toEqual({ mode: 'flat', reason });
+  });
+
   it('builds the exact scene-only editable-text camera plane', () => {
     const plan = buildStaticShape3DPlan(
       parseShape3D(perspectiveTextCameraScene, ''),
@@ -1362,6 +1430,59 @@ describe('appendStaticShape3DEffects', () => {
     expect(svg.querySelectorAll('linearGradient[data-pptx-shape3d-camera-gradient]')).toHaveLength(
       1,
     );
+  });
+
+  it('projects a multi-contour cubic path without replacing its silhouette with a rectangle', () => {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    const defs = document.createElementNS(ns, 'defs');
+    const basePath = document.createElementNS(ns, 'path');
+    const pathD =
+      'M0,201.6 C0,48.4 112.9,0 181.4,64.5 C225.8,108.9 193.5,201.6 121,233.9 L0,290.3 Z ' +
+      'M225.8,72.6 C282.2,8.1 403.2,48.4 383,173.4 C370.9,274.2 274.2,362.9 209.7,290.3 C165.3,237.9 181.4,129 225.8,72.6 Z';
+    basePath.setAttribute('d', pathD);
+    basePath.setAttribute('fill', '#2F75B5');
+    svg.append(basePath);
+    const ctx = createMockRenderContext({
+      presentation: { ...createMockRenderContext().presentation, width: 1280, height: 720 },
+    });
+    const plan = buildStaticShape3DPlan(
+      parseShape3D(perspectiveCameraScene, ''),
+      {
+        nodeType: 'shape',
+        width: 403.2,
+        height: 403.2,
+        paintKind: 'solid',
+        baseFill: '#2F75B5',
+        hasCustomGeometry: true,
+        customGeometryProfile: 'multi-contour-cubic',
+        container: 'standalone-slide',
+      },
+      ctx,
+    );
+
+    const result = appendStaticShape3DEffects({
+      svg,
+      defs,
+      basePath,
+      pathD,
+      bounds: { width: 403.2, height: 403.2 },
+      plan,
+      ctx,
+    });
+
+    expect(basePath.getAttribute('visibility')).toBe('hidden');
+    expect(result?.group.dataset.pptxShape3dCameraGeometry).toBe('custom');
+    const projected = result?.group.querySelector<SVGPathElement>(
+      '[data-pptx-shape3d-projected-custom-plane]',
+    );
+    expect(projected?.getAttribute('d')).not.toBe(pathD);
+    expect(projected?.getAttribute('d')?.match(/M/g)).toHaveLength(2);
+    expect(projected?.getAttribute('d')?.match(/Z/g)).toHaveLength(2);
+    expect(projected?.getAttribute('d')).not.toContain('C');
+    expect(projected?.getAttribute('d')?.match(/L/g)?.length).toBeGreaterThan(16);
+    expect(projected?.style.transform).toBe('');
+    expect(projected?.getAttribute('fill')).toMatch(/^url\(#shape3d-camera-gradient-/);
   });
 
   it('keeps vector faces until the contour-aware texture is ready, then swaps only the lighting', async () => {

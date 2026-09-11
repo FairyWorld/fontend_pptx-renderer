@@ -48,6 +48,17 @@ PICTURE_CROP_MUTATION_RATIO = 0.12
 BOTTOM_FRONT_CORNER_SCORE_THRESHOLD = 0.98
 BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD = 1.0
 BOTTOM_FRONT_SOURCE_FLAT_FILL = (68, 114, 196)
+CUSTOM_RASTER_TOLERANCE_RATIO = 0.0025
+CUSTOM_TOLERANT_FOREGROUND_F1_THRESHOLD = 0.95
+CUSTOM_TOLERANT_BOUNDS_SCORE_THRESHOLD = 0.98
+CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD = 0.90
+CUSTOM_COLOR_SCORE_THRESHOLD = 0.98
+CUSTOM_VERTICAL_SQUASH_RATIO = 0.20
+CUSTOM_GEOMETRY_EXTENTS = {
+    (3840480, 3840480),
+    (7315200, 2926080),
+    (2926080, 4937760),
+}
 
 
 def _slide_number(path: str) -> int:
@@ -192,6 +203,119 @@ def _is_supported_camera_shape(
     )
 
 
+def _is_bounded_multi_contour_cubic_geometry(custom_geometry) -> bool:
+    for list_name in ("avLst", "gdLst", "ahLst", "cxnLst"):
+        values = custom_geometry.find(f"a:{list_name}", NS)
+        if values is None or len(values) != 0:
+            return False
+    text_rect = custom_geometry.find("a:rect", NS)
+    if text_rect is None or dict(text_rect.attrib) != {"l": "l", "t": "t", "r": "r", "b": "b"}:
+        return False
+    paths = custom_geometry.findall("a:pathLst/a:path", NS)
+    if len(paths) != 1 or dict(paths[0].attrib) != {"w": "1000", "h": "1000"}:
+        return False
+
+    contour_open = False
+    move_count = 0
+    close_count = 0
+    cubic_count = 0
+    for command in paths[0]:
+        local_name = etree.QName(command).localname
+        if local_name == "close":
+            if not contour_open or len(command) != 0:
+                return False
+            contour_open = False
+            close_count += 1
+            continue
+        if local_name not in {"moveTo", "lnTo", "cubicBezTo"}:
+            return False
+        if local_name == "moveTo":
+            if contour_open:
+                return False
+            contour_open = True
+            move_count += 1
+        elif not contour_open:
+            return False
+        points = command.findall("a:pt", NS)
+        expected_count = 3 if local_name == "cubicBezTo" else 1
+        if len(points) != expected_count:
+            return False
+        for point in points:
+            try:
+                x = float(point.get("x", "nan"))
+                y = float(point.get("y", "nan"))
+            except ValueError:
+                return False
+            if not (math.isfinite(x) and math.isfinite(y) and 0 <= x <= 1000 and 0 <= y <= 1000):
+                return False
+        if local_name == "cubicBezTo":
+            cubic_count += 1
+    return (
+        not contour_open
+        and move_count >= 2
+        and close_count == move_count
+        and cubic_count >= 1
+    )
+
+
+def _is_supported_custom_geometry_camera_shape(shape) -> bool:
+    if shape.xpath("boolean(ancestor::p:grpSp)", namespaces=NS):
+        return False
+    if shape.find("p:style", NS) is not None:
+        return False
+    shape_properties = shape.find("p:spPr", NS)
+    if shape_properties is None:
+        return False
+    transform = shape_properties.find("a:xfrm", NS)
+    extent = transform.find("a:ext", NS) if transform is not None else None
+    if transform is None or extent is None:
+        return False
+    if any(not _zero_or_absent(transform.get(name)) for name in ("rot", "flipH", "flipV")):
+        return False
+    try:
+        dimensions = (int(extent.get("cx", "")), int(extent.get("cy", "")))
+    except ValueError:
+        return False
+    if dimensions not in CUSTOM_GEOMETRY_EXTENTS:
+        return False
+
+    custom_geometry = shape_properties.find("a:custGeom", NS)
+    if custom_geometry is None or not _is_bounded_multi_contour_cubic_geometry(custom_geometry):
+        return False
+    scene = shape_properties.find("a:scene3d", NS)
+    if scene is None or scene.find("a:backdrop", NS) is not None:
+        return False
+    camera = scene.find("a:camera", NS)
+    light = scene.find("a:lightRig", NS)
+    if (
+        camera is None
+        or camera.get("prst") != "perspectiveRelaxedModerately"
+        or camera.get("fov") != "7200000"
+        or camera.get("zoom") is not None
+        or not _rotation_matches(camera.find("a:rot", NS), (18590633, 0, 0))
+        or light is None
+        or light.get("rig") != "threePt"
+        or light.get("dir") != "t"
+        or light.find("a:rot", NS) is not None
+    ):
+        return False
+    if (
+        shape_properties.find("a:sp3d", NS) is not None
+        or shape_properties.find("a:effectLst", NS) is not None
+        or shape_properties.find("a:effectDag", NS) is not None
+        or shape_properties.find("a:ln/a:noFill", NS) is None
+        or shape.xpath("boolean(p:txBody//a:t[normalize-space(.) != ''])", namespaces=NS)
+    ):
+        return False
+    solid = shape_properties.find("a:solidFill", NS)
+    color = solid.find("a:srgbClr", NS) if solid is not None else None
+    return bool(
+        color is not None
+        and color.get("val", "").upper() in {"2F75B5", "FFFFFF"}
+        and len(color) == 0
+    )
+
+
 def _has_verified_theme_accent1(archive: ZipFile) -> bool:
     values: set[str] = set()
     for name in archive.namelist():
@@ -265,6 +389,28 @@ def extract_camera_slide_indices(source_pptx: Path) -> set[int]:
                 ):
                     indices.add(slide_index)
                     break
+    return indices
+
+
+def extract_custom_geometry_camera_slide_indices(source_pptx: Path) -> set[int]:
+    """Return slides containing the native-backed multi-contour cubic camera tuple."""
+    indices: set[int] = set()
+    with ZipFile(source_pptx) as archive:
+        slide_paths = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            ),
+            key=_slide_number,
+        )
+        for slide_index, slide_path in enumerate(slide_paths):
+            slide = etree.fromstring(archive.read(slide_path))
+            if any(
+                _is_supported_custom_geometry_camera_shape(shape)
+                for shape in slide.xpath(".//p:sp", namespaces=NS)
+            ):
+                indices.add(slide_index)
     return indices
 
 
@@ -1274,6 +1420,242 @@ def compute_text_camera_metrics(
     }
 
 
+def _custom_background_color(image: np.ndarray) -> np.ndarray:
+    edge = max(2, round(min(image.shape[:2]) * 0.01))
+    samples = np.concatenate(
+        [
+            image[:edge, :edge, :3].reshape(-1, 3),
+            image[:edge, -edge:, :3].reshape(-1, 3),
+            image[-edge:, :edge, :3].reshape(-1, 3),
+            image[-edge:, -edge:, :3].reshape(-1, 3),
+        ]
+    )
+    return np.median(samples.astype(np.float64), axis=0)
+
+
+def _custom_foreground_mask(image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    if image.ndim != 3 or image.shape[2] < 3:
+        raise ValueError("custom camera metric requires an RGB image")
+    background = _custom_background_color(image)
+    delta = np.max(np.abs(image[..., :3].astype(np.float64) - background), axis=2)
+    raw = (delta > 10).astype(np.uint8)
+    component_count, labels, stats, _ = cv2.connectedComponentsWithStats(raw, 8)
+    mask = np.zeros(raw.shape, dtype=bool)
+    for component in range(1, component_count):
+        x, y, width, height, area = stats[component]
+        touches_frame = (
+            x == 0
+            or y == 0
+            or x + width == raw.shape[1]
+            or y + height == raw.shape[0]
+        )
+        if area >= 32 and not touches_frame:
+            mask |= labels == component
+    if int(mask.sum()) < 64:
+        raise ValueError("custom camera foreground is below the resolution floor")
+    return mask, background
+
+
+def _custom_geometry_core_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    raster_tolerance_ratio: float,
+    tolerant_foreground_f1_threshold: float,
+    tolerant_bounds_score_threshold: float,
+    foreground_area_ratio_threshold: float,
+    color_score_threshold: float,
+) -> dict[str, Any]:
+    if candidate.shape[:2] != reference.shape[:2]:
+        candidate = cv2.resize(
+            candidate,
+            (reference.shape[1], reference.shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
+    reference_mask, _ = _custom_foreground_mask(reference)
+    candidate_mask, _ = _custom_foreground_mask(candidate)
+    reference_y, reference_x = np.nonzero(reference_mask)
+    candidate_y, candidate_x = np.nonzero(candidate_mask)
+
+    raster_tolerance_px = max(1, round(max(reference.shape[:2]) * raster_tolerance_ratio))
+    tolerance_kernel = cv2.getStructuringElement(
+        cv2.MORPH_ELLIPSE,
+        (raster_tolerance_px * 2 + 1, raster_tolerance_px * 2 + 1),
+    )
+    reference_dilated = cv2.dilate(reference_mask.astype(np.uint8), tolerance_kernel) > 0
+    candidate_dilated = cv2.dilate(candidate_mask.astype(np.uint8), tolerance_kernel) > 0
+    reference_coverage = float(
+        np.logical_and(reference_mask, candidate_dilated).sum()
+        / max(int(reference_mask.sum()), 1)
+    )
+    candidate_coverage = float(
+        np.logical_and(candidate_mask, reference_dilated).sum()
+        / max(int(candidate_mask.sum()), 1)
+    )
+    tolerant_foreground_f1 = (
+        2 * reference_coverage * candidate_coverage / (reference_coverage + candidate_coverage)
+        if reference_coverage + candidate_coverage > 0
+        else 0.0
+    )
+
+    reference_bounds = np.asarray(
+        [reference_x.min(), reference_y.min(), reference_x.max(), reference_y.max()],
+        dtype=np.float64,
+    )
+    candidate_bounds = np.asarray(
+        [candidate_x.min(), candidate_y.min(), candidate_x.max(), candidate_y.max()],
+        dtype=np.float64,
+    )
+    reference_diagonal = math.hypot(
+        reference_bounds[2] - reference_bounds[0],
+        reference_bounds[3] - reference_bounds[1],
+    )
+    if reference_diagonal <= 0:
+        raise ValueError("custom camera reference bounds are degenerate")
+    tolerant_bounds_delta = np.maximum(
+        np.abs(reference_bounds - candidate_bounds) - raster_tolerance_px,
+        0,
+    )
+    tolerant_mean_bounds_error_ratio = float(
+        (
+            np.linalg.norm(tolerant_bounds_delta[:2])
+            + np.linalg.norm(tolerant_bounds_delta[2:])
+        )
+        / (2 * reference_diagonal)
+    )
+    tolerant_bounds_score = max(0.0, 1.0 - tolerant_mean_bounds_error_ratio)
+    reference_centroid = np.asarray([reference_x.mean(), reference_y.mean()])
+    candidate_centroid = np.asarray([candidate_x.mean(), candidate_y.mean()])
+    centroid_error_ratio = float(
+        np.linalg.norm(reference_centroid - candidate_centroid) / reference_diagonal
+    )
+    centroid_score = max(0.0, 1.0 - centroid_error_ratio)
+    foreground_area_ratio = float(
+        min(int(reference_mask.sum()), int(candidate_mask.sum()))
+        / max(int(reference_mask.sum()), int(candidate_mask.sum()))
+    )
+    reference_color = np.median(reference[..., :3][reference_mask], axis=0).astype(np.float64)
+    candidate_color = np.median(candidate[..., :3][candidate_mask], axis=0).astype(np.float64)
+    mean_color_error = float(np.abs(reference_color - candidate_color).mean())
+    color_score = max(0.0, 1.0 - mean_color_error / 255)
+    passed = (
+        tolerant_foreground_f1 >= tolerant_foreground_f1_threshold
+        and tolerant_bounds_score >= tolerant_bounds_score_threshold
+        and foreground_area_ratio >= foreground_area_ratio_threshold
+        and centroid_score >= 0.99
+        and color_score >= color_score_threshold
+    )
+    return {
+        "evaluable": True,
+        "rasterTolerancePx": raster_tolerance_px,
+        "referenceCoverageAtTolerance": reference_coverage,
+        "candidateCoverageAtTolerance": candidate_coverage,
+        "tolerantForegroundF1": float(tolerant_foreground_f1),
+        "tolerantBoundsScore": tolerant_bounds_score,
+        "tolerantMeanBoundsErrorRatio": tolerant_mean_bounds_error_ratio,
+        "foregroundAreaRatio": foreground_area_ratio,
+        "referenceForegroundPixels": int(reference_mask.sum()),
+        "candidateForegroundPixels": int(candidate_mask.sum()),
+        "centroidScore": centroid_score,
+        "centroidErrorRatio": centroid_error_ratio,
+        "colorScore": color_score,
+        "meanColorError": mean_color_error,
+        "referenceColor": reference_color.round(3).tolist(),
+        "candidateColor": candidate_color.round(3).tolist(),
+        "referenceBounds": reference_bounds.astype(int).tolist(),
+        "candidateBounds": candidate_bounds.astype(int).tolist(),
+        "thresholds": {
+            "rasterToleranceRatio": raster_tolerance_ratio,
+            "tolerantForegroundF1": tolerant_foreground_f1_threshold,
+            "tolerantBoundsScore": tolerant_bounds_score_threshold,
+            "foregroundAreaRatio": foreground_area_ratio_threshold,
+            "centroidScore": 0.99,
+            "colorScore": color_score_threshold,
+        },
+        "passed": passed,
+    }
+
+
+def _vertical_squash_candidate(candidate: np.ndarray, ratio: float) -> np.ndarray:
+    mask, background = _custom_foreground_mask(candidate)
+    y, x = np.nonzero(mask)
+    left, right = int(x.min()), int(x.max()) + 1
+    top, bottom = int(y.min()), int(y.max()) + 1
+    crop = candidate[top:bottom, left:right, :3]
+    crop_mask = mask[top:bottom, left:right]
+    squashed_height = max(1, round(crop.shape[0] * ratio))
+    squashed = cv2.resize(
+        crop,
+        (crop.shape[1], squashed_height),
+        interpolation=cv2.INTER_AREA,
+    )
+    squashed_mask = cv2.resize(
+        crop_mask.astype(np.uint8),
+        (crop.shape[1], squashed_height),
+        interpolation=cv2.INTER_NEAREST,
+    ) > 0
+    output = np.empty_like(candidate[..., :3])
+    output[:] = np.rint(background).astype(np.uint8)
+    center_y = (top + bottom) // 2
+    next_top = max(0, min(output.shape[0] - squashed_height, center_y - squashed_height // 2))
+    target = output[next_top : next_top + squashed_height, left:right]
+    target[squashed_mask] = squashed[squashed_mask]
+    return output
+
+
+def compute_custom_geometry_camera_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    raster_tolerance_ratio: float = CUSTOM_RASTER_TOLERANCE_RATIO,
+    tolerant_foreground_f1_threshold: float = CUSTOM_TOLERANT_FOREGROUND_F1_THRESHOLD,
+    tolerant_bounds_score_threshold: float = CUSTOM_TOLERANT_BOUNDS_SCORE_THRESHOLD,
+    foreground_area_ratio_threshold: float = CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD,
+    color_score_threshold: float = CUSTOM_COLOR_SCORE_THRESHOLD,
+) -> dict[str, Any]:
+    if reference.ndim != 3 or candidate.ndim != 3:
+        raise ValueError("custom camera metric requires RGB images")
+    if candidate.shape[:2] != reference.shape[:2]:
+        candidate = cv2.resize(
+            candidate,
+            (reference.shape[1], reference.shape[0]),
+            interpolation=cv2.INTER_AREA,
+        )
+    metrics = _custom_geometry_core_metrics(
+        reference,
+        candidate,
+        raster_tolerance_ratio=raster_tolerance_ratio,
+        tolerant_foreground_f1_threshold=tolerant_foreground_f1_threshold,
+        tolerant_bounds_score_threshold=tolerant_bounds_score_threshold,
+        foreground_area_ratio_threshold=foreground_area_ratio_threshold,
+        color_score_threshold=color_score_threshold,
+    )
+    mutated = _vertical_squash_candidate(candidate, CUSTOM_VERTICAL_SQUASH_RATIO)
+    mutated_metrics = _custom_geometry_core_metrics(
+        reference,
+        mutated,
+        raster_tolerance_ratio=raster_tolerance_ratio,
+        tolerant_foreground_f1_threshold=tolerant_foreground_f1_threshold,
+        tolerant_bounds_score_threshold=tolerant_bounds_score_threshold,
+        foreground_area_ratio_threshold=foreground_area_ratio_threshold,
+        color_score_threshold=color_score_threshold,
+    )
+    sensitivity = {
+        "mutation": "vertical-squash",
+        "ratio": CUSTOM_VERTICAL_SQUASH_RATIO,
+        "mutatedTolerantForegroundF1": mutated_metrics["tolerantForegroundF1"],
+        "mutatedTolerantBoundsScore": mutated_metrics["tolerantBoundsScore"],
+        "mutatedForegroundAreaRatio": mutated_metrics["foregroundAreaRatio"],
+        "mutatedCentroidScore": mutated_metrics["centroidScore"],
+        "mutatedColorScore": mutated_metrics["colorScore"],
+        "mutatedPassed": mutated_metrics["passed"],
+        "detected": not mutated_metrics["passed"],
+    }
+    metrics["squashSensitivity"] = sensitivity
+    metrics["passed"] = metrics["passed"] and sensitivity["detected"]
+    return metrics
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -1336,7 +1718,14 @@ def build_camera_report(
         shadow_slides = extract_camera_shadow_slide_indices(source_path)
         text_slides = extract_text_camera_slide_indices(source_path)
         picture_slides = extract_picture_camera_slide_indices(source_path)
-        applicable_slides = plane_slides | bottom_front_slides | text_slides | picture_slides
+        custom_slides = extract_custom_geometry_camera_slide_indices(source_path)
+        applicable_slides = (
+            plane_slides
+            | bottom_front_slides
+            | text_slides
+            | picture_slides
+            | custom_slides
+        )
         slide_results: list[dict[str, Any]] = []
         for slide in case_report.get("perSlide", []):
             if not isinstance(slide, Mapping) or slide.get("hidden") is True:
@@ -1374,7 +1763,10 @@ def build_camera_report(
             candidate = np.asarray(
                 Image.open(reports_dir / f"{case_id}_slide{slide_index}_html.png").convert("RGB")
             )
-            if slide_index in bottom_front_slides:
+            if slide_index in custom_slides:
+                modality = "custom-geometry"
+                metrics = compute_custom_geometry_camera_metrics(reference, candidate)
+            elif slide_index in bottom_front_slides:
                 modality = "bottom-material"
                 metrics = compute_bottom_bevel_front_metrics(reference, candidate)
             elif slide_index in plane_slides:
@@ -1418,7 +1810,7 @@ def build_camera_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 5,
+        "schemaVersion": 6,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "plane": {
@@ -1452,6 +1844,15 @@ def build_camera_report(
                 "cornerScore": BOTTOM_FRONT_CORNER_SCORE_THRESHOLD,
                 "meanBandColorError": BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD,
                 "sourceFlatFill": list(BOTTOM_FRONT_SOURCE_FLAT_FILL),
+            },
+            "custom-geometry": {
+                "rasterToleranceRatio": CUSTOM_RASTER_TOLERANCE_RATIO,
+                "tolerantForegroundF1": CUSTOM_TOLERANT_FOREGROUND_F1_THRESHOLD,
+                "tolerantBoundsScore": CUSTOM_TOLERANT_BOUNDS_SCORE_THRESHOLD,
+                "foregroundAreaRatio": CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD,
+                "centroidScore": 0.99,
+                "colorScore": CUSTOM_COLOR_SCORE_THRESHOLD,
+                "verticalSquashRatio": CUSTOM_VERTICAL_SQUASH_RATIO,
             },
         },
         "caseResults": sorted(cases, key=lambda case: case["caseId"]),

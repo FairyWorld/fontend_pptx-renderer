@@ -55,6 +55,13 @@ CAMERA_PICTURE_CROP_MUTATION_RATIO = 0.12
 CAMERA_BOTTOM_FRONT_CORNER_SCORE_THRESHOLD = 0.98
 CAMERA_BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD = 1.0
 CAMERA_BOTTOM_FRONT_SOURCE_FLAT_FILL = [68, 114, 196]
+CAMERA_CUSTOM_RASTER_TOLERANCE_RATIO = 0.0025
+CAMERA_CUSTOM_TOLERANT_FOREGROUND_F1_THRESHOLD = 0.95
+CAMERA_CUSTOM_TOLERANT_BOUNDS_SCORE_THRESHOLD = 0.98
+CAMERA_CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD = 0.90
+CAMERA_CUSTOM_CENTROID_SCORE_THRESHOLD = 0.99
+CAMERA_CUSTOM_COLOR_SCORE_THRESHOLD = 0.98
+CAMERA_CUSTOM_VERTICAL_SQUASH_RATIO = 0.20
 
 
 class CapabilityVerificationError(ValueError):
@@ -734,8 +741,8 @@ def _validate_camera_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 5:
-        raise CapabilityVerificationError("camera-local report requires schemaVersion=5")
+    if report.get("schemaVersion") != 6:
+        raise CapabilityVerificationError("camera-local report requires schemaVersion=6")
     renderer = _mapping(report.get("renderer"), "camera-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -773,6 +780,15 @@ def _validate_camera_local(
             "cornerScore": CAMERA_BOTTOM_FRONT_CORNER_SCORE_THRESHOLD,
             "meanBandColorError": CAMERA_BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD,
             "sourceFlatFill": CAMERA_BOTTOM_FRONT_SOURCE_FLAT_FILL,
+        },
+        "custom-geometry": {
+            "rasterToleranceRatio": CAMERA_CUSTOM_RASTER_TOLERANCE_RATIO,
+            "tolerantForegroundF1": CAMERA_CUSTOM_TOLERANT_FOREGROUND_F1_THRESHOLD,
+            "tolerantBoundsScore": CAMERA_CUSTOM_TOLERANT_BOUNDS_SCORE_THRESHOLD,
+            "foregroundAreaRatio": CAMERA_CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD,
+            "centroidScore": CAMERA_CUSTOM_CENTROID_SCORE_THRESHOLD,
+            "colorScore": CAMERA_CUSTOM_COLOR_SCORE_THRESHOLD,
+            "verticalSquashRatio": CAMERA_CUSTOM_VERTICAL_SQUASH_RATIO,
         },
     }
     thresholds = _mapping(report.get("thresholds"), "camera-local thresholds")
@@ -1167,6 +1183,186 @@ def _validate_camera_local(
                     corner_score >= CAMERA_BOTTOM_FRONT_CORNER_SCORE_THRESHOLD
                     and mean_color_error
                     <= CAMERA_BOTTOM_FRONT_MEAN_BAND_COLOR_ERROR_THRESHOLD
+                    and detected
+                )
+            elif modality == "custom-geometry":
+                raster_tolerance_px = metrics.get("rasterTolerancePx")
+                reference_coverage = _finite_metric(
+                    metrics.get("referenceCoverageAtTolerance"),
+                    f"{context} custom reference coverage",
+                )
+                candidate_coverage = _finite_metric(
+                    metrics.get("candidateCoverageAtTolerance"),
+                    f"{context} custom candidate coverage",
+                )
+                tolerant_foreground_f1 = _finite_metric(
+                    metrics.get("tolerantForegroundF1"),
+                    f"{context} custom tolerant foreground F1",
+                )
+                tolerant_bounds_score = _finite_metric(
+                    metrics.get("tolerantBoundsScore"),
+                    f"{context} custom tolerant bounds score",
+                )
+                tolerant_bounds_error = _finite_metric(
+                    metrics.get("tolerantMeanBoundsErrorRatio"),
+                    f"{context} custom tolerant bounds error",
+                )
+                foreground_area_ratio = _finite_metric(
+                    metrics.get("foregroundAreaRatio"),
+                    f"{context} custom foreground area ratio",
+                )
+                centroid_score = _finite_metric(
+                    metrics.get("centroidScore"), f"{context} custom centroid score"
+                )
+                centroid_error = _finite_metric(
+                    metrics.get("centroidErrorRatio"),
+                    f"{context} custom centroid error",
+                )
+                color_score = _finite_metric(
+                    metrics.get("colorScore"), f"{context} custom color score"
+                )
+                mean_color_error = _finite_metric(
+                    metrics.get("meanColorError"), f"{context} custom color error"
+                )
+                reference_pixels = metrics.get("referenceForegroundPixels")
+                candidate_pixels = metrics.get("candidateForegroundPixels")
+                if (
+                    not isinstance(raster_tolerance_px, int)
+                    or isinstance(raster_tolerance_px, bool)
+                    or raster_tolerance_px < 1
+                    or not isinstance(reference_pixels, int)
+                    or isinstance(reference_pixels, bool)
+                    or reference_pixels < 1
+                    or not isinstance(candidate_pixels, int)
+                    or isinstance(candidate_pixels, bool)
+                    or candidate_pixels < 1
+                    or any(
+                        not 0 <= value <= 1
+                        for value in (
+                            reference_coverage,
+                            candidate_coverage,
+                            tolerant_foreground_f1,
+                            tolerant_bounds_score,
+                            foreground_area_ratio,
+                            centroid_score,
+                            color_score,
+                        )
+                    )
+                    or tolerant_bounds_error < 0
+                    or centroid_error < 0
+                    or mean_color_error < 0
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} custom metrics are outside their domains"
+                    )
+
+                colors: list[list[float]] = []
+                for kind in ("reference", "candidate"):
+                    color_value = metrics.get(f"{kind}Color")
+                    if not isinstance(color_value, list) or len(color_value) != 3:
+                        raise CapabilityVerificationError(
+                            f"{context} custom {kind} color is invalid"
+                        )
+                    parsed = [
+                        _finite_metric(channel, f"{context} custom {kind} color")
+                        for channel in color_value
+                    ]
+                    if any(channel < 0 or channel > 255 for channel in parsed):
+                        raise CapabilityVerificationError(
+                            f"{context} custom {kind} color is invalid"
+                        )
+                    colors.append(parsed)
+                expected_f1 = (
+                    2
+                    * reference_coverage
+                    * candidate_coverage
+                    / (reference_coverage + candidate_coverage)
+                    if reference_coverage + candidate_coverage > 0
+                    else 0.0
+                )
+                expected_area_ratio = min(reference_pixels, candidate_pixels) / max(
+                    reference_pixels, candidate_pixels
+                )
+                expected_color_error = sum(
+                    abs(colors[0][channel] - colors[1][channel]) for channel in range(3)
+                ) / 3
+                if (
+                    abs(tolerant_foreground_f1 - expected_f1) > 1e-9
+                    or abs(tolerant_bounds_score - max(0.0, 1.0 - tolerant_bounds_error))
+                    > 1e-9
+                    or abs(foreground_area_ratio - expected_area_ratio) > 1e-9
+                    or abs(centroid_score - max(0.0, 1.0 - centroid_error)) > 1e-9
+                    or abs(mean_color_error - expected_color_error) > 1e-9
+                    or abs(color_score - max(0.0, 1.0 - mean_color_error / 255)) > 1e-9
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} custom metrics are inconsistent"
+                    )
+
+                sensitivity = _mapping(
+                    metrics.get("squashSensitivity"),
+                    f"{context} custom squash sensitivity",
+                )
+                mutated_f1 = _finite_metric(
+                    sensitivity.get("mutatedTolerantForegroundF1"),
+                    f"{context} mutated custom foreground F1",
+                )
+                mutated_bounds = _finite_metric(
+                    sensitivity.get("mutatedTolerantBoundsScore"),
+                    f"{context} mutated custom bounds score",
+                )
+                mutated_area = _finite_metric(
+                    sensitivity.get("mutatedForegroundAreaRatio"),
+                    f"{context} mutated custom area ratio",
+                )
+                mutated_centroid = _finite_metric(
+                    sensitivity.get("mutatedCentroidScore"),
+                    f"{context} mutated custom centroid score",
+                )
+                mutated_color = _finite_metric(
+                    sensitivity.get("mutatedColorScore"),
+                    f"{context} mutated custom color score",
+                )
+                mutated_passed = sensitivity.get("mutatedPassed")
+                detected = sensitivity.get("detected")
+                expected_mutated_pass = (
+                    mutated_f1 >= CAMERA_CUSTOM_TOLERANT_FOREGROUND_F1_THRESHOLD
+                    and mutated_bounds >= CAMERA_CUSTOM_TOLERANT_BOUNDS_SCORE_THRESHOLD
+                    and mutated_area >= CAMERA_CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD
+                    and mutated_centroid >= CAMERA_CUSTOM_CENTROID_SCORE_THRESHOLD
+                    and mutated_color >= CAMERA_CUSTOM_COLOR_SCORE_THRESHOLD
+                )
+                if (
+                    sensitivity.get("mutation") != "vertical-squash"
+                    or sensitivity.get("ratio") != CAMERA_CUSTOM_VERTICAL_SQUASH_RATIO
+                    or any(
+                        not 0 <= value <= 1
+                        for value in (
+                            mutated_f1,
+                            mutated_bounds,
+                            mutated_area,
+                            mutated_centroid,
+                            mutated_color,
+                        )
+                    )
+                    or not isinstance(mutated_passed, bool)
+                    or mutated_passed is not expected_mutated_pass
+                    or not isinstance(detected, bool)
+                    or detected is not (not expected_mutated_pass)
+                    or detected is not True
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} custom squash sensitivity is inconsistent"
+                    )
+                expected_pass = (
+                    tolerant_foreground_f1
+                    >= CAMERA_CUSTOM_TOLERANT_FOREGROUND_F1_THRESHOLD
+                    and tolerant_bounds_score
+                    >= CAMERA_CUSTOM_TOLERANT_BOUNDS_SCORE_THRESHOLD
+                    and foreground_area_ratio
+                    >= CAMERA_CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD
+                    and centroid_score >= CAMERA_CUSTOM_CENTROID_SCORE_THRESHOLD
+                    and color_score >= CAMERA_CUSTOM_COLOR_SCORE_THRESHOLD
                     and detected
                 )
             elif modality == "text":

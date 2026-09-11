@@ -1,4 +1,5 @@
 import type { Shape3DRotation } from '../../model/nodes/Shape3D';
+import { tokenizeSvgPathData } from '../pathData';
 
 export interface ProjectedPoint {
   x: number;
@@ -24,22 +25,31 @@ export interface FlatPlaneProjectionOptions {
 }
 
 const HOMOGRAPHY_EPSILON = 1e-9;
+const DEFAULT_PROJECTED_CURVE_TOLERANCE = 0.25;
+const MAX_PROJECTED_CURVE_DEPTH = 10;
+const MAX_PROJECTED_PATH_TOKENS = 16_384;
+const MAX_PROJECTED_PATH_POINTS = 8_192;
+
+interface ProjectiveTransform {
+  h11: number;
+  h12: number;
+  h13: number;
+  h21: number;
+  h22: number;
+  h23: number;
+  h31: number;
+  h32: number;
+}
 
 function finitePoint(point: ProjectedPoint): boolean {
   return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
-/**
- * Encode the projective map from a local rectangle to a four-corner camera plane.
- *
- * CSS `matrix3d()` exposes the homogeneous W row needed for a true quadrilateral map, so live
- * text remains selectable while its line boxes follow the same zero-depth camera plane as SVG.
- */
-export function projectiveTransformToCssMatrix3d(
+function rectangleToQuadTransform(
   width: number,
   height: number,
   corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint],
-): string | undefined {
+): ProjectiveTransform | undefined {
   if (
     !Number.isFinite(width) ||
     !Number.isFinite(height) ||
@@ -75,14 +85,221 @@ export function projectiveTransformToCssMatrix3d(
     perspectiveY = (dx1 * dy3 - dx3 * dy1) / denominator;
   }
 
-  const h11 = (topRight.x - topLeft.x + perspectiveX * topRight.x) / width;
-  const h12 = (bottomLeft.x - topLeft.x + perspectiveY * bottomLeft.x) / height;
-  const h13 = topLeft.x;
-  const h21 = (topRight.y - topLeft.y + perspectiveX * topRight.y) / width;
-  const h22 = (bottomLeft.y - topLeft.y + perspectiveY * bottomLeft.y) / height;
-  const h23 = topLeft.y;
-  const h31 = perspectiveX / width;
-  const h32 = perspectiveY / height;
+  const transform = {
+    h11: (topRight.x - topLeft.x + perspectiveX * topRight.x) / width,
+    h12: (bottomLeft.x - topLeft.x + perspectiveY * bottomLeft.x) / height,
+    h13: topLeft.x,
+    h21: (topRight.y - topLeft.y + perspectiveX * topRight.y) / width,
+    h22: (bottomLeft.y - topLeft.y + perspectiveY * bottomLeft.y) / height,
+    h23: topLeft.y,
+    h31: perspectiveX / width,
+    h32: perspectiveY / height,
+  };
+  return Object.values(transform).every(Number.isFinite) ? transform : undefined;
+}
+
+function projectPoint(
+  transform: ProjectiveTransform,
+  point: ProjectedPoint,
+): ProjectedPoint | undefined {
+  const denominator = transform.h31 * point.x + transform.h32 * point.y + 1;
+  if (!Number.isFinite(denominator) || Math.abs(denominator) <= HOMOGRAPHY_EPSILON) {
+    return undefined;
+  }
+  const projected = {
+    x: (transform.h11 * point.x + transform.h12 * point.y + transform.h13) / denominator,
+    y: (transform.h21 * point.x + transform.h22 * point.y + transform.h23) / denominator,
+  };
+  return finitePoint(projected) ? projected : undefined;
+}
+
+function formatProjectedNumber(value: number): string {
+  const normalized = Math.abs(value) < 0.0000005 ? 0 : value;
+  return Number.isInteger(normalized) ? String(normalized) : String(Number(normalized.toFixed(6)));
+}
+
+function formatProjectedPoint(point: ProjectedPoint): string {
+  return `${formatProjectedNumber(point.x)},${formatProjectedNumber(point.y)}`;
+}
+
+function midpoint(a: ProjectedPoint, b: ProjectedPoint): ProjectedPoint {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
+function splitCubic(
+  start: ProjectedPoint,
+  control1: ProjectedPoint,
+  control2: ProjectedPoint,
+  end: ProjectedPoint,
+): readonly [
+  readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint],
+  readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint],
+] {
+  const a = midpoint(start, control1);
+  const b = midpoint(control1, control2);
+  const c = midpoint(control2, end);
+  const d = midpoint(a, b);
+  const e = midpoint(b, c);
+  const center = midpoint(d, e);
+  return [
+    [start, a, d, center],
+    [center, e, c, end],
+  ];
+}
+
+function pointLineDistance(
+  point: ProjectedPoint,
+  start: ProjectedPoint,
+  end: ProjectedPoint,
+): number {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const denominator = Math.hypot(dx, dy);
+  if (denominator <= HOMOGRAPHY_EPSILON) return Math.hypot(point.x - start.x, point.y - start.y);
+  return Math.abs(dy * point.x - dx * point.y + end.x * start.y - end.y * start.x) / denominator;
+}
+
+function appendProjectedCubic(
+  output: string[],
+  transform: ProjectiveTransform,
+  cubic: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint],
+  tolerance: number,
+  pointCount: { value: number },
+  depth = 0,
+): boolean {
+  const projected = cubic.map((point) => projectPoint(transform, point));
+  if (projected.some((point) => point === undefined)) return false;
+  const [start, control1, control2, end] = projected as [
+    ProjectedPoint,
+    ProjectedPoint,
+    ProjectedPoint,
+    ProjectedPoint,
+  ];
+  const flatness = Math.max(
+    pointLineDistance(control1, start, end),
+    pointLineDistance(control2, start, end),
+  );
+  if (flatness <= tolerance || depth >= MAX_PROJECTED_CURVE_DEPTH) {
+    pointCount.value += 1;
+    if (pointCount.value > MAX_PROJECTED_PATH_POINTS) return false;
+    output.push(`L${formatProjectedPoint(end)}`);
+    return true;
+  }
+
+  const [left, right] = splitCubic(...cubic);
+  return (
+    appendProjectedCubic(output, transform, left, tolerance, pointCount, depth + 1) &&
+    appendProjectedCubic(output, transform, right, tolerance, pointCount, depth + 1)
+  );
+}
+
+/**
+ * Project a tightly bounded absolute SVG path through the same rectangle-to-camera homography.
+ *
+ * A projective transform turns a polynomial cubic into a rational cubic. SVG has no rational
+ * cubic command, so supported cubic segments are flattened adaptively with a sub-pixel screen-space
+ * tolerance. The parser deliberately accepts only explicit absolute M/L/C/Z contours emitted by
+ * the verified custom-geometry lane.
+ */
+export function projectAbsoluteMoveLineCubicPath(
+  pathD: string,
+  width: number,
+  height: number,
+  corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint],
+  tolerance = DEFAULT_PROJECTED_CURVE_TOLERANCE,
+): string | undefined {
+  if (!Number.isFinite(tolerance) || tolerance <= 0) return undefined;
+  if (!/^[MLCZ0-9eE+.,\-\s]+$/.test(pathD)) return undefined;
+  const transform = rectangleToQuadTransform(width, height, corners);
+  const tokens = tokenizeSvgPathData(pathD);
+  if (!transform || !tokens || tokens.length === 0 || tokens.length > MAX_PROJECTED_PATH_TOKENS) {
+    return undefined;
+  }
+
+  const output: string[] = [];
+  const pointCount = { value: 0 };
+  let index = 0;
+  let current: ProjectedPoint | undefined;
+  let contourOpen = false;
+  let contourCount = 0;
+  const readPoint = (): ProjectedPoint | undefined => {
+    if (index + 1 >= tokens.length) return undefined;
+    const point = { x: Number(tokens[index]), y: Number(tokens[index + 1]) };
+    index += 2;
+    if (!finitePoint(point) || point.x < 0 || point.x > width || point.y < 0 || point.y > height) {
+      return undefined;
+    }
+    return point;
+  };
+
+  while (index < tokens.length) {
+    const command = tokens[index++];
+    if (command === 'M') {
+      if (contourOpen) return undefined;
+      const point = readPoint();
+      const projected = point && projectPoint(transform, point);
+      if (!point || !projected) return undefined;
+      output.push(`M${formatProjectedPoint(projected)}`);
+      current = point;
+      contourOpen = true;
+      contourCount += 1;
+      pointCount.value += 1;
+    } else if (command === 'L') {
+      if (!contourOpen || !current) return undefined;
+      const point = readPoint();
+      const projected = point && projectPoint(transform, point);
+      if (!point || !projected) return undefined;
+      output.push(`L${formatProjectedPoint(projected)}`);
+      current = point;
+      pointCount.value += 1;
+    } else if (command === 'C') {
+      if (!contourOpen || !current) return undefined;
+      const control1 = readPoint();
+      const control2 = readPoint();
+      const end = readPoint();
+      if (
+        !control1 ||
+        !control2 ||
+        !end ||
+        !appendProjectedCubic(
+          output,
+          transform,
+          [current, control1, control2, end],
+          tolerance,
+          pointCount,
+        )
+      ) {
+        return undefined;
+      }
+      current = end;
+    } else if (command === 'Z') {
+      if (!contourOpen) return undefined;
+      output.push('Z');
+      current = undefined;
+      contourOpen = false;
+    } else {
+      return undefined;
+    }
+    if (pointCount.value > MAX_PROJECTED_PATH_POINTS) return undefined;
+  }
+
+  return contourCount > 0 && !contourOpen ? output.join(' ') : undefined;
+}
+
+/**
+ * Encode the projective map from a local rectangle to a four-corner camera plane.
+ *
+ * CSS `matrix3d()` exposes the homogeneous W row needed for a true quadrilateral map, so live
+ * text remains selectable while its line boxes follow the same zero-depth camera plane as SVG.
+ */
+export function projectiveTransformToCssMatrix3d(
+  width: number,
+  height: number,
+  corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint],
+): string | undefined {
+  const transform = rectangleToQuadTransform(width, height, corners);
+  if (!transform) return undefined;
+  const { h11, h12, h13, h21, h22, h23, h31, h32 } = transform;
   const values = [h11, h21, 0, h31, h12, h22, 0, h32, 0, 0, 1, 0, h13, h23, 0, 1];
   if (values.some((value) => !Number.isFinite(value))) return undefined;
   return `matrix3d(${values.map((value) => Number(value.toFixed(12))).join(',')})`;

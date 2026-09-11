@@ -256,11 +256,21 @@ def camera_report(
         "meanBandColorError": 1.0,
         "sourceFlatFill": [68, 114, 196],
     }
+    custom_geometry_thresholds = {
+        "rasterToleranceRatio": 0.0025,
+        "tolerantForegroundF1": 0.95,
+        "tolerantBoundsScore": 0.98,
+        "foregroundAreaRatio": 0.90,
+        "centroidScore": 0.99,
+        "colorScore": 0.98,
+        "verticalSquashRatio": 0.20,
+    }
     thresholds = {
         "plane": plane_thresholds,
         "text": text_thresholds,
         "picture": picture_thresholds,
         "bottom-material": bottom_material_thresholds,
+        "custom-geometry": custom_geometry_thresholds,
     }
     if modality == "plane":
         metrics = {
@@ -337,6 +347,52 @@ def camera_report(
             "thresholds": text_thresholds,
             "passed": passed,
         }
+    elif modality == "custom-geometry":
+        reference_coverage = 0.98 if passed else 0.5
+        candidate_coverage = 0.97 if passed else 0.5
+        bounds_error = 0.005 if passed else 0.05
+        reference_pixels = 1000
+        candidate_pixels = 980 if passed else 500
+        centroid_error = 0.005 if passed else 0.05
+        metrics = {
+            "evaluable": True,
+            "rasterTolerancePx": 3,
+            "referenceCoverageAtTolerance": reference_coverage,
+            "candidateCoverageAtTolerance": candidate_coverage,
+            "tolerantForegroundF1": (
+                2
+                * reference_coverage
+                * candidate_coverage
+                / (reference_coverage + candidate_coverage)
+            ),
+            "tolerantBoundsScore": 1 - bounds_error,
+            "tolerantMeanBoundsErrorRatio": bounds_error,
+            "foregroundAreaRatio": min(reference_pixels, candidate_pixels)
+            / max(reference_pixels, candidate_pixels),
+            "referenceForegroundPixels": reference_pixels,
+            "candidateForegroundPixels": candidate_pixels,
+            "centroidScore": 1 - centroid_error,
+            "centroidErrorRatio": centroid_error,
+            "colorScore": 1.0,
+            "meanColorError": 0.0,
+            "referenceColor": [71.0, 144.0, 210.0],
+            "candidateColor": [71.0, 144.0, 210.0],
+            "referenceBounds": [10, 20, 100, 80],
+            "candidateBounds": [10, 20, 100, 80],
+            "squashSensitivity": {
+                "mutation": "vertical-squash",
+                "ratio": 0.20,
+                "mutatedTolerantForegroundF1": 0.4,
+                "mutatedTolerantBoundsScore": 0.7,
+                "mutatedForegroundAreaRatio": 0.2,
+                "mutatedCentroidScore": 0.995,
+                "mutatedColorScore": 1.0,
+                "mutatedPassed": False,
+                "detected": True,
+            },
+            "thresholds": custom_geometry_thresholds,
+            "passed": passed,
+        }
     else:
         reference_edge_coverage = 0.96
         candidate_edge_coverage = 0.94
@@ -383,7 +439,7 @@ def camera_report(
             "passed": passed,
         }
     return {
-        "schemaVersion": 5,
+        "schemaVersion": 6,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": thresholds,
         "applicableCaseCount": 1,
@@ -666,6 +722,66 @@ def test_derives_camera_local_gate_from_live_picture_projection_evidence(tmp_pat
     )
 
     assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_derives_camera_local_gate_from_custom_geometry_silhouette_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-custom-geometry")
+    baseline = native_report("camera-custom-geometry", revision="b" * 40)
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        camera_report=camera_report(current, repo, modality="custom-geometry"),
+    )
+
+    assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_rejects_inconsistent_custom_geometry_metrics_or_undetected_squash(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-custom-geometry")
+    baseline = native_report("camera-custom-geometry", revision="b" * 40)
+
+    inconsistent = camera_report(current, repo, modality="custom-geometry")
+    inconsistent["caseResults"][0]["slides"][0]["metrics"]["foregroundAreaRatio"] = 0.5
+    with pytest.raises(CapabilityVerificationError, match="custom metrics are inconsistent"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=inconsistent,
+        )
+
+    undetected = camera_report(current, repo, modality="custom-geometry")
+    undetected["caseResults"][0]["slides"][0]["metrics"]["squashSensitivity"][
+        "detected"
+    ] = False
+    with pytest.raises(CapabilityVerificationError, match="squash sensitivity"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+            camera_report=undetected,
+        )
 
 
 def test_derives_camera_local_gate_from_bottom_bevel_front_material_evidence(tmp_path: Path):

@@ -19,6 +19,7 @@ import {
 } from '../utils/color';
 import { fitShape3DRasterScale, renderCircleBevelOverlay } from './shape3d/BevelLighting';
 import {
+  projectAbsoluteMoveLineCubicPath,
   projectFlatPlane,
   projectiveTransformToCssMatrix3d,
   type ProjectedPoint,
@@ -108,6 +109,8 @@ interface StaticShape3DTarget {
   hasBlipEffects?: boolean;
   hasPictureBackgroundFill?: boolean;
   hasCustomGeometry?: boolean;
+  /** Exact custom-path family backed by a native PowerPoint camera matrix. */
+  customGeometryProfile?: 'multi-contour-cubic';
   /** Parsed a:srcRect fractions removed from each source-image edge. */
   sourceCrop?: StaticShape3DSourceCrop;
   /** Exact live-text layout tuple covered by the scene-only native matrix. */
@@ -163,7 +166,7 @@ export interface StaticShape3DSupportedPlan {
 export interface StaticShape3DCameraPlan {
   mode: 'camera-projected-plane';
   surface: 'shape';
-  geometry: 'rect';
+  geometry: 'rect' | 'custom';
   /** Exact native front-face material lane used when a bottom bevel is edge-on. */
   frontMaterial?: 'dkEdge' | 'implicit';
   bounds: { width: number; height: number };
@@ -277,16 +280,32 @@ interface AppendedStaticShape3DEffects {
 const SUPPORTED_SHAPE_PRESETS = new Set(['donut', 'ellipse', 'rect', 'roundrect']);
 const SUPPORTED_PICTURE_PRESETS = new Set(['rect']);
 const SUPPORTED_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#4f81bd']);
+const SUPPORTED_CUSTOM_CAMERA_BASE_FILLS = new Set(['#2f75b5', '#ffffff']);
 const SHAPE3D_LIGHTING_VERSION = 'distance-field-v8';
 const MAX_SHAPE3D_RASTER_PIXELS = 262_144;
 const TARGET_SHAPE3D_RASTER_SCALE = 2;
 const PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_RELAXED_MODERATELY_PROJECTION_SCALE = 0.996;
+// Native PowerPoint fits the verified custom-path plane more broadly than its rectangular plane
+// for the same camera tuple. The square/wide/tall 0019 matrix pins this separate profile.
+const PERSPECTIVE_RELAXED_MODERATELY_CUSTOM_VIEWPORT_SCALE = 1.1;
+const PERSPECTIVE_RELAXED_MODERATELY_CUSTOM_PROJECTION_SCALE = 1.1;
 const PERSPECTIVE_CONTRASTING_RIGHT_FACING_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_LEFT_VIEWPORT_SCALE = 0.95;
 const PERSPECTIVE_RIGHT_VIEWPORT_SCALE = 0.95;
+const CUSTOM_CAMERA_VERIFIED_BOUNDS = [
+  { width: 403.2, height: 403.2 },
+  { width: 768, height: 307.2 },
+  { width: 307.2, height: 518.4 },
+] as const;
 const shape3dTaskTails = new WeakMap<Promise<void>[], Promise<void>>();
 let shape3dIdCounter = 0;
+
+function customCameraBoundsSupported(width: number, height: number): boolean {
+  return CUSTOM_CAMERA_VERIFIED_BOUNDS.some(
+    (bounds) => Math.abs(width - bounds.width) <= 0.01 && Math.abs(height - bounds.height) <= 0.01,
+  );
+}
 
 const SOLID_BEVEL_SHADOW_STRENGTH_ANCHORS = [
   { aspect: 0.55, strength: 0.72 },
@@ -683,7 +702,19 @@ function buildCameraProjectionPlan(
   if ((shape?.contourWidth ?? 0) > 0 || shape?.contourColorSource?.exists()) {
     return flat('contour-paint');
   }
-  if (normalizedPreset(target) !== 'rect') return flat('geometry-preset');
+  const isCustomCameraPlane =
+    target.nodeType === 'shape' &&
+    target.hasCustomGeometry === true &&
+    target.customGeometryProfile === 'multi-contour-cubic' &&
+    !target.presetGeometry;
+  if (target.hasCustomGeometry && !isCustomCameraPlane) return flat('geometry-preset');
+  if (!isCustomCameraPlane && normalizedPreset(target) !== 'rect') return flat('geometry-preset');
+  if (isCustomCameraPlane) {
+    if (target.container !== 'standalone-slide') return flat('parent-container');
+    if (target.hasStyleReference) return flat('style-reference');
+    if (!customCameraBoundsSupported(target.width, target.height)) return flat('invalid-bounds');
+    if (shape) return flat('missing-shape-format');
+  }
   if (!scene.lightRig) return flat('missing-light-rig');
   if (scene.lightRig !== 'threePt') return flat('light-rig');
   if (scene.lightDirection !== 't') return flat('light-direction');
@@ -817,8 +848,11 @@ function buildCameraProjectionPlan(
     return flat('paint-kind');
   }
   const baseFill = target.baseFill.toLowerCase();
-  if (!SUPPORTED_CAMERA_BASE_FILLS.has(baseFill)) return flat('paint-value');
-  if (!shape && baseFill !== '#2f75b5') return flat('paint-value');
+  const supportedBaseFills = isCustomCameraPlane
+    ? SUPPORTED_CUSTOM_CAMERA_BASE_FILLS
+    : SUPPORTED_CAMERA_BASE_FILLS;
+  if (!supportedBaseFills.has(baseFill)) return flat('paint-value');
+  if (!shape && !isCustomCameraPlane && baseFill !== '#2f75b5') return flat('paint-value');
 
   let kind: StaticShape3DCameraPlan['camera']['kind'];
   let preset: StaticShape3DCameraPlan['camera']['preset'];
@@ -828,6 +862,7 @@ function buildCameraProjectionPlan(
   let presetViewportScale: number | undefined;
 
   if (scene.cameraPreset === 'orthographicFront') {
+    if (isCustomCameraPlane) return flat('camera-preset');
     if (scene.fieldOfView !== undefined) return flat('camera-field-of-view');
     if (baseFill !== '#2f75b5') return flat('paint-value');
     kind = 'orthographic';
@@ -858,7 +893,9 @@ function buildCameraProjectionPlan(
     rotation = scene.cameraRotation!;
     fieldOfView = scene.fieldOfView;
     materialKind = 'perspective';
-    presetViewportScale = PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE;
+    presetViewportScale = isCustomCameraPlane
+      ? PERSPECTIVE_RELAXED_MODERATELY_CUSTOM_VIEWPORT_SCALE
+      : PERSPECTIVE_RELAXED_MODERATELY_VIEWPORT_SCALE;
     // Absence of a:sp3d is verified as an implicit zero-depth plane only for this exact tuple.
   } else {
     if (!shape) return flat('missing-shape-format');
@@ -874,19 +911,26 @@ function buildCameraProjectionPlan(
     fieldOfView,
     presetViewportScale,
     presetProjectionScale:
-      kind === 'perspective' ? PERSPECTIVE_RELAXED_MODERATELY_PROJECTION_SCALE : undefined,
+      kind === 'perspective'
+        ? isCustomCameraPlane
+          ? PERSPECTIVE_RELAXED_MODERATELY_CUSTOM_PROJECTION_SCALE
+          : PERSPECTIVE_RELAXED_MODERATELY_PROJECTION_SCALE
+        : undefined,
   });
   if (!projection) return flat('projection-out-of-range');
   return {
     mode: 'camera-projected-plane',
     surface: 'shape',
-    geometry: 'rect',
+    geometry: isCustomCameraPlane ? 'custom' : 'rect',
     bounds: { width: target.width, height: target.height },
     corners: projection.corners,
     camera: { kind, preset, rotation, fieldOfView },
-    fill: shape
-      ? cameraMaterialFill(baseFill, materialKind)
-      : sceneOnlyCameraMaterialFill(target.width, target.height),
+    fill:
+      isCustomCameraPlane && baseFill === '#ffffff'
+        ? { top: '#ffffff', bottom: '#ffffff' }
+        : shape
+          ? cameraMaterialFill(baseFill, materialKind)
+          : sceneOnlyCameraMaterialFill(target.width, target.height),
   };
 }
 
@@ -1432,12 +1476,26 @@ function appendCameraProjectedPlane(
   const id = ++shape3dIdCounter;
   const group = document.createElementNS(ns, 'g');
   group.dataset.pptxShape3dCamera = plan.camera.preset;
+  group.dataset.pptxShape3dCameraGeometry = plan.geometry;
   if (plan.frontMaterial) group.dataset.pptxShape3dFrontMaterial = plan.frontMaterial;
   group.setAttribute('pointer-events', 'none');
 
   const projectedPath = document.createElementNS(ns, 'path');
-  projectedPath.dataset.pptxShape3dProjectedPlane = plan.camera.kind;
-  projectedPath.setAttribute('d', cameraPlanePath(plan.corners));
+  if (plan.geometry === 'custom') {
+    const projectedPathData = projectAbsoluteMoveLineCubicPath(
+      basePath.getAttribute('d') ?? '',
+      plan.bounds.width,
+      plan.bounds.height,
+      plan.corners,
+    );
+    if (!projectedPathData) return undefined;
+    projectedPath.dataset.pptxShape3dProjectedCustomPlane = plan.camera.kind;
+    projectedPath.setAttribute('d', projectedPathData);
+    projectedPath.setAttribute('fill-rule', basePath.getAttribute('fill-rule') ?? 'evenodd');
+  } else {
+    projectedPath.dataset.pptxShape3dProjectedPlane = plan.camera.kind;
+    projectedPath.setAttribute('d', cameraPlanePath(plan.corners));
+  }
   projectedPath.setAttribute('stroke', 'none');
   if (plan.fill.top === plan.fill.bottom) {
     projectedPath.setAttribute('fill', plan.fill.top);

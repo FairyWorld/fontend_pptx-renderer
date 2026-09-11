@@ -664,8 +664,9 @@ rendering is unavailable, the vector fallback remains visible. Text stays outsid
 overlay, picture outlines remain centered on the source bounds, and group transforms retain the
 existing coordinate mapping.
 
-The separate camera-plane lane has three zero-depth rectangle modalities. Solid planes become SVG
-quadrilaterals. No-fill text planes and stretch-filled pictures retain their live DOM content and
+The separate camera-plane lane has four bounded zero-depth modalities. Preset solid rectangles
+become SVG quadrilaterals. One standalone multi-contour custom-path family is projected directly as
+SVG. No-fill text planes and stretch-filled pictures retain their live DOM content and
 receive a CSS `matrix3d` homography, so text remains selectable and picture crop stays in the normal
 image pipeline. The solid matrix contains
 `orthographicFront` with absent rotation, `orthographicFront` with exactly `lat=20°`, `lon=30°`,
@@ -677,9 +678,14 @@ rotation, and the preset's implicit `lat=0°`, `lon=20°`, `rev=0°`. The pictur
 `perspectiveRight` with `fov=95°`, absent explicit rotation, and implicit `lat=0°`, `lon=-20°`,
 `rev=0°`. All rows use an unrotated `threePt:t` light.
 
-Nineteen native slides cover the original six explicit-`a:sp3d` solid controls, scene-only solid,
+Twenty-five native slides cover the original six explicit-`a:sp3d` solid controls, scene-only solid,
 two live-text square/wide/tall matrices, and a four-slide picture matrix spanning absent,
-horizontal, vertical, and asymmetric source crops. An absent `a:sp3d` is treated as implicit zero
+horizontal, vertical, and asymmetric source crops. Six additional rows cross the bounded custom
+silhouette over square/wide/tall physical bounds with explicit `#2F75B5` and `#FFFFFF` paint. That
+custom lane requires one `1000×1000` path, an identity text rectangle, present but empty guide and
+handle lists, at least two closed contours made only from numeric `moveTo`, `lnTo`, `cubicBezTo`,
+and `close` commands, no path paint attributes, no `p:style`, and exact physical bounds of
+`403.2×403.2`, `768×307.2`, or `307.2×518.4` CSS pixels. An absent `a:sp3d` is treated as implicit zero
 depth only for those exact scene-only tuples. Solid shapes must have no visible text or stroke and use the
 verified explicit `#2F75B5` or theme `#4F81BD` rows. Live-text shapes must use explicit `a:noFill`,
 omit the line element and `p:style`, and declare local `bodyPr wrap="none"` with `a:spAutoFit`.
@@ -687,7 +693,7 @@ The contrasting-right row requires `anchor="ctr"`; the perspective-left row requ
 be absent so Office's top default applies. Vertical text and independent text bounds remain outside
 this lane. Picture rows require rectangular `a:stretch` without `a:fillRect`, style references,
 visible outlines, picture background fills, or direct blip effects; source crops must be finite,
-nonnegative, and leave positive visible width and height. All three modalities exclude local
+nonnegative, and leave positive visible width and height. All four modalities exclude local
 rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion color,
 material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
 its resolved `outerShdw` is applied to the visible projected polygon with a filter region covering
@@ -712,24 +718,30 @@ material replacement.
 This plane projection uses small independent SVG math rather than a mesh engine: longitude,
 latitude, and revolution rotations are followed by orthographic or perspective division. OOXML
 provides the camera properties; preset viewport scale and material response are pinned to native
-PowerPoint evidence. A dedicated gate compares normalized four-corner geometry, three material
+PowerPoint evidence. Custom cubics become rational under projective mapping, so the bounded custom
+lane adaptively flattens them in projected screen space with at most `0.25px` error while preserving
+closed contours and even-odd fill. A dedicated gate compares normalized four-corner geometry, three material
 color bands, gradient range, gradient direction, and source-required external shadow energy and
-direction for solid planes. Schema v5 keeps raw foreground IoU and bounds for live-text diagnosis,
+direction for solid planes. Schema v6 keeps raw foreground IoU and bounds for live-text diagnosis,
 then gates on bidirectional foreground F1 and bounds after a resolution-normalized `0.25%` raster
 tolerance, plus grayscale ink-density retention. It inverse-projects picture planes to a fixed
 rectangle and gates their content with color similarity and tolerant edge F1, so a correct outer
 quadrilateral cannot hide a wrong crop. The tolerance absorbs font and image rasterization
 differences while preserving semantic failures against the same hashed native rasters.
+Custom-path rows require tolerant foreground F1 `0.95`, bounds score `0.98`, foreground area ratio
+`0.90`, centroid score `0.99`, and color score `0.98`.
 For bottom-front rows it additionally requires mean RGB error across three interior bands to stay
 at or below `1.0`, then restores the source flat `#4472C4` fill and requires that mutation to fail.
 For every measurable shadow row, the report erases the candidate's exterior shadow and requires the
 shadow metric to reject that mutation. Every picture row likewise injects a 12% left crop and
-rescale after rectification and requires the content metric to reject it. A gate therefore proves
+rescale after rectification and requires the content metric to reject it. Every custom row is
+vertically squashed to 20% height and must fail its silhouette gate. A gate therefore proves
 both that the current rendering passes and that its local assertions still detect the targeted
 failure modes.
 
 This support does not include camera values outside that exact plane matrix, nonzero extrusion,
 arbitrary light rotation, other bevel presets, tiled pictures, negative or degenerate source crops,
+custom geometry outside the exact numeric path profile or verified bounds,
 gradient/pattern/group/image-filled shapes, other text-body/style combinations, or pixel-identical
 PowerPoint material simulation.
 Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
@@ -917,7 +929,8 @@ DrawingML shape/picture 3D outside the bounded circular top-bevel, zero-depth ca
 edge-on bottom-bevel front-material tuples above retains the flat 2D fallback. This includes other
 perspective or rotated cameras, nonzero extrusion, other bottom or non-circular bevels, other preset
 materials, unsupported lighting, tiled pictures,
-and unsupported paint, text, stroke, transform, or effect combinations. True 3D chart
+custom geometry outside the exact camera-path profile, and unsupported paint, text, stroke,
+transform, or effect combinations. True 3D chart
 perspective/depth/surface meshes, Office 2017 embedded 3D
 models, animations/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing
 embedded OLE objects, and slide notes rendering are outside the verified native scope. Available OLE

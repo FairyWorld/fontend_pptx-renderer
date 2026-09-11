@@ -67,7 +67,8 @@ a strong average cannot hide a local mismatch. Review rows require an explicit c
 - `../scripts/shape3d_bevel_metrics.py`: source-OOXML-derived bevel-ring and round-corner lighting
   gate for the bounded static 3D cohort.
 - `../scripts/shape3d_camera_metrics.py`: source-OOXML-derived projection, material, external-shadow,
-  live-text, rectified-picture, and bottom-front material gate for the bounded zero-depth cohorts.
+  custom-path silhouette, live-text, rectified-picture, and bottom-front material gate for the
+  bounded zero-depth cohorts.
 - `shape` nodes support `shapeTypeId` (numeric `MsoAutoShapeType`) for forward-compatible shape coverage.
 
 4. VBA probe module
@@ -186,7 +187,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 177 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 178 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -196,7 +197,7 @@ ground-truth export. It defines 177 cases under `oracle/cases-pypptx/` with the
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Zero-adjustment flowcharts** (28 cases, 84 slides): presets in shape IDs 61-88, each with
   square explicit paint, wide theme-reference paint, and grouped-tall rendering
-- **Static DrawingML 3D** (18 cases, 52 slides): flat picture opt-out plus a bounded
+- **Static DrawingML 3D** (19 cases, 58 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
   `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
@@ -212,7 +213,9 @@ ground-truth export. It defines 177 cases under `oracle/cases-pypptx/` with the
   including absent, horizontal, vertical, and real-corpus asymmetric source crops; case 17 pairs
   omitted top-bevel preset/width/height attributes with explicit `circle`/76200-EMU values; case 18
   crosses donut aspect ratios `0.75`, `1.25`, and `2.0` with adjustments `10000`, default `25000`,
-  and `40000` while holding paint, container, camera, light, and bevel constant
+  and `40000` while holding paint, container, camera, light, and bevel constant; case 19 crosses
+  one bounded multi-contour numeric line/cubic custom path over square/wide/tall physical bounds
+  with explicit blue/white paint and the exact `perspectiveRelaxedModerately` scene tuple
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -291,8 +294,9 @@ For the native-backed grouped donut in case 0012, the bevel field is rasterized 
 coordinate space and then stretched with the group. This scope does not extend to grouped rectangles,
 ellipses, or arbitrary nested geometry without their own native matrix.
 
-After evaluating cases 0013 through 0016, run `../scripts/shape3d_camera_metrics.py` with all clean
-native reports. It binds the exact source, ground truth, revision, and per-slide raster hashes. Solid
+After evaluating cases 0013 through 0016 and case 0019, run
+`../scripts/shape3d_camera_metrics.py` with all clean native reports. It binds the exact source,
+ground truth, revision, and per-slide raster hashes. Solid
 rows use normalized four-corner geometry and three material color bands, requiring corner score
 `0.98`, color score `0.97`, and, for measurable gradients, range ratio `0.65` and direction cosine
 `0.95`. Exact source-required outer shadows additionally require measurable native shadow evidence,
@@ -304,10 +308,13 @@ bounds remain diagnostic. Picture rows are inverse-projected to `384×384` and r
 `0.98`, rectified color score `0.95`, and tolerant edge F1 `0.90`, which detects wrong image content
 or crop behind a correct outer plane. Bottom-front rows require normalized corner score `0.98`,
 mean RGB band error no greater than `1.0`, and rejection of a restored source-flat-fill mutation.
-Pass the schema-v5 report to `run_capability_loop.py verify --camera-report ...`; callers cannot
+Custom-path rows require tolerant foreground F1 `0.95`, tolerant bounds score `0.98`,
+candidate/reference foreground area ratio `0.90`, centroid score `0.99`, and color score `0.98`.
+Pass the schema-v6 report to `run_capability_loop.py verify --camera-report ...`; callers cannot
 self-attest `camera-local`.
 The same report erases every measurable candidate shadow and applies a 12% left crop plus rescale to
-each rectified picture. Both mutations must be rejected by their target metric, so the gate also
+each rectified picture. It also vertically squashes every custom-path candidate to 20% height. All
+matching mutations must be rejected by their target metric, so the gate also
 proves that the selected corpus remains sensitive to the failure it claims to cover.
 
 On macOS the PowerPoint interactive session must remain available. Error `-9074` can come from a

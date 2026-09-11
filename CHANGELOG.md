@@ -18,13 +18,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus an eighteen-case, fifty-two-slide
+  shapes and pictures, with stable renderer fallback reasons, plus a nineteen-case, fifty-eight-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
   ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
   vertical and combined source crops, plus explicit- and implicit-depth camera planes, editable-text
   projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
   implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
-  omitted/explicit default top-bevel dimensions. A nine-slide donut matrix independently crosses
+  omitted/explicit default top-bevel dimensions. A six-slide custom-geometry matrix crosses one
+  bounded multi-contour cubic silhouette over square/wide/tall bounds and blue/white paint for the
+  exact `perspectiveRelaxedModerately` tuple. A nine-slide donut matrix independently crosses
   intermediate `0.75|1.25|2.0` aspects with `10000|default25000|40000` adjustments.
 - Added a schema-v8 bevel-ring fidelity metric and derived capability gate with independent dynamic
   range and shadow-amplitude floors, a `1.05` general directional shadow-overshoot ceiling, a
@@ -40,14 +42,15 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Grouped donuts now rasterize their circular bevel lighting in the child OOXML coordinate space
   before the non-identity group stretch. This removes the concentrated dark lobe seen on the tall
   adjustment row while leaving the independently verified grouped rect and ellipse paths unchanged.
-- Added a schema-v5 camera-plane metric and derived capability gate that bind native raster hashes
+- Added a schema-v6 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,
   projected bounds, and ink retention for live text; and rectified picture color/edge fidelity so
   source-crop errors cannot pass on correct outer geometry alone. It also verifies the exact
   bottom-bevel front-material tuple through three interior color bands and a restored-flat-fill
-  mutation. The report erases each measurable shadow and injects a 12% picture crop as the other
-  mutation controls; promotion fails unless each corresponding local metric detects its fault.
+  mutation, plus bounded custom-path foreground, bounds, area, centroid, and color fidelity. The
+  report erases each measurable shadow, injects a 12% picture crop, and vertically squashes custom
+  silhouettes to 20% height; promotion fails unless each corresponding local metric detects its fault.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -78,6 +81,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   preserving live DOM content and normal picture cropping. Text-body/style, stroke, transform,
   depth, bevel, contour, material, effect, camera, light, paint, stretch, blip-effect, and source-crop
   values outside the accepted matrix retain the ordinary flat path with a diagnostic reason.
+- Project the native-verified standalone `1000×1000` multi-contour numeric line/cubic custom-path
+  profile directly through the exact `perspectiveRelaxedModerately` homography for three physical
+  bounds and explicit blue/white paint. Rational cubics are adaptively flattened in projected space
+  to a maximum `0.25px` error; guided, open, differently sized, transformed, styled, or effect-bearing
+  custom geometry retains the ordinary flat path.
 - Preserve the scene-only solid camera row's theme `effectRef=2` outer shadow on the visible
   projected polygon, with a filter region derived from the projected four-corner bounds so wide and
   tall planes are not clipped back to their pre-projection rectangle. Scale its blur and distance

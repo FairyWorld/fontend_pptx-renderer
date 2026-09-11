@@ -214,7 +214,8 @@ bevel plan.
 `src/renderer/Shape3DRenderer.ts` is a narrow decision and effect layer. It returns either an
 `orthographic-top-bevel` plan, a `camera-projected-plane` plan, a
 `camera-projected-text-plane` plan, a `camera-projected-picture-plane` plan, or an explicit
-flat-fallback reason before touching the DOM.
+flat-fallback reason before touching the DOM. The camera-plane plan records whether its SVG source
+is the verified rectangular preset or bounded custom-path profile.
 The top-bevel plan requires all of the following:
 
 - `orthographicFront` without camera rotation;
@@ -285,10 +286,16 @@ paths, so a matching child cannot accidentally enter the standalone-only lane. L
 its existing overlay. A 5% alpha fill remains on the ordinary composition path because the paired
 native 3D/flat rows differ by at most one RGB level.
 
-The camera-plane plan is a separate zero-depth lane with solid SVG, live DOM text, and live picture
-modalities. All require rectangular geometry with no local rotation or flip, backdrop, nonzero `z`,
-explicit effect list, bevel, contour, extrusion color, material, or extrusion. The solid modality
-requires an opaque supported fill, no visible text, and no visible stroke. The text modality requires
+The camera-plane plan is a separate zero-depth lane with preset/custom solid SVG, live DOM text, and
+live picture modalities. All require no local rotation or flip, backdrop, nonzero `z`, explicit
+effect list, bevel, contour, extrusion color, material, or extrusion. The preset solid modality
+requires rectangular geometry, an opaque supported fill, no visible text, and no visible stroke. The
+custom solid modality is limited to a standalone shape with no `p:style` or `a:sp3d`, explicit
+opaque `#2F75B5` or `#FFFFFF` paint, no visible text or stroke, and one `1000×1000` `a:custGeom`
+path. Its `avLst`, `gdLst`, `ahLst`, and `cxnLst` must be present and empty; its text rectangle must
+be the identity `l/t/r/b` rectangle; and it must contain at least two closed numeric contours made
+only from `moveTo`, `lnTo`, `cubicBezTo`, and `close`, with no path-level paint attributes. The only
+accepted physical bounds are `403.2×403.2`, `768×307.2`, and `307.2×518.4` CSS pixels. The text modality requires
 no shape fill, an absent line element and `p:style`, plus local `bodyPr wrap="none"` with the bounded
 anchor tuple and `a:spAutoFit`; inherited body properties, vertical text, and independent text bounds
 remain flat. The picture modality requires `a:stretch` without `a:fillRect`, a rectangular preset,
@@ -311,8 +318,9 @@ The accepted camera/light tuples are deliberately finite:
 `shape3d/CameraProjection.ts` rotates the four local plane corners around Y, then X, applies camera
 revolution, and performs perspective division when required. The perspective distance uses the
 presentation width and field of view; preset constants describe the native-observed viewport and
-projected-plane scales. The renderer emits one replacement SVG path and hides the ordinary flat
-path only after that replacement exists. Perspective solid rows receive a vertical `linearRGB`
+projected-plane scales. The bounded custom family uses its independently calibrated `1.1` viewport
+and projection scales across the square/wide/tall native matrix. The renderer emits one replacement
+SVG path and hides the ordinary flat path only after that replacement exists. Perspective solid rows receive a vertical `linearRGB`
 material field; identity and rotated orthographic controls use their native-observed flat material
 responses. The scene-only solid row's theme `effectRef=2` outer shadow is transferred from the
 hidden source path to this projected path. Its SVG filter uses the projected four-corner bounds to
@@ -322,23 +330,30 @@ interpolation for the native-verified camera tuple. For the exact text tuples,
 `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
 homography and applies it after text layout, while preserving the text DOM. The picture path applies
 the same homography to the existing crop-clipping stage, preserving the image pipeline and its
-source-crop semantics. This is independent planar math and does not introduce a mesh or WebGL
-dependency.
+source-crop semantics. For the custom SVG lane, the same homography projects each absolute line
+point directly. A projective transform maps polynomial cubics to rational cubics, so the renderer
+adaptively flattens each supported cubic in projected screen space with a maximum `0.25px` error,
+ten subdivision levels, and bounded token/point budgets while preserving closed contours and
+even-odd fill. This is independent planar math and does not introduce a mesh or WebGL dependency.
 
-The nineteen-slide native matrix covers identity and rotated orthographic controls, explicit
+The twenty-five-slide camera native matrix covers identity and rotated orthographic controls, explicit
 `a:sp3d`, scene-only implicit depth, square/wide/tall perspective shapes, explicit and theme paint,
 a non-identity group, two square/wide/tall live-text camera tuples, and four live-picture rows with
-absent, horizontal, vertical, and asymmetric source crops. Public solid-paint support remains
-limited to its explicit `#2F75B5` and theme `#4F81BD` rows. The schema-v5 local metric binds the
+absent, horizontal, vertical, and asymmetric source crops. It also crosses the bounded custom-path
+silhouette over square/wide/tall physical bounds and explicit blue/white paint. Public solid-paint
+support remains limited to the exact registry rows. The schema-v6 local metric binds the
 exact native rasters and checks normalized four-corner geometry, material color, gradient response,
 and required external-shadow evidence for solid planes; resolution-tolerant foreground, bounds, and
 ink retention for live text; and inverse-projected picture color plus tolerant edge fidelity for
-picture planes, in addition to the full-page oracle gate. Bottom-front rows add normalized corner
+picture planes, in addition to the full-page oracle gate. Custom rows require tolerant foreground
+F1 `0.95`, tolerant bounds score `0.98`, candidate/reference foreground area ratio `0.90`, centroid
+score `0.99`, and color score `0.98`. Bottom-front rows add normalized corner
 coverage and three interior material bands with mean RGB error at most `1.0`. The report also runs
 deterministic sensitivity mutations against the same rasters: erasing a measurable exterior shadow,
 applying a 12% left crop plus rescale to rectified picture content, and restoring bottom-front rows
-to the source flat fill. The derived gate fails if any applicable mutation still passes its target
-metric.
+to the source flat fill. It vertically squashes every custom candidate to 20% height and requires
+that mutation to fail the custom silhouette gate. The derived gate fails if any applicable mutation
+still passes its target metric.
 
 The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
 picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent
@@ -348,7 +363,8 @@ remain in their owning renderers.
 Anything outside the registry's bounded tuples stays on the existing flat path with a stable planner reason.
 Other perspective and rotated cameras, nonzero extrusion, materials/bevels/lights outside the
 verified top-bevel, camera-plane, and bottom-front tuples, negative
-or degenerate picture source crops, gradient/pattern/group/image-filled shapes, tiled pictures,
+or degenerate picture source crops, custom geometry outside the exact path profile or verified
+physical bounds, gradient/pattern/group/image-filled shapes, tiled pictures,
 chart `view3D`, and Office 2017 `model3d` are separate capability lanes. The raster lighting backend
 can consume arbitrary silhouettes, but support is still constrained by the planner and native
 evidence. This is bounded static rendering, not a general mesh or PowerPoint material engine.

@@ -13,14 +13,45 @@ from scripts.shape3d_camera_metrics import (
     build_camera_report,
     compute_bottom_bevel_front_metrics,
     compute_camera_plane_metrics,
+    compute_custom_geometry_camera_metrics,
     compute_picture_camera_metrics,
     compute_text_camera_metrics,
     extract_camera_shadow_slide_indices,
     extract_camera_slide_indices,
     extract_bottom_bevel_front_slide_indices,
+    extract_custom_geometry_camera_slide_indices,
     extract_picture_camera_slide_indices,
     extract_text_camera_slide_indices,
 )
+
+
+def _custom_geometry_specimen(
+    width: int,
+    height: int,
+    *,
+    background=(255, 255, 255),
+    foreground=(71, 144, 210),
+):
+    image = np.full((height, width, 3), background, dtype=np.uint8)
+    scale_x = width / 600
+    scale_y = height / 360
+    left = np.asarray(
+        [
+            (180, 185),
+            (210, 105),
+            (315, 92),
+            (330, 160),
+            (275, 205),
+            (180, 225),
+        ],
+        dtype=np.float64,
+    )
+    right = cv2.ellipse2Poly((370, 175), (62, 78), 0, 0, 360, 3).astype(np.float64)
+    for contour in (left, right):
+        contour[:, 0] *= scale_x
+        contour[:, 1] *= scale_y
+        cv2.fillPoly(image, [np.rint(contour).astype(np.int32)], foreground)
+    return image
 
 
 def _plane_specimen(
@@ -147,6 +178,58 @@ def test_camera_metric_rejects_flat_geometry_and_flat_material():
     assert metrics["cornerScore"] < 0.95
     assert metrics["gradientRangeRatio"] == 0
     assert metrics["gradientDirection"] == 0
+
+
+@pytest.mark.parametrize(
+    ("background", "foreground"),
+    [
+        ((255, 255, 255), (71, 144, 210)),
+        ((32, 56, 100), (255, 255, 255)),
+    ],
+)
+def test_custom_geometry_metric_accepts_scaled_equivalent_two_contour_silhouettes(
+    background,
+    foreground,
+):
+    reference = _custom_geometry_specimen(
+        600,
+        360,
+        background=background,
+        foreground=foreground,
+    )
+    candidate = _custom_geometry_specimen(
+        300,
+        180,
+        background=background,
+        foreground=foreground,
+    )
+
+    metrics = compute_custom_geometry_camera_metrics(reference, candidate)
+
+    assert metrics["passed"] is True
+    assert metrics["tolerantForegroundF1"] > 0.99
+    assert metrics["tolerantBoundsScore"] > 0.99
+    assert metrics["foregroundAreaRatio"] > 0.98
+    assert metrics["colorScore"] > 0.99
+    assert metrics["squashSensitivity"]["mutation"] == "vertical-squash"
+    assert metrics["squashSensitivity"]["mutatedPassed"] is False
+    assert metrics["squashSensitivity"]["detected"] is True
+
+
+def test_custom_geometry_metric_rejects_a_visible_vertical_sliver():
+    reference = _custom_geometry_specimen(600, 360)
+    candidate = np.full_like(reference, 255)
+    source_mask = np.any(reference != 255, axis=2).astype(np.uint8) * 255
+    source_pixels = reference.copy()
+    squashed_mask = cv2.resize(source_mask, (600, 72), interpolation=cv2.INTER_NEAREST)
+    squashed_pixels = cv2.resize(source_pixels, (600, 72), interpolation=cv2.INTER_AREA)
+    candidate[144:216][squashed_mask > 0] = squashed_pixels[squashed_mask > 0]
+
+    metrics = compute_custom_geometry_camera_metrics(reference, candidate)
+
+    assert metrics["passed"] is False
+    assert metrics["tolerantForegroundF1"] < metrics["thresholds"]["tolerantForegroundF1"]
+    assert metrics["foregroundAreaRatio"] < metrics["thresholds"]["foregroundAreaRatio"]
 
 
 def test_camera_metric_does_not_require_a_gradient_for_a_native_flat_control():
@@ -438,6 +521,46 @@ def test_extracts_exact_theme_shadow_contract_for_solid_camera_planes(tmp_path):
             target.writestr(name, data)
     assert extract_camera_slide_indices(wrong_theme) == {1}
     assert extract_camera_shadow_slide_indices(wrong_theme) == set()
+
+
+def test_extracts_only_bounded_multi_contour_custom_camera_rows(tmp_path):
+    source = tmp_path / "custom-camera.pptx"
+    positive = """
+      <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:cSld><p:spTree><p:sp><p:nvSpPr/><p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="3840480" cy="3840480"/></a:xfrm>
+          <a:custGeom><a:avLst/><a:gdLst/><a:ahLst/><a:cxnLst/><a:rect l="l" t="t" r="r" b="b"/><a:pathLst><a:path w="1000" h="1000">
+            <a:moveTo><a:pt x="0" y="500"/></a:moveTo>
+            <a:cubicBezTo><a:pt x="0" y="120"/><a:pt x="280" y="0"/><a:pt x="450" y="160"/></a:cubicBezTo>
+            <a:lnTo><a:pt x="0" y="720"/></a:lnTo><a:close/>
+            <a:moveTo><a:pt x="560" y="180"/></a:moveTo>
+            <a:cubicBezTo><a:pt x="700" y="20"/><a:pt x="1000" y="120"/><a:pt x="950" y="430"/></a:cubicBezTo>
+            <a:cubicBezTo><a:pt x="410" y="590"/><a:pt x="450" y="320"/><a:pt x="560" y="180"/></a:cubicBezTo><a:close/>
+          </a:path></a:pathLst></a:custGeom>
+          <a:solidFill><a:srgbClr val="2F75B5"/></a:solidFill><a:ln><a:noFill/></a:ln>
+          <a:scene3d><a:camera prst="perspectiveRelaxedModerately" fov="7200000"><a:rot lat="18590633" lon="0" rev="0"/></a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+        </p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p/></p:txBody></p:sp></p:spTree></p:cSld>
+      </p:sld>"""
+    white = positive.replace('val="2F75B5"', 'val="FFFFFF"').replace(
+        'cx="3840480" cy="3840480"',
+        'cx="7315200" cy="2926080"',
+    )
+    negatives = [
+        positive.replace('<a:moveTo><a:pt x="560" y="180"/></a:moveTo>', '<a:lnTo><a:pt x="560" y="180"/></a:lnTo>'),
+        positive.replace('<a:lnTo><a:pt x="0" y="720"/></a:lnTo>', '<a:quadBezTo><a:pt x="0" y="720"/><a:pt x="10" y="10"/></a:quadBezTo>'),
+        positive.replace('</p:spPr><p:txBody>', '</p:spPr><p:style/><p:txBody>'),
+        positive.replace('</p:spPr><p:txBody>', '<a:sp3d/></p:spPr><p:txBody>'),
+        positive.replace('cx="3840480" cy="3840480"', 'cx="4000000" cy="3840480"'),
+        positive.replace('val="2F75B5"', 'val="70AD47"'),
+    ]
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr("ppt/slides/slide1.xml", positive)
+        archive.writestr("ppt/slides/slide2.xml", white)
+        for index, negative in enumerate(negatives, start=3):
+            archive.writestr(f"ppt/slides/slide{index}.xml", negative)
+
+    assert extract_custom_geometry_camera_slide_indices(source) == {0, 1}
 
 
 def test_extracts_only_native_backed_bottom_bevel_front_material_rows(tmp_path):
