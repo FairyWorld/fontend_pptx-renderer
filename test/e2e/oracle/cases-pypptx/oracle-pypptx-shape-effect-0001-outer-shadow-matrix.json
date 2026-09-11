@@ -66,7 +66,7 @@
       "semantics=inverse|defaults|offset|direction|uniformScale|colorModifiers",
       "geometry=rect|roundRect|ellipse",
       "geometry.aspect=square|wide|tall",
-      "container=standalone|unrotatedGroup",
+      "container=standalone|singleLevelUniformUnrotatedGroup",
       "paint=explicitSolid|simpleGradient",
       "shadow.color=srgbClr|schemeClr+lumMod+lumOff+alpha",
       "shadow.skew=absent",

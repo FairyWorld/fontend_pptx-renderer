@@ -3,8 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import posixpath
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping, Sequence
+from xml.etree import ElementTree
+from zipfile import BadZipFile, ZipFile
 
 from oracle.capability_contract import (
     CapabilityDefinition,
@@ -14,7 +17,14 @@ from oracle.capability_evidence import compute_implementation_fingerprint
 
 
 DERIVED_GATES = frozenset(
-    {"native-powerpoint", "manual-visual", "regression", "bevel-local", "camera-local"}
+    {
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "bevel-local",
+        "camera-local",
+        "shadow-local",
+    }
 )
 SSIM_REGRESSION_BUDGET = 0.02
 BEVEL_SCORE_THRESHOLD = 0.60
@@ -62,6 +72,18 @@ CAMERA_CUSTOM_FOREGROUND_AREA_RATIO_THRESHOLD = 0.90
 CAMERA_CUSTOM_CENTROID_SCORE_THRESHOLD = 0.99
 CAMERA_CUSTOM_COLOR_SCORE_THRESHOLD = 0.98
 CAMERA_CUSTOM_VERTICAL_SQUASH_RATIO = 0.20
+SHADOW_RING_INNER_RATIO = 0.002
+SHADOW_RING_OUTER_RATIO = 0.05
+SHADOW_BACKGROUND_NOISE_FLOOR = 2.0
+SHADOW_MINIMUM_REFERENCE_DENSITY = 0.25
+SHADOW_INVISIBLE_DENSITY_THRESHOLD = 0.50
+SHADOW_ENERGY_RATIO_THRESHOLD = 0.75
+SHADOW_OVERSHOOT_RATIO_THRESHOLD = 1.25
+SHADOW_FIELD_COSINE_THRESHOLD = 0.90
+SHADOW_FIELD_IOU_THRESHOLD = 0.55
+SHADOW_FIELD_ERROR_THRESHOLD = 0.35
+SHADOW_CENTROID_ERROR_RATIO_THRESHOLD = 0.03
+SHADOW_FIELD_BINARY_THRESHOLD = 2.0
 
 
 class CapabilityVerificationError(ValueError):
@@ -141,6 +163,117 @@ def _case_hashes(report: Mapping[str, Any], case_id: str) -> tuple[str, str]:
         _sha256(source.get("sha256"), f"{case_id} source"),
         _sha256(ground_truth.get("combinedSha256"), f"{case_id} ground truth"),
     )
+
+
+def _source_outer_shadow_slide_indices(
+    report: Mapping[str, Any],
+    case_id: str,
+    expected_source_hash: str,
+    repo: Path,
+) -> set[int]:
+    provenance = _mapping(report.get("provenance"), f"{case_id} provenance")
+    inputs = _mapping(provenance.get("inputs"), f"{case_id} inputs")
+    source = _mapping(inputs.get("sourcePptx"), f"{case_id} sourcePptx")
+    path_value = source.get("path")
+    expected_relative = (
+        PurePosixPath("test/e2e/testdata/cases") / case_id / "source.pptx"
+    )
+    if (
+        not isinstance(path_value, str)
+        or "\\" in path_value
+        or PurePosixPath(path_value) != expected_relative
+    ):
+        raise CapabilityVerificationError(
+            f"{case_id} sourcePptx path must identify its local case source"
+        )
+
+    source_path = repo / expected_relative.as_posix()
+    testdata_root = (repo / "test/e2e/testdata").resolve()
+    try:
+        resolved_source = source_path.resolve(strict=True)
+        resolved_source.relative_to(testdata_root)
+    except (FileNotFoundError, OSError, ValueError) as error:
+        raise CapabilityVerificationError(
+            f"{case_id} sourcePptx is missing or escapes local testdata"
+        ) from error
+    if not resolved_source.is_file():
+        raise CapabilityVerificationError(f"{case_id} sourcePptx is missing")
+    size_bytes = source.get("sizeBytes")
+    if (
+        not isinstance(size_bytes, int)
+        or isinstance(size_bytes, bool)
+        or size_bytes != resolved_source.stat().st_size
+    ):
+        raise CapabilityVerificationError(f"{case_id} sourcePptx size changed")
+    if hashlib.sha256(resolved_source.read_bytes()).hexdigest() != expected_source_hash:
+        raise CapabilityVerificationError(f"{case_id} sourcePptx hash changed")
+
+    presentation_namespace = (
+        "http://schemas.openxmlformats.org/presentationml/2006/main"
+    )
+    drawing_namespace = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    office_relationship_namespace = (
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    )
+    package_relationship_namespace = (
+        "http://schemas.openxmlformats.org/package/2006/relationships"
+    )
+    try:
+        with ZipFile(resolved_source) as archive:
+            presentation = ElementTree.fromstring(archive.read("ppt/presentation.xml"))
+            relationships = ElementTree.fromstring(
+                archive.read("ppt/_rels/presentation.xml.rels")
+            )
+            targets = {
+                relationship.get("Id"): relationship.get("Target")
+                for relationship in relationships.findall(
+                    f"{{{package_relationship_namespace}}}Relationship"
+                )
+                if relationship.get("TargetMode") != "External"
+            }
+            slide_ids = presentation.findall(
+                f"./{{{presentation_namespace}}}sldIdLst/"
+                f"{{{presentation_namespace}}}sldId"
+            )
+            shadow_slides: set[int] = set()
+            for slide_index, slide_id in enumerate(slide_ids):
+                relationship_id = slide_id.get(
+                    f"{{{office_relationship_namespace}}}id"
+                )
+                target = targets.get(relationship_id)
+                if not isinstance(target, str) or not target:
+                    raise CapabilityVerificationError(
+                        f"{case_id} source OOXML has an unresolved slide relationship"
+                    )
+                part_name = posixpath.normpath(posixpath.join("ppt", target))
+                relative_part = PurePosixPath(part_name)
+                if (
+                    relative_part.is_absolute()
+                    or ".." in relative_part.parts
+                    or not relative_part.parts
+                    or relative_part.parts[0] != "ppt"
+                ):
+                    raise CapabilityVerificationError(
+                        f"{case_id} source OOXML has an invalid slide target"
+                    )
+                slide = ElementTree.fromstring(archive.read(relative_part.as_posix()))
+                outer_shadow_path = (
+                    f"./{{{presentation_namespace}}}spPr/"
+                    f"{{{drawing_namespace}}}effectLst/"
+                    f"{{{drawing_namespace}}}outerShdw"
+                )
+                if any(
+                    shape.find(outer_shadow_path) is not None
+                    for shape in slide.iter(f"{{{presentation_namespace}}}sp")
+                ):
+                    shadow_slides.add(slide_index)
+    except CapabilityVerificationError:
+        raise
+    except (BadZipFile, KeyError, ElementTree.ParseError, OSError) as error:
+        raise CapabilityVerificationError(
+            f"{case_id} source OOXML cannot be verified"
+        ) from error
+    return shadow_slides
 
 
 def _case_result(
@@ -1640,6 +1773,297 @@ def _validate_camera_local(
         raise CapabilityVerificationError("camera-local report failed")
 
 
+def _validate_shadow_local(
+    report: Mapping[str, Any],
+    current: Mapping[str, Mapping[str, Any]],
+    current_revision: str,
+    repo: Path,
+) -> None:
+    if report.get("schemaVersion") != 1:
+        raise CapabilityVerificationError("shadow-local report requires schemaVersion=1")
+    renderer = _mapping(report.get("renderer"), "shadow-local renderer")
+    if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
+        raise CapabilityVerificationError(
+            "shadow-local report must match the clean native-report revision"
+        )
+    expected_thresholds = {
+        "ringInnerRatio": SHADOW_RING_INNER_RATIO,
+        "ringOuterRatio": SHADOW_RING_OUTER_RATIO,
+        "backgroundNoiseFloor": SHADOW_BACKGROUND_NOISE_FLOOR,
+        "minimumReferenceShadowDensity": SHADOW_MINIMUM_REFERENCE_DENSITY,
+        "invisibleShadowDensity": SHADOW_INVISIBLE_DENSITY_THRESHOLD,
+        "shadowEnergyRatio": SHADOW_ENERGY_RATIO_THRESHOLD,
+        "shadowOvershootRatio": SHADOW_OVERSHOOT_RATIO_THRESHOLD,
+        "shadowFieldCosine": SHADOW_FIELD_COSINE_THRESHOLD,
+        "shadowFieldIou": SHADOW_FIELD_IOU_THRESHOLD,
+        "shadowFieldError": SHADOW_FIELD_ERROR_THRESHOLD,
+        "shadowCentroidErrorRatio": SHADOW_CENTROID_ERROR_RATIO_THRESHOLD,
+        "shadowFieldBinaryThreshold": SHADOW_FIELD_BINARY_THRESHOLD,
+    }
+    thresholds = _mapping(report.get("thresholds"), "shadow-local thresholds")
+    if thresholds != expected_thresholds:
+        raise CapabilityVerificationError("shadow-local report uses unexpected thresholds")
+
+    values = report.get("caseResults")
+    if not isinstance(values, list) or any(not isinstance(value, Mapping) for value in values):
+        raise CapabilityVerificationError("shadow-local caseResults must be a list of objects")
+    by_case: dict[str, Mapping[str, Any]] = {}
+    for value in values:
+        case_id = value.get("caseId")
+        if not isinstance(case_id, str) or not case_id or case_id in by_case:
+            raise CapabilityVerificationError("shadow-local case IDs must be unique strings")
+        by_case[case_id] = value
+    if set(by_case) != set(current):
+        raise CapabilityVerificationError("shadow-local case IDs must match native reports")
+
+    applicable_count = 0
+    all_cases_passed = True
+    for case_id, value in by_case.items():
+        source_hash, ground_truth_hash = _case_hashes(current[case_id], case_id)
+        source_shadow_slides = _source_outer_shadow_slide_indices(
+            current[case_id], case_id, source_hash, repo
+        )
+        if value.get("sourceSha256") != source_hash or value.get(
+            "groundTruthSha256"
+        ) != ground_truth_hash:
+            raise CapabilityVerificationError(
+                f"{case_id} shadow-local input hashes must match native reports"
+            )
+        slides = value.get("slides")
+        if not isinstance(slides, list) or any(not isinstance(slide, Mapping) for slide in slides):
+            raise CapabilityVerificationError(f"{case_id} shadow-local slides must be objects")
+        native_slide_values = current[case_id].get("perSlide")
+        if not isinstance(native_slide_values, list) or any(
+            not isinstance(slide, Mapping) for slide in native_slide_values
+        ):
+            raise CapabilityVerificationError(
+                f"{case_id} native report is missing per-slide artifacts"
+            )
+        native_slides = {
+            slide.get("slideIdx"): slide
+            for slide in native_slide_values
+            if isinstance(slide.get("slideIdx"), int) and slide.get("hidden") is not True
+        }
+        seen_slide_indices: set[int] = set()
+        slide_passes: list[bool] = []
+        shadow_required_count = 0
+        for ordinal, slide in enumerate(slides):
+            context = f"{case_id} shadow-local slide {ordinal}"
+            source_slide_index = slide.get("slideIdx")
+            if (
+                not isinstance(source_slide_index, int)
+                or isinstance(source_slide_index, bool)
+                or source_slide_index < 0
+                or source_slide_index in seen_slide_indices
+            ):
+                raise CapabilityVerificationError(f"{context} index is invalid or duplicated")
+            seen_slide_indices.add(source_slide_index)
+            native_slide = native_slides.get(source_slide_index)
+            if native_slide is None:
+                raise CapabilityVerificationError(f"{context} is absent from the native report")
+            native_artifacts = _mapping(
+                native_slide.get("renderArtifacts"), f"{context} native render artifacts"
+            )
+            for kind in ("reference", "candidate"):
+                path_value = slide.get(f"{kind}Path")
+                expected_hash = _sha256(slide.get(f"{kind}Sha256"), f"{context} {kind}")
+                native_artifact = _mapping(
+                    native_artifacts.get(kind), f"{context} native {kind} artifact"
+                )
+                if (
+                    native_artifact.get("path") != path_value
+                    or native_artifact.get("sha256") != expected_hash
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} does not match native report artifacts"
+                    )
+                if not isinstance(path_value, str) or "\\" in path_value:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                relative = PurePosixPath(path_value)
+                if relative.is_absolute() or ".." in relative.parts or "." in relative.parts:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                artifact = (repo / relative.as_posix()).resolve()
+                try:
+                    artifact.relative_to(repo.resolve())
+                except ValueError as error:
+                    raise CapabilityVerificationError(
+                        f"{context} {kind} path escapes the repository"
+                    ) from error
+                if not artifact.is_file():
+                    raise CapabilityVerificationError(f"{context} {kind} artifact is missing")
+                digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+                if digest != expected_hash:
+                    raise CapabilityVerificationError(f"{context} {kind} artifact hash changed")
+
+            shadow_required = slide.get("shadowRequired")
+            if not isinstance(shadow_required, bool):
+                raise CapabilityVerificationError(f"{context} shadow requirement is invalid")
+            if shadow_required is not (source_slide_index in source_shadow_slides):
+                raise CapabilityVerificationError(
+                    f"{context} shadow requirement does not match source OOXML"
+                )
+            if shadow_required:
+                shadow_required_count += 1
+            metrics = _mapping(slide.get("metrics"), f"{context} metrics")
+            if metrics.get("shadowRequired") is not shadow_required:
+                raise CapabilityVerificationError(f"{context} shadow requirement is inconsistent")
+            measurable = metrics.get("shadowMeasurable")
+            if not isinstance(measurable, bool):
+                raise CapabilityVerificationError(f"{context} measurability is invalid")
+            reference_density = _finite_metric(
+                metrics.get("referenceShadowDensity"), f"{context} reference density"
+            )
+            candidate_density = _finite_metric(
+                metrics.get("candidateShadowDensity"), f"{context} candidate density"
+            )
+            energy_ratio = _finite_metric(
+                metrics.get("shadowEnergyRatio"), f"{context} energy ratio"
+            )
+            overshoot_ratio = _finite_metric(
+                metrics.get("shadowOvershootRatio"), f"{context} overshoot ratio"
+            )
+            field_cosine = _finite_metric(
+                metrics.get("shadowFieldCosine"), f"{context} field cosine"
+            )
+            field_iou = _finite_metric(metrics.get("shadowFieldIou"), f"{context} field IoU")
+            field_error = _finite_metric(
+                metrics.get("shadowFieldError"), f"{context} field error"
+            )
+            centroid_error = _finite_metric(
+                metrics.get("shadowCentroidErrorRatio"), f"{context} centroid error"
+            )
+            ring_pixels = metrics.get("shadowRingPixels")
+            ring_inner = metrics.get("shadowRingInnerPx")
+            ring_outer = metrics.get("shadowRingOuterPx")
+            if (
+                reference_density < 0
+                or candidate_density < 0
+                or not 0 <= energy_ratio <= 1
+                or overshoot_ratio < 0
+                or not 0 <= field_cosine <= 1
+                or not 0 <= field_iou <= 1
+                or not 0 <= field_error <= 1
+                or centroid_error < 0
+                or not isinstance(ring_pixels, int)
+                or isinstance(ring_pixels, bool)
+                or ring_pixels < 64
+                or not isinstance(ring_inner, int)
+                or isinstance(ring_inner, bool)
+                or ring_inner < 1
+                or not isinstance(ring_outer, int)
+                or isinstance(ring_outer, bool)
+                or ring_outer <= ring_inner
+            ):
+                raise CapabilityVerificationError(f"{context} metrics are outside their domains")
+            maximum_density = max(reference_density, candidate_density)
+            expected_energy_ratio = (
+                min(reference_density, candidate_density) / maximum_density
+                if maximum_density > 1e-9
+                else 1.0
+            )
+            expected_overshoot = (
+                candidate_density / reference_density
+                if reference_density > 1e-9
+                else 1.0 + candidate_density
+            )
+            expected_measurable = (
+                shadow_required and reference_density >= SHADOW_MINIMUM_REFERENCE_DENSITY
+            )
+            if (
+                abs(energy_ratio - expected_energy_ratio) > 1e-9
+                or abs(overshoot_ratio - expected_overshoot) > 1e-9
+                or measurable is not expected_measurable
+            ):
+                raise CapabilityVerificationError(f"{context} metrics are inconsistent")
+            if _mapping(metrics.get("thresholds"), f"{context} thresholds") != expected_thresholds:
+                raise CapabilityVerificationError(f"{context} uses unexpected thresholds")
+
+            sensitivity = _mapping(
+                metrics.get("shadowSensitivity"), f"{context} sensitivity"
+            )
+            if (
+                sensitivity.get("mutation") != "erase-exterior-shadow"
+                or sensitivity.get("applicable") is not measurable
+            ):
+                raise CapabilityVerificationError(f"{context} sensitivity is inconsistent")
+            sensitivity_detected = sensitivity.get("detected")
+            if measurable:
+                mutated_density = _finite_metric(
+                    sensitivity.get("mutatedCandidateShadowDensity"),
+                    f"{context} mutated candidate density",
+                )
+                mutated_energy_ratio = _finite_metric(
+                    sensitivity.get("mutatedShadowEnergyRatio"),
+                    f"{context} mutated energy ratio",
+                )
+                mutated_passed = sensitivity.get("mutatedShadowPassed")
+                mutated_maximum_density = max(reference_density, mutated_density)
+                expected_mutated_energy_ratio = (
+                    min(reference_density, mutated_density) / mutated_maximum_density
+                    if mutated_maximum_density > 1e-9
+                    else 1.0
+                )
+                if (
+                    mutated_density < 0
+                    or not 0 <= mutated_energy_ratio <= 1
+                    or abs(mutated_energy_ratio - expected_mutated_energy_ratio) > 1e-9
+                    or mutated_density > SHADOW_INVISIBLE_DENSITY_THRESHOLD
+                    or mutated_energy_ratio >= SHADOW_ENERGY_RATIO_THRESHOLD
+                    or mutated_passed is not False
+                    or sensitivity_detected is not True
+                ):
+                    raise CapabilityVerificationError(f"{context} sensitivity is invalid")
+            elif sensitivity_detected is not None:
+                raise CapabilityVerificationError(f"{context} sensitivity is invalid")
+
+            if measurable:
+                expected_pass = (
+                    energy_ratio >= SHADOW_ENERGY_RATIO_THRESHOLD
+                    and overshoot_ratio <= SHADOW_OVERSHOOT_RATIO_THRESHOLD
+                    and field_cosine >= SHADOW_FIELD_COSINE_THRESHOLD
+                    and field_iou >= SHADOW_FIELD_IOU_THRESHOLD
+                    and field_error <= SHADOW_FIELD_ERROR_THRESHOLD
+                    and centroid_error <= SHADOW_CENTROID_ERROR_RATIO_THRESHOLD
+                    and sensitivity_detected is True
+                )
+            else:
+                invisible_limit = max(
+                    SHADOW_INVISIBLE_DENSITY_THRESHOLD,
+                    reference_density * SHADOW_OVERSHOOT_RATIO_THRESHOLD,
+                )
+                expected_pass = candidate_density <= invisible_limit
+            if (
+                metrics.get("passed") is not expected_pass
+                or slide.get("passed") is not expected_pass
+            ):
+                raise CapabilityVerificationError(f"{context} pass status is inconsistent")
+            slide_passes.append(expected_pass)
+
+        if seen_slide_indices != set(native_slides):
+            raise CapabilityVerificationError(
+                f"{case_id} shadow-local slides must match visible native slides"
+            )
+        applicable = shadow_required_count > 0
+        if value.get("applicable") is not applicable:
+            raise CapabilityVerificationError(
+                f"{case_id} shadow-local applicability is inconsistent"
+            )
+        if applicable:
+            applicable_count += 1
+        case_passed = applicable and all(slide_passes)
+        if value.get("passed") is not case_passed:
+            raise CapabilityVerificationError(
+                f"{case_id} shadow-local pass status is inconsistent"
+            )
+        all_cases_passed = all_cases_passed and case_passed
+        if not case_passed:
+            raise CapabilityVerificationError(f"{case_id} shadow-local report failed")
+    if applicable_count < 1 or report.get("applicableCaseCount") != applicable_count:
+        raise CapabilityVerificationError("shadow-local report requires applicable case evidence")
+    if report.get("passed") is not all_cases_passed or report.get("passed") is not True:
+        raise CapabilityVerificationError("shadow-local report failed")
+
+
 def normalize_native_evaluation_reports(
     capability: CapabilityDefinition,
     reports: Sequence[Mapping[str, Any]],
@@ -1651,6 +2075,7 @@ def normalize_native_evaluation_reports(
     manual_verdicts: Mapping[str, str] | None = None,
     bevel_report: Mapping[str, Any] | None = None,
     camera_report: Mapping[str, Any] | None = None,
+    shadow_report: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if oracle not in {"powerpoint-macos", "powerpoint-windows"}:
         raise CapabilityVerificationError(
@@ -1700,6 +2125,10 @@ def normalize_native_evaluation_reports(
     if camera_report is not None:
         _validate_camera_local(camera_report, current, next(iter(revisions)), repo)
         camera_local_passed = True
+    shadow_local_passed = False
+    if shadow_report is not None:
+        _validate_shadow_local(shadow_report, current, next(iter(revisions)), repo)
+        shadow_local_passed = True
     gates = {
         gate: (
             "passed"
@@ -1709,6 +2138,7 @@ def normalize_native_evaluation_reports(
             or (gate == "regression" and baseline_reports)
             or (gate == "bevel-local" and bevel_local_passed)
             or (gate == "camera-local" and camera_local_passed)
+            or (gate == "shadow-local" and shadow_local_passed)
             else "failed"
             if gate == "native-powerpoint"
             else "missing"

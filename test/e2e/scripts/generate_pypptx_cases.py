@@ -1597,7 +1597,7 @@ def _build_shape_effect_cases() -> list[CaseDef]:
         group.left = _emu(3.4)
         group.top = _emu(1.55)
         group.width = _emu(6.5)
-        group.height = _emu(4.0)
+        group.height = _emu(3.75)
 
         _add_standalone_shape(
             prs,
@@ -1631,7 +1631,7 @@ def _build_shape_effect_cases() -> list[CaseDef]:
                     "semantics=inverse|defaults|offset|direction|uniformScale|colorModifiers",
                     "geometry=rect|roundRect|ellipse",
                     "geometry.aspect=square|wide|tall",
-                    "container=standalone|unrotatedGroup",
+                    "container=standalone|singleLevelUniformUnrotatedGroup",
                     "paint=explicitSolid|simpleGradient",
                     "shadow.color=srgbClr|schemeClr+lumMod+lumOff+alpha",
                     "shadow.skew=absent",

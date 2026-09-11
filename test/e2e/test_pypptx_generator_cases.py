@@ -595,6 +595,16 @@ def test_outer_shadow_matrix_is_registered_and_serializes_exact_ooxml(tmp_path: 
         "rect",
     ]
 
+    group_xfrm = roots[6].xpath(".//p:grpSp/p:grpSpPr/a:xfrm", namespaces=ns)[0]
+    group_ext = group_xfrm.xpath("a:ext", namespaces=ns)[0]
+    group_child_ext = group_xfrm.xpath("a:chExt", namespaces=ns)[0]
+    assert group_ext is not None
+    assert group_child_ext is not None
+    group_scale_x = int(group_ext.get("cx")) / int(group_child_ext.get("cx"))
+    group_scale_y = int(group_ext.get("cy")) / int(group_child_ext.get("cy"))
+    assert group_scale_x == 1.25
+    assert abs(group_scale_y - group_scale_x) < 1e-9
+
     expected_attributes = [
         {"blurRad": "127000", "rotWithShape": "0"},
         {

@@ -332,7 +332,8 @@ def test_tracked_capability_contract_is_valid():
     validate_acceptance_history(registry, history)
     assert len(registry.capabilities) == 16
     outer_shadow = registry.by_id()["drawingml.shape.effect.outer-shadow"]
-    assert outer_shadow.render_mode == "approximate"
+    assert outer_shadow.render_mode == "native"
+    assert "shadow-local" in outer_shadow.required_gates
     assert tuple(
         (step.namespace, step.local_names)
         for step in outer_shadow.selectors[0].ancestor_path
@@ -351,6 +352,22 @@ def test_tracked_capability_contract_is_valid():
         ),
     )
     assert outer_shadow.scope["source"] == ("direct-shape-effect-list",)
+    assert outer_shadow.scope["alignment"] == ("absent-default-b", "b", "ctr", "tr")
+    assert outer_shadow.scope["scaleOoxmlPercent"] == (
+        "absent-default-100000",
+        92000,
+        100000,
+        102000,
+    )
+    assert outer_shadow.scope["groupScale"] == (
+        "absent-standalone",
+        "single-level-uniform-1.25",
+    )
+    assert outer_shadow.scope["rotWithShape"] == ("explicit-zero",)
+    assert outer_shadow.scope["combinationPolicy"] == (
+        "only-listed-verified-matrix-rows",
+    )
+    assert len(outer_shadow.scope["verifiedMatrixRows"]) == 7
     top_bevel = registry.by_id()["drawingml.shape.3d.top-bevel-contour"]
     assert top_bevel.scope["bevelPresetEncoding"] == (
         "explicit-circle",

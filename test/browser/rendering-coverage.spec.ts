@@ -148,6 +148,182 @@ test('browser accepts deterministic OOXML runtime geometry and bounded donut adj
   expect(pictureClipD).toContain('M10,50 A90,40');
 });
 
+test('bounded ordinary outer shadows keep native scale anchors and visible filter bounds', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { parseGroupNode } = await import('/src/model/nodes/GroupNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { renderGroup } = await import('/src/renderer/GroupRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+
+    const shapeXml = (id: number, x: number, shadow: string, preset = 'rect') => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="${id}" name="Shadow ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="${x * 9525}" y="381000"/><a:ext cx="2286000" cy="1143000"/></a:xfrm>
+          <a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:effectLst>${shadow}</a:effectLst>
+        </p:spPr>
+      </p:sp>`;
+    const scaledUp = renderShape(
+      parseShapeNode(
+        parseXml(
+          shapeXml(
+            1,
+            40,
+            '<a:outerShdw blurRad="115455" dist="46182" sx="102000" sy="102000" algn="ctr" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw>',
+          ),
+        ),
+      ),
+      createMockRenderContext(),
+    );
+    const scaledDown = renderShape(
+      parseShapeNode(
+        parseXml(
+          shapeXml(
+            2,
+            360,
+            '<a:outerShdw blurRad="317500" dist="127000" dir="8100000" sx="92000" sy="92000" algn="tr" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw>',
+          ),
+        ),
+      ),
+      createMockRenderContext(),
+    );
+    const groupXml = `
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="10" name="Rotated group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm rot="2700000"><a:off x="6477000" y="381000"/><a:ext cx="2286000" cy="1143000"/><a:chOff x="0" y="0"/><a:chExt cx="2286000" cy="1143000"/></a:xfrm></p:grpSpPr>
+        ${shapeXml(
+          3,
+          0,
+          '<a:outerShdw blurRad="115455" dist="46182" sx="102000" sy="102000" algn="ctr" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw>',
+        )}
+      </p:grpSp>`;
+    const rotatedGroup = renderGroup(
+      parseGroupNode(parseXml(groupXml)),
+      createMockRenderContext(),
+      (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
+    );
+    const uniformGroupXml = `
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="11" name="Uniform group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm><a:off x="6191250" y="381000"/><a:ext cx="2857500" cy="1428750"/><a:chOff x="0" y="0"/><a:chExt cx="2286000" cy="1143000"/></a:xfrm></p:grpSpPr>
+        ${shapeXml(
+          4,
+          0,
+          '<a:outerShdw blurRad="76200" dist="50800" dir="2700000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw>',
+          'roundRect',
+        )}
+      </p:grpSp>`;
+    const uniformGroup = renderGroup(
+      parseGroupNode(parseXml(uniformGroupXml)),
+      createMockRenderContext(),
+      (node, context) => renderShape(node as Parameters<typeof renderShape>[0], context),
+    );
+
+    const host = document.createElement('div');
+    host.id = 'outer-shadow-browser-host';
+    host.style.position = 'relative';
+    host.style.width = '960px';
+    host.style.height = '240px';
+    host.style.background = '#fff';
+    host.append(scaledUp, scaledDown, rotatedGroup, uniformGroup);
+    document.body.append(host);
+
+    const inspect = (element: HTMLElement) => {
+      const svg = element.querySelector('svg')!;
+      const group = svg.querySelector<SVGGElement>(
+        ':scope > g[data-pptx-outer-shadow="scaled-silhouette"]',
+      )!;
+      const main = svg.querySelector<SVGPathElement>(':scope > path')!;
+      const filter = svg.querySelector<SVGFilterElement>('filter[id^="shape-shadow-blur-"]')!;
+      return {
+        scaleX: group.getAttribute('data-pptx-shadow-scale-x'),
+        scaleY: group.getAttribute('data-pptx-shadow-scale-y'),
+        alignment: group.getAttribute('data-pptx-shadow-alignment'),
+        anchorX: Number(group.getAttribute('data-pptx-shadow-anchor-x')),
+        anchorY: Number(group.getAttribute('data-pptx-shadow-anchor-y')),
+        width: Number(svg.getAttribute('width')),
+        height: Number(svg.getAttribute('height')),
+        mainFilter: main.getAttribute('filter'),
+        shadowBeforeMain:
+          Array.from(svg.children).indexOf(group) < Array.from(svg.children).indexOf(main),
+        filterExpandsLeft: Number(filter.getAttribute('x')) < 0,
+        filterExpandsTop: Number(filter.getAttribute('y')) < 0,
+        filterExpandsRight:
+          Number(filter.getAttribute('width')) > Number(svg.getAttribute('width')),
+        filterExpandsBottom:
+          Number(filter.getAttribute('height')) > Number(svg.getAttribute('height')),
+        overflow: svg.style.overflow,
+      };
+    };
+
+    return {
+      scaledUp: inspect(scaledUp),
+      scaledDown: inspect(scaledDown),
+      rotatedGroupHasClone: !!rotatedGroup.querySelector(
+        '[data-pptx-outer-shadow="scaled-silhouette"]',
+      ),
+      rotatedGroupFallback: rotatedGroup.querySelector('svg > path')?.getAttribute('filter'),
+      uniformGroupHasClone: !!uniformGroup.querySelector(
+        '[data-pptx-outer-shadow="scaled-silhouette"]',
+      ),
+      uniformGroupFilter: uniformGroup.querySelector('svg > path')?.getAttribute('filter'),
+      uniformGroupStdDeviation: uniformGroup
+        .querySelector('feDropShadow')
+        ?.getAttribute('stdDeviation'),
+    };
+  });
+
+  expect(result.scaledUp).toMatchObject({
+    scaleX: '1.02',
+    scaleY: '1.02',
+    alignment: 'ctr',
+    mainFilter: null,
+    shadowBeforeMain: true,
+    filterExpandsLeft: true,
+    filterExpandsTop: true,
+    filterExpandsRight: true,
+    filterExpandsBottom: true,
+    overflow: 'visible',
+  });
+  expect(result.scaledUp.anchorX).toBeCloseTo(result.scaledUp.width / 2, 8);
+  expect(result.scaledUp.anchorY).toBeCloseTo(result.scaledUp.height / 2, 8);
+  expect(result.scaledDown).toMatchObject({
+    scaleX: '0.92',
+    scaleY: '0.92',
+    alignment: 'tr',
+    anchorY: 0,
+    mainFilter: null,
+    shadowBeforeMain: true,
+    overflow: 'visible',
+  });
+  expect(result.scaledDown.anchorX).toBeCloseTo(result.scaledDown.width, 8);
+  expect(result.rotatedGroupHasClone).toBe(false);
+  expect(result.rotatedGroupFallback).toMatch(/^url\(#shape-shadow-/);
+  expect(result.uniformGroupHasClone).toBe(false);
+  expect(result.uniformGroupFilter).toMatch(/^url\(#shape-shadow-/);
+  expect(result.uniformGroupStdDeviation).toBe('4.00');
+
+  const host = page.locator('#outer-shadow-browser-host');
+  const first = await host.screenshot();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  const second = await host.screenshot();
+  expect(first.equals(second)).toBe(true);
+});
+
 test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, and disposal', async ({
   page,
 }) => {

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { parseXml } from '../../../src/parser/XmlParser';
 import { parseShapeNode } from '../../../src/model/nodes/ShapeNode';
 import { renderShape } from '../../../src/renderer/ShapeRenderer';
+import type { RenderContext } from '../../../src/renderer/RenderContext';
 import { getOoxmlPresetShapePaths } from '../../../src/shapes/ooxmlGeometryRuntime';
 import { createMockRenderContext } from '../helpers/mockContext';
 import { applyColorModifiers, applyTint, hexToRgb, rgbToHex } from '../../../src/utils/color';
@@ -3763,9 +3764,58 @@ describe('ShapeRenderer', () => {
     expect(path?.getAttribute('filter') ?? '').toContain('url(#shape-shadow-');
     expect(filter).toBeTruthy();
     expect(filter?.querySelector('feDropShadow')).toBeTruthy();
+    expect(el.querySelector('[data-pptx-outer-shadow="scaled-silhouette"]')).toBeNull();
   });
 
-  it('keeps scaled-down outer shadows visible on non-line SVG paths (xcloud-plan slide 42)', () => {
+  it('renders a 102% centered outer shadow as a separately scaled silhouette', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="301" name="Scaled up shadow"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:effectLst>
+            <a:outerShdw blurRad="115455" dist="46182" sx="102000" sy="102000" algn="ctr" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </p:spPr>
+      </p:sp>
+    `;
+
+    const shapeNode = parseShapeNode(parseXml(xml));
+    const el = renderShape(shapeNode, createMockRenderContext());
+    const mainPath = el.querySelector('svg > path');
+    const shadowGroup = el.querySelector<SVGGElement>(
+      'svg > g[data-pptx-outer-shadow="scaled-silhouette"]',
+    );
+    const shadowPath = shadowGroup?.querySelector('path');
+
+    expect(mainPath?.getAttribute('filter')).toBeNull();
+    expect(shadowGroup).toBeTruthy();
+    expect(shadowGroup?.getAttribute('data-pptx-shadow-scale-x')).toBe('1.02');
+    expect(shadowGroup?.getAttribute('data-pptx-shadow-scale-y')).toBe('1.02');
+    expect(shadowGroup?.getAttribute('data-pptx-shadow-alignment')).toBe('ctr');
+    expect(Number(shadowGroup?.getAttribute('data-pptx-shadow-anchor-x'))).toBeCloseTo(
+      shapeNode.size.w / 2,
+      8,
+    );
+    expect(Number(shadowGroup?.getAttribute('data-pptx-shadow-anchor-y'))).toBeCloseTo(
+      shapeNode.size.h / 2,
+      8,
+    );
+    expect(shadowGroup?.getAttribute('filter') ?? '').toContain('url(#shape-shadow-blur-');
+    expect(shadowPath?.getAttribute('d')).toBe(mainPath?.getAttribute('d'));
+    expect(shadowPath?.getAttribute('fill')).toBe('rgb(0,0,0)');
+    expect(shadowPath?.getAttribute('fill-opacity')).toBe('0.3500');
+    expect(el.querySelector('filter feGaussianBlur')).toBeTruthy();
+    expect(el.querySelector('filter feDropShadow')).toBeNull();
+  });
+
+  it('keeps a 92% top-right outer shadow visible with its native scale anchor (xcloud-plan slide 42)', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -3774,9 +3824,10 @@ describe('ShapeRenderer', () => {
           <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
           <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
           <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
           <a:effectLst>
-            <a:outerShdw blurRad="317500" dist="127000" dir="5400000" sx="92000" sy="92000" algn="ctr" rotWithShape="0">
-              <a:srgbClr val="000000"><a:alpha val="45000"/></a:srgbClr>
+            <a:outerShdw blurRad="317500" dist="127000" dir="8100000" sx="92000" sy="92000" algn="tr" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr>
             </a:outerShdw>
           </a:effectLst>
         </p:spPr>
@@ -3784,13 +3835,135 @@ describe('ShapeRenderer', () => {
     `;
 
     const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
-    const path = el.querySelector('svg > path');
-    const dropShadow = el.querySelector('filter feDropShadow');
+    const mainPath = el.querySelector('svg > path');
+    const shadowGroup = el.querySelector<SVGGElement>(
+      'svg > g[data-pptx-outer-shadow="scaled-silhouette"]',
+    );
 
-    expect(path?.getAttribute('filter') ?? '').toContain('url(#shape-shadow-');
-    expect(dropShadow?.getAttribute('stdDeviation')).not.toBe('0.00');
-    expect(dropShadow?.getAttribute('flood-opacity')).not.toBe('0');
+    expect(mainPath?.getAttribute('filter')).toBeNull();
+    expect(shadowGroup).toBeTruthy();
+    expect(shadowGroup?.getAttribute('data-pptx-shadow-scale-x')).toBe('0.92');
+    expect(shadowGroup?.getAttribute('data-pptx-shadow-scale-y')).toBe('0.92');
+    expect(shadowGroup?.getAttribute('data-pptx-shadow-alignment')).toBe('tr');
+    expect(Number(shadowGroup?.getAttribute('data-pptx-shadow-anchor-x'))).toBeGreaterThan(200);
+    expect(Number(shadowGroup?.getAttribute('data-pptx-shadow-anchor-y'))).toBe(0);
+    expect(shadowGroup?.querySelector('path')?.getAttribute('transform')).toContain(
+      'scale(0.92 0.92)',
+    );
+    expect(el.querySelector('filter feGaussianBlur')?.getAttribute('stdDeviation')).not.toBe(
+      '0.00',
+    );
+    expect(el.querySelector('filter feDropShadow')).toBeNull();
   });
+
+  it('keeps the bounded scaled-silhouette path disabled inside a rotated group', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="303" name="Rotated group child"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:effectLst>
+            <a:outerShdw blurRad="115455" dist="46182" sx="102000" sy="102000" algn="ctr" rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </p:spPr>
+      </p:sp>
+    `;
+
+    const el = renderShape(
+      parseShapeNode(parseXml(xml)),
+      createMockRenderContext({ groupTransformHasRotationOrFlip: true }),
+    );
+
+    expect(el.querySelector('[data-pptx-outer-shadow="scaled-silhouette"]')).toBeNull();
+    expect(el.querySelector('svg > path')?.getAttribute('filter') ?? '').toContain(
+      'url(#shape-shadow-',
+    );
+  });
+
+  it.each([
+    { label: 'unverified alignment', attributes: 'algn="l" sx="102000" sy="102000"' },
+    {
+      label: 'scale outside the native matrix',
+      attributes: 'algn="ctr" sx="110000" sy="110000"',
+    },
+    {
+      label: 'unverified combination of otherwise verified matrix values',
+      attributes: 'algn="tr" sx="102000" sy="102000"',
+    },
+    {
+      label: 'nested group',
+      attributes: 'algn="ctr" sx="102000" sy="102000"',
+      context: { groupDepth: 2, groupChildScale: { x: 1.25, y: 1.25 } },
+    },
+    {
+      label: 'unverified group scale',
+      attributes: 'algn="ctr" sx="102000" sy="102000"',
+      context: { groupDepth: 1, groupChildScale: { x: 1.5, y: 1.5 } },
+    },
+  ])('keeps $label on the outer-shadow approximation path', ({ attributes, context }) => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="305" name="Bounded shadow fallback"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:effectLst>
+            <a:outerShdw blurRad="115455" dist="46182" ${attributes} rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </p:spPr>
+      </p:sp>
+    `;
+
+    const el = renderShape(
+      parseShapeNode(parseXml(xml)),
+      createMockRenderContext(context as Partial<RenderContext>),
+    );
+
+    expect(Boolean(el.querySelector('[data-pptx-outer-shadow="scaled-silhouette"]'))).toBe(false);
+    expect(el.querySelector('svg > path')?.getAttribute('filter') ?? '').toContain(
+      'url(#shape-shadow-',
+    );
+  });
+
+  it.each([
+    ['zero-distance blur', '', '5.00'],
+    ['directional blur', 'dist="127000" dir="5400000"', '6.67'],
+  ])(
+    'calibrates bounded %s without changing directional shadow blur',
+    (_label, attrs, expected) => {
+      const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="304" name="Blur calibration"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="2000000" cy="1000000"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:effectLst>
+            <a:outerShdw blurRad="127000" ${attrs} rotWithShape="0">
+              <a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr>
+            </a:outerShdw>
+          </a:effectLst>
+        </p:spPr>
+      </p:sp>
+    `;
+
+      const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+      expect(el.querySelector('feDropShadow')?.getAttribute('stdDeviation')).toBe(expected);
+    },
+  );
 
   it('treats spAutoFit as bounded text fit to prevent overflow bleed', () => {
     const xml = `

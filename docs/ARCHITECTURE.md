@@ -200,6 +200,32 @@ The native matrix includes positive paragraph defaults, an explicit run override
 inverse fallback, and square, wide, and tall containers. This boundary verifies color selection; it
 does not claim pixel-identical font metrics across every host font installation.
 
+### Bounded ordinary-shape outer shadows
+
+`ShapeRenderer` resolves a direct `p:sp/p:spPr/a:effectLst/a:outerShdw` independently from the fill
+and visible stroke. The native lane is deliberately limited to `rect`, `roundRect`, and `ellipse`
+with direct opaque solid or simple-gradient paint, no other effect-list child, no skew or 3D, and no
+shape rotation/flip. A group child may enter only for the verified single group level with no
+rotation/flip and a uniform 1.25 child-coordinate scale. `GroupRenderer` propagates the
+ancestor rotation/flip fact rather than trying to infer it after coordinates have been flattened.
+
+At 100% scale, the shape path receives the shadow filter without changing the fill or stroke. The
+verified 92% and 102% uniform `sx=sy` values clone the filled silhouette into a sibling SVG group
+behind the visible shape and scale it around the matrix's `tr` or `ctr` anchor. The clone carries
+no stroke. Its filter bounds are computed in user space from the transformed silhouette, offset, and
+blur margin so expanded and displaced shadows remain visible. Native evidence requires distinct
+Gaussian calibration for bounded zero-distance and scaled-silhouette shadows; directional 100%
+effects and combinations outside the seven exact positive matrix rows keep the general approximation
+path; parameter values observed in different rows are not combined implicitly. The anchor helper
+implements all nine OOXML positions, but positions without native rows are not promoted by this
+capability.
+
+The capability is verified by an eight-slide native PowerPoint matrix plus the schema-v1
+`shadow-local` report. The report derives applicable slides from the exact XML ancestor path, binds
+source/ground-truth and per-slide raster hashes to one clean renderer revision, compares exterior
+darkness energy and field geometry, and must reject a deterministic exterior-shadow erasure. This
+keeps a nearly white full-slide background from masking a locally missing shadow.
+
 ### Bounded static DrawingML 3D
 
 `src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,

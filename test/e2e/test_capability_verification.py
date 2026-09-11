@@ -2,6 +2,7 @@ import hashlib
 import json
 from dataclasses import replace
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 import pytest
 
@@ -470,6 +471,136 @@ def camera_report(
     }
 
 
+def _bind_shadow_source(case: dict, peers: tuple[dict, ...], repo: Path) -> None:
+    case_id = case["testFile"]
+    source_path = repo / "test/e2e/testdata/cases" / case_id / "source.pptx"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    with ZipFile(source_path, "w", ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "ppt/presentation.xml",
+            """<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>""",
+        )
+        archive.writestr(
+            "ppt/_rels/presentation.xml.rels",
+            """<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>""",
+        )
+        archive.writestr(
+            "ppt/slides/slide1.xml",
+            """<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:spPr><a:effectLst><a:outerShdw blurRad="127000" rotWithShape="0"><a:srgbClr val="000000"><a:alpha val="35000"/></a:srgbClr></a:outerShdw></a:effectLst></p:spPr></p:sp></p:spTree></p:cSld></p:sld>""",
+        )
+    source_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    source = {
+        "path": source_path.relative_to(repo).as_posix(),
+        "sizeBytes": source_path.stat().st_size,
+        "sha256": source_hash,
+    }
+    for report in (case, *peers):
+        report["provenance"]["inputs"]["sourcePptx"] = dict(source)
+
+
+def shadow_report(
+    case: dict,
+    repo: Path,
+    *,
+    baseline_reports: tuple[dict, ...] = (),
+    passed: bool = True,
+) -> dict:
+    case_id = case["testFile"]
+    _bind_shadow_source(case, baseline_reports, repo)
+    reports_dir = repo / "test/e2e/reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    reference_path = reports_dir / f"{case_id}_pdf.png"
+    candidate_path = reports_dir / f"{case_id}_html.png"
+    reference_path.write_bytes(b"native-shadow-reference")
+    candidate_path.write_bytes(b"renderer-shadow-candidate")
+    reference_hash = hashlib.sha256(reference_path.read_bytes()).hexdigest()
+    candidate_hash = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
+    artifacts = {
+        "reference": {
+            "path": reference_path.relative_to(repo).as_posix(),
+            "sizeBytes": reference_path.stat().st_size,
+            "sha256": reference_hash,
+        },
+        "candidate": {
+            "path": candidate_path.relative_to(repo).as_posix(),
+            "sizeBytes": candidate_path.stat().st_size,
+            "sha256": candidate_hash,
+        },
+    }
+    case["perSlide"] = [
+        {"slideIdx": 0, "hidden": False, "renderArtifacts": artifacts}
+    ]
+    thresholds = {
+        "ringInnerRatio": 0.002,
+        "ringOuterRatio": 0.05,
+        "backgroundNoiseFloor": 2.0,
+        "minimumReferenceShadowDensity": 0.25,
+        "invisibleShadowDensity": 0.5,
+        "shadowEnergyRatio": 0.75,
+        "shadowOvershootRatio": 1.25,
+        "shadowFieldCosine": 0.9,
+        "shadowFieldIou": 0.55,
+        "shadowFieldError": 0.35,
+        "shadowCentroidErrorRatio": 0.03,
+        "shadowFieldBinaryThreshold": 2.0,
+    }
+    metrics = {
+        "shadowRequired": True,
+        "shadowMeasurable": True,
+        "referenceShadowDensity": 1.0,
+        "candidateShadowDensity": 1.0 if passed else 0.5,
+        "shadowEnergyRatio": 1.0 if passed else 0.5,
+        "shadowOvershootRatio": 1.0 if passed else 0.5,
+        "shadowFieldCosine": 1.0 if passed else 0.5,
+        "shadowFieldIou": 1.0 if passed else 0.4,
+        "shadowFieldError": 0.0 if passed else 0.5,
+        "shadowCentroidErrorRatio": 0.0 if passed else 0.1,
+        "shadowRingPixels": 100,
+        "shadowRingInnerPx": 1,
+        "shadowRingOuterPx": 5,
+        "shadowSensitivity": {
+            "mutation": "erase-exterior-shadow",
+            "applicable": True,
+            "mutatedCandidateShadowDensity": 0.0,
+            "mutatedShadowEnergyRatio": 0.0,
+            "mutatedShadowPassed": False,
+            "detected": True,
+        },
+        "thresholds": thresholds,
+        "passed": passed,
+    }
+    return {
+        "schemaVersion": 1,
+        "renderer": dict(case["provenance"]["renderer"]),
+        "thresholds": thresholds,
+        "applicableCaseCount": 1,
+        "passed": passed,
+        "caseResults": [
+            {
+                "caseId": case_id,
+                "sourceSha256": case["provenance"]["inputs"]["sourcePptx"]["sha256"],
+                "groundTruthSha256": case["provenance"]["inputs"]["groundTruth"][
+                    "combinedSha256"
+                ],
+                "applicable": True,
+                "passed": passed,
+                "slides": [
+                    {
+                        "slideIdx": 0,
+                        "shadowRequired": True,
+                        "referencePath": artifacts["reference"]["path"],
+                        "candidatePath": artifacts["candidate"]["path"],
+                        "referenceSha256": reference_hash,
+                        "candidateSha256": candidate_hash,
+                        "metrics": metrics,
+                        "passed": passed,
+                    }
+                ],
+            }
+        ],
+    }
+
+
 def test_normalizes_native_reports_into_promotion_evidence(tmp_path: Path):
     repo, capability = capability_fixture(tmp_path)
     current = [native_report("donut-thin"), native_report("donut-thick")]
@@ -678,6 +809,137 @@ def test_derives_camera_local_gate_from_matching_artifact_evidence(tmp_path: Pat
         camera_report=camera_report(current, repo),
     )
     assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_derives_shadow_local_gate_from_matching_artifact_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "shadow-local"),
+    )
+    current = native_report("outer-shadow-matrix")
+    baseline = native_report("outer-shadow-matrix", revision="b" * 40)
+
+    missing = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+    )
+    assert missing["gates"]["shadow-local"] == "missing"
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        shadow_report=shadow_report(current, repo, baseline_reports=(baseline,)),
+    )
+    assert verified["gates"]["shadow-local"] == "passed"
+
+
+def test_rejects_shadow_local_erasure_sensitivity_tampering(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "shadow-local"),
+    )
+    current = native_report("outer-shadow-matrix")
+    baseline = native_report("outer-shadow-matrix", revision="b" * 40)
+    report = shadow_report(current, repo, baseline_reports=(baseline,))
+    report["caseResults"][0]["slides"][0]["metrics"]["shadowSensitivity"][
+        "detected"
+    ] = False
+
+    with pytest.raises(CapabilityVerificationError, match="sensitivity"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            shadow_report=report,
+        )
+
+
+def test_rejects_failed_shadow_local_report(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "shadow-local"),
+    )
+    current = native_report("outer-shadow-matrix")
+    baseline = native_report("outer-shadow-matrix", revision="b" * 40)
+
+    with pytest.raises(CapabilityVerificationError, match="shadow-local report failed"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            shadow_report=shadow_report(
+                current, repo, baseline_reports=(baseline,), passed=False
+            ),
+        )
+
+
+def test_rejects_shadow_requirement_that_disagrees_with_source_ooxml(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "shadow-local"),
+    )
+    current = native_report("outer-shadow-matrix")
+    baseline = native_report("outer-shadow-matrix", revision="b" * 40)
+    report = shadow_report(current, repo, baseline_reports=(baseline,))
+    report["caseResults"][0]["slides"][0]["shadowRequired"] = False
+    report["caseResults"][0]["slides"][0]["metrics"]["shadowRequired"] = False
+
+    with pytest.raises(
+        CapabilityVerificationError,
+        match="shadow requirement does not match source OOXML",
+    ):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            shadow_report=report,
+        )
+
+
+def test_rejects_shadow_sensitivity_that_does_not_cross_failure_threshold(
+    tmp_path: Path,
+):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "shadow-local"),
+    )
+    current = native_report("outer-shadow-matrix")
+    baseline = native_report("outer-shadow-matrix", revision="b" * 40)
+    report = shadow_report(current, repo, baseline_reports=(baseline,))
+    sensitivity = report["caseResults"][0]["slides"][0]["metrics"][
+        "shadowSensitivity"
+    ]
+    sensitivity["mutatedCandidateShadowDensity"] = 1.0
+    sensitivity["mutatedShadowEnergyRatio"] = 1.0
+
+    with pytest.raises(CapabilityVerificationError, match="sensitivity is invalid"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            shadow_report=report,
+        )
 
 
 def test_derives_camera_local_gate_from_live_text_projection_evidence(tmp_path: Path):

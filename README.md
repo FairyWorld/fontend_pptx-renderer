@@ -4,7 +4,7 @@
 
 A high-fidelity, browser-native PPTX renderer that parses Office Open XML (`.pptx`) files and renders slides as HTML/SVG DOM.
 
-Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded static DrawingML 3D, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
+Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded ordinary-shape outer shadows, bounded static DrawingML 3D, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
 
 ## Rendering Example
 
@@ -56,8 +56,10 @@ the public `supported` claim additionally requires a fresh `verified` receipt. A
 dirty tree, a changed capability scope, changed implementation files, changed input/ground-truth
 hashes, skipped cases, or an unresolved manual review cannot promote a capability.
 The `verify` command converts raw `/api/evaluate` results into the promotion schema and derives
-native-PowerPoint, manual-review, and regression gates from those results. Other `--passed-gate`
-values record checks already run by the caller; the command does not execute or infer them.
+native-PowerPoint, manual-review, regression, and capability-specific local gates from those
+results. A capability that requires `shadow-local` must also receive the hash-bound report emitted
+by `outer_shadow_metrics.py`. Other `--passed-gate` values record checks already run by the caller;
+the command does not execute or infer them.
 
 ## Install
 
@@ -608,6 +610,31 @@ retains both outer and inner contours across square, wide, tall, grouped, and pi
 Other presets retain the handwritten implementation until their own layering, adjustment, and
 oracle gates pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
 
+### Ordinary Shape Outer Shadows — Bounded Native Lane
+
+Direct `p:sp/p:spPr/a:effectLst/a:outerShdw` effects have a native-oracle-backed rendering lane for
+`rect`, `roundRect`, and `ellipse` shapes with an opaque resolved solid fill or simple gradient. The
+lane accepts standalone shapes and children of a single unrotated, unflipped group at the verified
+uniform 1.25 child scale. Shape rotation, flips, skew, 3D, additional effects, and effect DAGs remain on
+the existing approximation path.
+
+Within that boundary, the native lane covers the matrix's explicit blur/distance values, default
+zero distance/direction, 45°/90°/135° directions, default/bottom, center, and top-right anchors, and
+92%/100%/102% uniform scale. Only the seven positive matrix rows are promoted; those individual
+values do not form an independently supported Cartesian product. A scaled shadow is rendered as a
+separate silhouette behind the source path and transformed around the exact
+OOXML anchor; the visible shape itself is not scaled. Zero-distance and scaled-silhouette blur use
+separate native-calibrated SVG Gaussian widths, while directional 100% shadows retain the general
+filter path. Ancestor group rotation/flip is propagated through the render context so an unsupported
+coordinate system cannot accidentally enter the native lane.
+
+The eight-slide `oracle-pypptx-shape-effect-0001-outer-shadow-matrix` covers the no-shadow inverse,
+default/zero-distance blur, offset and direction, wide/tall geometry, a gradient ellipse, 102%
+centered and 92% top-right scaling, a single unrotated group at uniform 1.25 scale, and scheme-color modifiers.
+The `shadow-local` gate measures the exterior darkness field, energy, overlap, direction, centroid,
+and an erasure mutation against native PowerPoint rasters; full-slide SSIM alone cannot promote the
+capability.
+
 ### Static DrawingML 3D — Bounded Top Bevel, Camera Plane, and Bottom Front Material
 
 The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
@@ -925,7 +952,11 @@ Dev pages at `http://127.0.0.1:5173`:
 
 ## What's Not Yet Supported
 
-DrawingML shape/picture 3D outside the bounded circular top-bevel, zero-depth camera-plane, and
+Ordinary-shape outer shadows outside the bounded direct-effect matrix above retain the existing
+SVG/CSS approximation. This includes other parameter values, text-bearing or stroked shapes, custom
+geometry, nonuniform or nested group scale, skew, rotated/flipped shape or ancestor coordinates,
+3D, effect DAGs, and compound effect lists. DrawingML shape/picture 3D
+outside the bounded circular top-bevel, zero-depth camera-plane, and
 edge-on bottom-bevel front-material tuples above retains the flat 2D fallback. This includes other
 perspective or rotated cameras, nonzero extrusion, other bottom or non-circular bevels, other preset
 materials, unsupported lighting, tiled pictures,

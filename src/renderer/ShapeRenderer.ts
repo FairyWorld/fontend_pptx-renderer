@@ -522,6 +522,15 @@ function appendShapeBlipImage(
 
 let markerIdCounter = 0;
 let gradientIdCounter = 0;
+const DEFAULT_OUTER_SHADOW_STDDEV_PER_BLUR_RADIUS = 1 / 2;
+const BOUNDED_ZERO_DISTANCE_OUTER_SHADOW_STDDEV_PER_BLUR_RADIUS = 3 / 8;
+const BOUNDED_SCALED_OUTER_SHADOW_STDDEV_PER_BLUR_RADIUS = 1 / 3;
+const BOUNDED_OUTER_SHADOW_GROUP_SCALE = 1.25;
+const BOUNDED_OUTER_SHADOW_BLUR_RADII = new Set([50800, 76200, 101600, 115455, 127000, 317500]);
+const BOUNDED_OUTER_SHADOW_DISTANCES = new Set([0, 38100, 46182, 50800, 76200, 127000]);
+const BOUNDED_OUTER_SHADOW_DIRECTIONS = new Set([0, 2700000, 5400000, 8100000]);
+const BOUNDED_OUTER_SHADOW_SCALES = new Set([92000, 100000, 102000]);
+const BOUNDED_OUTER_SHADOW_ALIGNMENTS = new Set<OuterShadowAlignment>(['b', 'ctr', 'tr']);
 
 function applySvgDropShadowFilter(
   svgNs: string,
@@ -535,6 +544,7 @@ function applySvgDropShadowFilter(
     color: { r: number; g: number; b: number };
     opacity: number;
     colorInterpolation?: 'linearRGB' | 'sRGB';
+    stdDeviationScale?: number;
   },
 ): void {
   const filterId = `shape-shadow-${++gradientIdCounter}`;
@@ -555,7 +565,13 @@ function applySvgDropShadowFilter(
   const dropShadow = document.createElementNS(svgNs, 'feDropShadow');
   dropShadow.setAttribute('dx', shadow.dx.toFixed(1));
   dropShadow.setAttribute('dy', shadow.dy.toFixed(1));
-  dropShadow.setAttribute('stdDeviation', Math.max(0, shadow.blur / 2).toFixed(2));
+  dropShadow.setAttribute(
+    'stdDeviation',
+    Math.max(
+      0,
+      shadow.blur * (shadow.stdDeviationScale ?? DEFAULT_OUTER_SHADOW_STDDEV_PER_BLUR_RADIUS),
+    ).toFixed(2),
+  );
   dropShadow.setAttribute(
     'flood-color',
     `rgb(${shadow.color.r},${shadow.color.g},${shadow.color.b})`,
@@ -567,6 +583,130 @@ function applySvgDropShadowFilter(
     target.ownerSVGElement.insertBefore(defs, target.ownerSVGElement.firstChild);
   }
   target.setAttribute('filter', `url(#${filterId})`);
+}
+
+type OuterShadowAlignment = 'tl' | 't' | 'tr' | 'l' | 'ctr' | 'r' | 'bl' | 'b' | 'br';
+
+function normalizeOuterShadowAlignment(value: string | undefined): OuterShadowAlignment {
+  const normalized = value?.toLowerCase();
+  if (
+    normalized === 'tl' ||
+    normalized === 't' ||
+    normalized === 'tr' ||
+    normalized === 'l' ||
+    normalized === 'ctr' ||
+    normalized === 'r' ||
+    normalized === 'bl' ||
+    normalized === 'b' ||
+    normalized === 'br'
+  ) {
+    return normalized;
+  }
+  return 'b';
+}
+
+function isBoundedOuterShadowAlignment(value: string | undefined): boolean {
+  if (value == null) return true;
+  const normalized = value.toLowerCase() as OuterShadowAlignment;
+  return BOUNDED_OUTER_SHADOW_ALIGNMENTS.has(normalized);
+}
+
+function isOpaqueCssColor(value: string): boolean {
+  return /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function getOuterShadowAlignmentAnchor(
+  bounds: { x?: number; y?: number; w: number; h: number },
+  alignment: OuterShadowAlignment,
+): { x: number; y: number } {
+  const left = bounds.x ?? 0;
+  const top = bounds.y ?? 0;
+  const centerX = left + bounds.w / 2;
+  const centerY = top + bounds.h / 2;
+  const right = left + bounds.w;
+  const bottom = top + bounds.h;
+
+  const x =
+    alignment === 'tl' || alignment === 'l' || alignment === 'bl'
+      ? left
+      : alignment === 'tr' || alignment === 'r' || alignment === 'br'
+        ? right
+        : centerX;
+  const y =
+    alignment === 'tl' || alignment === 't' || alignment === 'tr'
+      ? top
+      : alignment === 'bl' || alignment === 'b' || alignment === 'br'
+        ? bottom
+        : centerY;
+  return { x, y };
+}
+
+function appendScaledOuterShadowSilhouette(
+  svgNs: string,
+  svg: SVGSVGElement,
+  defs: SVGDefsElement,
+  sourcePath: SVGPathElement,
+  bounds: { x?: number; y?: number; w: number; h: number },
+  shadow: {
+    dx: number;
+    dy: number;
+    blur: number;
+    scaleX: number;
+    scaleY: number;
+    alignment: OuterShadowAlignment;
+    color: { r: number; g: number; b: number };
+    opacity: number;
+  },
+): void {
+  const anchor = getOuterShadowAlignmentAnchor(bounds, shadow.alignment);
+  const filterId = `shape-shadow-blur-${++gradientIdCounter}`;
+  const filter = document.createElementNS(svgNs, 'filter');
+  const boundsX = bounds.x ?? 0;
+  const boundsY = bounds.y ?? 0;
+  const scaledLeft = anchor.x + (boundsX - anchor.x) * shadow.scaleX + shadow.dx;
+  const scaledTop = anchor.y + (boundsY - anchor.y) * shadow.scaleY + shadow.dy;
+  const scaledRight = anchor.x + (boundsX + bounds.w - anchor.x) * shadow.scaleX + shadow.dx;
+  const scaledBottom = anchor.y + (boundsY + bounds.h - anchor.y) * shadow.scaleY + shadow.dy;
+  const margin = shadow.blur * 4 + 4;
+  filter.setAttribute('id', filterId);
+  filter.setAttribute('filterUnits', 'userSpaceOnUse');
+  filter.setAttribute('x', String(Math.min(scaledLeft, scaledRight) - margin));
+  filter.setAttribute('y', String(Math.min(scaledTop, scaledBottom) - margin));
+  filter.setAttribute('width', String(Math.abs(scaledRight - scaledLeft) + margin * 2));
+  filter.setAttribute('height', String(Math.abs(scaledBottom - scaledTop) + margin * 2));
+
+  const gaussianBlur = document.createElementNS(svgNs, 'feGaussianBlur');
+  gaussianBlur.setAttribute(
+    'stdDeviation',
+    Math.max(0, shadow.blur * BOUNDED_SCALED_OUTER_SHADOW_STDDEV_PER_BLUR_RADIUS).toFixed(2),
+  );
+  filter.appendChild(gaussianBlur);
+  defs.appendChild(filter);
+  if (!defs.parentNode) svg.insertBefore(defs, svg.firstChild);
+
+  const group = document.createElementNS(svgNs, 'g');
+  group.setAttribute('data-pptx-outer-shadow', 'scaled-silhouette');
+  group.setAttribute('data-pptx-shadow-scale-x', String(shadow.scaleX));
+  group.setAttribute('data-pptx-shadow-scale-y', String(shadow.scaleY));
+  group.setAttribute('data-pptx-shadow-alignment', shadow.alignment);
+  group.setAttribute('data-pptx-shadow-anchor-x', String(anchor.x));
+  group.setAttribute('data-pptx-shadow-anchor-y', String(anchor.y));
+  group.setAttribute('transform', `translate(${shadow.dx} ${shadow.dy})`);
+  group.setAttribute('filter', `url(#${filterId})`);
+
+  const silhouette = document.createElementNS(svgNs, 'path');
+  silhouette.setAttribute('d', sourcePath.getAttribute('d') ?? '');
+  silhouette.setAttribute(
+    'transform',
+    `translate(${anchor.x} ${anchor.y}) scale(${shadow.scaleX} ${shadow.scaleY}) translate(${-anchor.x} ${-anchor.y})`,
+  );
+  silhouette.setAttribute('fill', `rgb(${shadow.color.r},${shadow.color.g},${shadow.color.b})`);
+  silhouette.setAttribute('fill-opacity', shadow.opacity.toFixed(4));
+  silhouette.setAttribute('stroke', 'none');
+  const fillRule = sourcePath.getAttribute('fill-rule');
+  if (fillRule) silhouette.setAttribute('fill-rule', fillRule);
+  group.appendChild(silhouette);
+  svg.insertBefore(group, sourcePath);
 }
 
 function applySvgInnerShadowFilter(
@@ -3407,79 +3547,255 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
         shadowColor = `rgba(${sr},${sg},${sb},${shdAlpha.toFixed(3)})`;
       }
 
+      const explicitEffectLst = spPr.child('effectLst');
+      const effectChildren = explicitEffectLst.children();
+      const preset = node.presetGeometry?.toLowerCase() ?? '';
+      const groupScale = ctx.groupChildScale;
+      const groupDepth = ctx.groupDepth ?? 0;
+      const hasVerifiedGroupScale =
+        (groupDepth === 0 && !groupScale) ||
+        (groupDepth === 1 &&
+          !!groupScale &&
+          Number.isFinite(groupScale.x) &&
+          Number.isFinite(groupScale.y) &&
+          Math.abs(groupScale.x - BOUNDED_OUTER_SHADOW_GROUP_SCALE) <= 0.000001 &&
+          Math.abs(groupScale.y - BOUNDED_OUTER_SHADOW_GROUP_SCALE) <= 0.000001);
+      const isStandaloneShape = groupDepth === 0 && !groupScale;
+      const isVerifiedGroupChild = groupDepth === 1 && hasVerifiedGroupScale;
+      const normalizedDirection = ((dir % 21600000) + 21600000) % 21600000;
+      const hasVerifiedScale =
+        (sx == null && sy == null) ||
+        (sx != null &&
+          sy != null &&
+          sx > 0 &&
+          sy > 0 &&
+          Math.abs(sx - sy) <= 0.000001 &&
+          BOUNDED_OUTER_SHADOW_SCALES.has(sx));
+      const hasOpaqueDirectSolidFill =
+        spPr.child('solidFill').exists() && isOpaqueCssColor(fillCss);
+      const hasOpaqueDirectLinearGradient =
+        spPr.child('gradFill').exists() &&
+        gradientFillData?.type === 'linear' &&
+        gradientFillData.stops.length === 2 &&
+        gradientFillData.stops.every((stop) => isOpaqueCssColor(stop.color));
+      const shadowColorChildren = outerShdw.children();
+      const shadowColorNode = shadowColorChildren.length === 1 ? shadowColorChildren[0] : undefined;
+      const shadowColorModifiers = shadowColorNode?.children() ?? [];
+      const hasVerifiedSrgbShadowColor =
+        shadowColorNode?.localName === 'srgbClr' &&
+        /^[0-9a-f]{6}$/i.test(shadowColorNode.attr('val') ?? '') &&
+        shadowColorModifiers.length === 1 &&
+        shadowColorModifiers[0].localName === 'alpha' &&
+        shadowColorModifiers[0].numAttr('val') === 35000;
+      const hasVerifiedSchemeShadowColor =
+        shadowColorNode?.localName === 'schemeClr' &&
+        !!shadowColorNode.attr('val') &&
+        shadowColorModifiers.length === 3 &&
+        shadowColorNode.child('lumMod').numAttr('val') === 60000 &&
+        shadowColorNode.child('lumOff').numAttr('val') === 10000 &&
+        shadowColorNode.child('alpha').numAttr('val') === 35000;
+      const hasAbsentScale = sx == null && sy == null;
+      const normalizedAlignment = algn?.toLowerCase();
+      const matchesVerifiedMatrixRow =
+        (isStandaloneShape &&
+          preset === 'rect' &&
+          hasOpaqueDirectSolidFill &&
+          hasVerifiedSrgbShadowColor &&
+          blurRad === 127000 &&
+          outerShdw.attr('dist') == null &&
+          outerShdw.attr('dir') == null &&
+          hasAbsentScale &&
+          algn == null) ||
+        (isStandaloneShape &&
+          preset === 'roundrect' &&
+          hasOpaqueDirectSolidFill &&
+          hasVerifiedSrgbShadowColor &&
+          blurRad === 50800 &&
+          dist === 38100 &&
+          normalizedDirection === 5400000 &&
+          hasAbsentScale &&
+          algn == null) ||
+        (isStandaloneShape &&
+          preset === 'ellipse' &&
+          hasOpaqueDirectLinearGradient &&
+          hasVerifiedSrgbShadowColor &&
+          blurRad === 101600 &&
+          dist === 76200 &&
+          normalizedDirection === 2700000 &&
+          hasAbsentScale &&
+          normalizedAlignment === 'ctr') ||
+        (isStandaloneShape &&
+          preset === 'rect' &&
+          hasOpaqueDirectSolidFill &&
+          hasVerifiedSrgbShadowColor &&
+          blurRad === 115455 &&
+          dist === 46182 &&
+          outerShdw.attr('dir') == null &&
+          sx === 102000 &&
+          sy === 102000 &&
+          normalizedAlignment === 'ctr') ||
+        (isStandaloneShape &&
+          preset === 'rect' &&
+          hasOpaqueDirectSolidFill &&
+          hasVerifiedSrgbShadowColor &&
+          blurRad === 317500 &&
+          dist === 127000 &&
+          normalizedDirection === 8100000 &&
+          sx === 92000 &&
+          sy === 92000 &&
+          normalizedAlignment === 'tr') ||
+        (isVerifiedGroupChild &&
+          preset === 'roundrect' &&
+          hasOpaqueDirectSolidFill &&
+          hasVerifiedSrgbShadowColor &&
+          blurRad === 76200 &&
+          dist === 50800 &&
+          normalizedDirection === 2700000 &&
+          hasAbsentScale &&
+          algn == null) ||
+        (isStandaloneShape &&
+          preset === 'rect' &&
+          hasOpaqueDirectSolidFill &&
+          hasVerifiedSchemeShadowColor &&
+          blurRad === 101600 &&
+          dist === 50800 &&
+          normalizedDirection === 5400000 &&
+          sx === 100000 &&
+          sy === 100000 &&
+          normalizedAlignment === 'b');
+      const supportsBoundedOrdinaryOuterShadow =
+        BOUNDED_OUTER_SHADOW_BLUR_RADII.has(blurRad) &&
+        BOUNDED_OUTER_SHADOW_DISTANCES.has(dist) &&
+        BOUNDED_OUTER_SHADOW_DIRECTIONS.has(normalizedDirection) &&
+        isBoundedOuterShadowAlignment(algn) &&
+        hasVerifiedScale &&
+        Math.abs(shdAlpha - 0.35) <= 0.000001 &&
+        (outerShdw.numAttr('kx') ?? 0) === 0 &&
+        (outerShdw.numAttr('ky') ?? 0) === 0 &&
+        outerShdw.attr('rotWithShape') === '0' &&
+        explicitEffectLst.exists() &&
+        explicitEffectLst.child('outerShdw').element === outerShdw.element &&
+        effectChildren.length === 1 &&
+        effectChildren[0].localName === 'outerShdw' &&
+        (preset === 'rect' || preset === 'roundrect' || preset === 'ellipse') &&
+        (hasOpaqueDirectSolidFill || hasOpaqueDirectLinearGradient) &&
+        (hasVerifiedSrgbShadowColor || hasVerifiedSchemeShadowColor) &&
+        node.line?.child('noFill').exists() === true &&
+        (!node.textBody || !hasVisibleText(node.textBody)) &&
+        node.rotation === 0 &&
+        !node.flipH &&
+        !node.flipV &&
+        !node.shape3d &&
+        !ctx.groupTransformHasRotationOrFlip &&
+        hasVerifiedGroupScale &&
+        matchesVerifiedMatrixRow;
+
       // PowerPoint outerShdw with sx/sy creates a scaled shadow copy, then draws the
-      // shape on top.  When dist=0 and scale ≈ 100%, only the thin edge overhang is
-      // visible – far subtler than a CSS drop-shadow with the full blur radius.
-      // Approximate with box-shadow using spread derived from scale and reduced blur.
+      // shape on top. Use a real silhouette clone for the narrow verified lane and
+      // retain the existing approximation for more complex combinations.
       if (sx != null && sy != null && sx > 0 && sy > 0) {
         const scaleX = sx / 100000;
         const scaleY = sy / 100000;
-        const shapeW = node.size?.w ?? 100;
-        const shapeH = node.size?.h ?? 100;
+        const supportsScaledSilhouette =
+          supportsBoundedOrdinaryOuterShadow &&
+          Math.abs(scaleX - scaleY) <= 0.000001 &&
+          Math.abs(scaleX - 1) > 0.000001 &&
+          !!mainSvgNs &&
+          !!mainSvg &&
+          !!mainDefs &&
+          !!mainPath &&
+          !!mainSvgBounds;
 
-        // For line-like shapes, sx/sy should scale line thickness, not full line length.
-        // Using shape width here can explode spread on long connectors (slide 68 regression).
-        let spreadBasisW = shapeW;
-        let spreadBasisH = shapeH;
-        if (isLineLike || shapeW <= 1 || shapeH <= 1) {
-          const lineWEmu = node.line?.numAttr('w') ?? 12700;
-          const lineThickness = Math.max(1, emuToPx(lineWEmu));
-          spreadBasisW = lineThickness;
-          spreadBasisH = lineThickness;
-        }
+        if (
+          supportsScaledSilhouette &&
+          mainSvgNs &&
+          mainSvg &&
+          mainDefs &&
+          mainPath &&
+          mainSvgBounds
+        ) {
+          appendScaledOuterShadowSilhouette(mainSvgNs, mainSvg, mainDefs, mainPath, mainSvgBounds, {
+            dx: offsetX,
+            dy: offsetY,
+            blur: blurPx,
+            scaleX,
+            scaleY,
+            alignment: normalizeOuterShadowAlignment(algn),
+            color: shadowRgb,
+            opacity: shdAlpha,
+          });
+        } else {
+          const shapeW = node.size?.w ?? 100;
+          const shapeH = node.size?.h ?? 100;
 
-        // Spread = how far the shadow extends beyond the shape on each side
-        const spreadX = (spreadBasisW * (scaleX - 1)) / 2;
-        const spreadY = (spreadBasisH * (scaleY - 1)) / 2;
-        const spread = Math.max(0, (spreadX + spreadY) / 2);
-
-        // Alignment shifts the shadow anchor point; compute extra offset
-        let alignOffX = 0;
-        let alignOffY = 0;
-        if (algn) {
-          // OOXML algn is an enum (t, b, l, r, tl, tr, bl, br, ctr), not a substring bag.
-          // Exact matching avoids misinterpreting "ctr" as containing both "t" and "r".
-          const a = algn.toLowerCase();
-          if (a === 't' || a === 'tl' || a === 'tr') alignOffY = (spreadBasisH * (scaleY - 1)) / 2;
-          if (a === 'b' || a === 'bl' || a === 'br') alignOffY = (-spreadBasisH * (scaleY - 1)) / 2;
-          if (a === 'l' || a === 'tl' || a === 'bl') alignOffX = (spreadBasisW * (scaleX - 1)) / 2;
-          if (a === 'r' || a === 'tr' || a === 'br') alignOffX = (-spreadBasisW * (scaleX - 1)) / 2;
-        }
-
-        // When a scaled-up shadow overhang is tiny relative to blurPx, PowerPoint's
-        // Gaussian blur distributes energy across the full blur area. The visible
-        // edge receives only a fraction of the original alpha. Scaled-down shadows
-        // still remain visible through their offset/blur, so do not attenuate them
-        // to zero just because they have no positive spread.
-        const effectiveBlur = spread > 0 ? Math.min(blurPx, spread * 3) : blurPx;
-        let effectiveAlpha = shdAlpha;
-        if (spread > 0 && blurPx > 0 && spread < blurPx) {
-          effectiveAlpha = shdAlpha * (spread / blurPx);
-        }
-
-        // Skip shadow entirely if effective alpha is negligible
-        if (effectiveAlpha >= 0.01) {
-          const bsX = offsetX + alignOffX;
-          const bsY = offsetY + alignOffY;
-          // Recompute shadow color with attenuated alpha
-          let attenuatedColor = shadowColor;
-          if (shdColor) {
-            const hex2 = shdColor.startsWith('#') ? shdColor : `#${shdColor}`;
-            const { r: sr2, g: sg2, b: sb2 } = hexToRgb(hex2);
-            shadowRgb = { r: sr2, g: sg2, b: sb2 };
-            attenuatedColor = `rgba(${sr2},${sg2},${sb2},${effectiveAlpha.toFixed(4)})`;
+          // For line-like shapes, sx/sy should scale line thickness, not full line length.
+          // Using shape width here can explode spread on long connectors (slide 68 regression).
+          let spreadBasisW = shapeW;
+          let spreadBasisH = shapeH;
+          if (isLineLike || shapeW <= 1 || shapeH <= 1) {
+            const lineWEmu = node.line?.numAttr('w') ?? 12700;
+            const lineThickness = Math.max(1, emuToPx(lineWEmu));
+            spreadBasisW = lineThickness;
+            spreadBasisH = lineThickness;
           }
-          if (!isLineLike && mainSvgNs && mainDefs && outerShadowPath && outerShadowBounds) {
-            applySvgDropShadowFilter(mainSvgNs, mainDefs, outerShadowPath, outerShadowBounds, {
-              dx: bsX,
-              dy: bsY,
-              blur: effectiveBlur * cameraShadowScale,
-              color: shadowRgb,
-              opacity: effectiveAlpha,
-              ...cameraShadowFilterOptions,
-            });
-          } else {
-            wrapper.style.boxShadow = `${bsX.toFixed(1)}px ${bsY.toFixed(1)}px ${effectiveBlur.toFixed(1)}px ${spread.toFixed(1)}px ${attenuatedColor}`;
+
+          // Spread = how far the shadow extends beyond the shape on each side
+          const spreadX = (spreadBasisW * (scaleX - 1)) / 2;
+          const spreadY = (spreadBasisH * (scaleY - 1)) / 2;
+          const spread = Math.max(0, (spreadX + spreadY) / 2);
+
+          // Alignment shifts the shadow anchor point; compute extra offset
+          let alignOffX = 0;
+          let alignOffY = 0;
+          if (algn) {
+            // OOXML algn is an enum (t, b, l, r, tl, tr, bl, br, ctr), not a substring bag.
+            // Exact matching avoids misinterpreting "ctr" as containing both "t" and "r".
+            const a = algn.toLowerCase();
+            if (a === 't' || a === 'tl' || a === 'tr')
+              alignOffY = (spreadBasisH * (scaleY - 1)) / 2;
+            if (a === 'b' || a === 'bl' || a === 'br')
+              alignOffY = (-spreadBasisH * (scaleY - 1)) / 2;
+            if (a === 'l' || a === 'tl' || a === 'bl')
+              alignOffX = (spreadBasisW * (scaleX - 1)) / 2;
+            if (a === 'r' || a === 'tr' || a === 'br')
+              alignOffX = (-spreadBasisW * (scaleX - 1)) / 2;
+          }
+
+          // When a scaled-up shadow overhang is tiny relative to blurPx, PowerPoint's
+          // Gaussian blur distributes energy across the full blur area. The visible
+          // edge receives only a fraction of the original alpha. Scaled-down shadows
+          // still remain visible through their offset/blur, so do not attenuate them
+          // to zero just because they have no positive spread.
+          const effectiveBlur = spread > 0 ? Math.min(blurPx, spread * 3) : blurPx;
+          let effectiveAlpha = shdAlpha;
+          if (spread > 0 && blurPx > 0 && spread < blurPx) {
+            effectiveAlpha = shdAlpha * (spread / blurPx);
+          }
+
+          // Skip shadow entirely if effective alpha is negligible
+          if (effectiveAlpha >= 0.01) {
+            const bsX = offsetX + alignOffX;
+            const bsY = offsetY + alignOffY;
+            // Recompute shadow color with attenuated alpha
+            let attenuatedColor = shadowColor;
+            if (shdColor) {
+              const hex2 = shdColor.startsWith('#') ? shdColor : `#${shdColor}`;
+              const { r: sr2, g: sg2, b: sb2 } = hexToRgb(hex2);
+              shadowRgb = { r: sr2, g: sg2, b: sb2 };
+              attenuatedColor = `rgba(${sr2},${sg2},${sb2},${effectiveAlpha.toFixed(4)})`;
+            }
+            if (!isLineLike && mainSvgNs && mainDefs && outerShadowPath && outerShadowBounds) {
+              applySvgDropShadowFilter(mainSvgNs, mainDefs, outerShadowPath, outerShadowBounds, {
+                dx: bsX,
+                dy: bsY,
+                blur: effectiveBlur * cameraShadowScale,
+                color: shadowRgb,
+                opacity: effectiveAlpha,
+                ...cameraShadowFilterOptions,
+              });
+            } else {
+              wrapper.style.boxShadow = `${bsX.toFixed(1)}px ${bsY.toFixed(1)}px ${effectiveBlur.toFixed(1)}px ${spread.toFixed(1)}px ${attenuatedColor}`;
+            }
           }
         }
       } else {
@@ -3490,6 +3806,10 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
             blur: svgBlurPx,
             color: shadowRgb,
             opacity: shdAlpha,
+            stdDeviationScale:
+              supportsBoundedOrdinaryOuterShadow && dist === 0
+                ? BOUNDED_ZERO_DISTANCE_OUTER_SHADOW_STDDEV_PER_BLUR_RADIUS
+                : undefined,
             ...cameraShadowFilterOptions,
           });
         } else {

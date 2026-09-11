@@ -291,7 +291,7 @@
     {
       "id": "drawingml.shape.effect.outer-shadow",
       "component": "shape",
-      "renderMode": "approximate",
+      "renderMode": "native",
       "impact": "fidelity",
       "selectors": [
         {
@@ -315,24 +315,40 @@
         }
       ],
       "scope": {
-        "alignment": ["all-standard-values"],
-        "blurRadius": ["absent-default-zero", "nonnegative"],
+        "alignment": ["absent-default-b", "b", "ctr", "tr"],
+        "blurRadiusEmu": [50800, 76200, 101600, 115455, 127000, 317500],
         "coexistingEffects": ["outer-shadow-only"],
-        "direction": ["absent-default-zero", "all-normalized-angles"],
-        "distance": ["absent-default-zero", "nonnegative"],
+        "combinationPolicy": ["only-listed-verified-matrix-rows"],
+        "directionOoxmlUnits": ["absent-default-zero", 2700000, 5400000, 8100000],
+        "distanceEmu": ["absent-default-zero", 38100, 46182, 50800, 76200, 127000],
         "geometry": ["ellipse", "rect", "roundRect"],
+        "geometryRows": ["rect-standard", "roundRect-wide", "ellipse-tall"],
         "groupTransform": ["rotation-0", "flipH-false", "flipV-false"],
-        "nodeContainer": ["standalone-slide-shape", "group-child-shape"],
-        "rotWithShape": ["0", "absent-default-true-with-unrotated-shape"],
-        "scale": ["absent-default-100pct", "uniform-positive-sx-equals-sy"],
-        "shapeFill": ["resolved-opaque-solid", "simple-gradient"],
+        "groupScale": ["absent-standalone", "single-level-uniform-1.25"],
+        "nodeContainer": ["standalone-slide-shape", "single-level-group-child-shape"],
+        "rotWithShape": ["explicit-zero"],
+        "scaleOoxmlPercent": ["absent-default-100000", 92000, 100000, 102000],
+        "shapeFill": ["explicit-opaque-solid", "explicit-two-stop-opaque-linear-gradient"],
+        "shapeStroke": ["explicit-noFill"],
+        "shapeText": ["absent-or-empty"],
         "shapeTransform": ["rotation-0", "flipH-false", "flipV-false"],
+        "shadowAlphaOoxmlPercent": [35000],
+        "shadowColorEncoding": ["srgbClr", "schemeClr-with-lumMod-lumOff"],
         "skew": ["absent-or-zero"],
-        "source": ["direct-shape-effect-list"]
+        "source": ["direct-shape-effect-list"],
+        "verifiedMatrixRows": [
+          "rect-solid-srgb-blur-127000-default-offset-scale-alignment",
+          "roundRect-wide-solid-srgb-blur-50800-dist-38100-dir-5400000",
+          "ellipse-tall-gradient-srgb-blur-101600-dist-76200-dir-2700000-ctr",
+          "rect-solid-srgb-blur-115455-dist-46182-scale-102000-ctr",
+          "rect-solid-srgb-blur-317500-dist-127000-dir-8100000-scale-92000-tr",
+          "roundRect-solid-srgb-blur-76200-dist-50800-dir-2700000-group-1.25",
+          "rect-solid-scheme-modified-blur-101600-dist-50800-dir-5400000-scale-100000-b"
+        ]
       },
-      "fallback": "Render the existing bounded SVG shadow approximation; retain unsupported text-only, picture-fill, custom-geometry, transform, skew, nonuniform-scale, effect-DAG, and compound-effect behavior as separate follow-on lanes.",
-      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/ShapeRenderer.ts", "src/renderer/StyleResolver.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_inventory.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/ShapeRenderer.test.ts"],
-      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "performance", "package", "package-size", "typecheck", "lint", "build", "docs"],
+      "fallback": "Use the existing SVG/CSS approximation outside the verified matrix bounds; keep other alignments, directions, blur/distance/scale values, text-bearing or stroked shapes, picture fills, custom geometry, nested or differently scaled groups, rotation/flip, skew, 3D, effect DAGs, and compound effects as separate follow-on lanes.",
+      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/GroupRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/StyleResolver.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_inventory.py", "test/e2e/oracle/capability_verification.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/outer_shadow_metrics.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_verification.py", "test/e2e/test_outer_shadow_metrics.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "shadow-local", "performance", "package", "package-size", "typecheck", "lint", "build", "docs"],
       "issueUrls": []
     },
     {

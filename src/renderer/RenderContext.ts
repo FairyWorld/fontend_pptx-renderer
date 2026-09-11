@@ -42,6 +42,8 @@ export interface RenderContext {
   groupDepth?: number;
   /** Scale from the current group child's OOXML coordinate space into rendered slide pixels. */
   groupChildScale?: { x: number; y: number };
+  /** True when any ancestor group rotates or flips this node's rendered coordinate space. */
+  groupTransformHasRotationOrFlip?: boolean;
   /** Connected root used for hidden text measurement while slide nodes are still detached. */
   measurementRoot?: HTMLElement;
   /** Template rendering skips placeholder descendants inside groups as well as top-level shapes. */

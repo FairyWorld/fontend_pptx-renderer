@@ -17,6 +17,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   ignored corpora; generated evidence stays outside the published package and tracked source tree.
 - Added capability verification normalization for raw native API reports, with clean-revision,
   input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
+- Added an eight-slide native PowerPoint matrix and a hash-bound `shadow-local` metric for direct
+  ordinary-shape outer shadows. The local gate measures exterior shadow energy, spatial field,
+  overlap, centroid, and an erasure mutation so a high full-slide SSIM cannot hide a missing or
+  misplaced shadow.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
   shapes and pictures, with stable renderer fallback reasons, plus a nineteen-case, fifty-eight-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
@@ -70,6 +74,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Promote the bounded direct `a:outerShdw` lane for solid/simple-gradient `rect`, `roundRect`, and
+  `ellipse` shapes. Verified 92% and 102% uniformly scaled shadows now use a separate SVG silhouette
+  with their exact top-right and center anchors; zero-distance and scaled shadows use independently
+  native-calibrated blur widths. Only the seven positive matrix rows are promoted. Rotated/flipped
+  ancestor groups, unverified parameter combinations, nonuniform scale, skew, custom geometry, 3D,
+  effect DAGs, and compound effects retain the existing approximation.
 - Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
   polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
 - Promote finite nonnegative `a:srcRect` picture crops into the bounded static 3D top-bevel lane;

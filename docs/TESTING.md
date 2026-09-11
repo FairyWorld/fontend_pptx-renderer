@@ -216,9 +216,10 @@ cd test/e2e
 
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
-For text, shape-adjustment, zero-adjustment flowchart, bounded static DrawingML 3D, composite, and
-chart interaction cases, use the python-pptx generator. It currently defines 178 cases: 59 text,
-31 shape-adjustment, 28 flowchart, 19 static 3D, 20 composite, and 21 chart cases. Each flowchart
+For text, shape-adjustment, zero-adjustment flowchart, ordinary-shape effects, bounded static
+DrawingML 3D, composite, and chart interaction cases, use the python-pptx generator. It currently
+defines 179 cases: 59 text, 31 shape-adjustment, 28 flowchart, 1 shape-effect, 19 static 3D,
+20 composite, and 21 chart cases. Each flowchart
 case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
 square explicit paint, wide theme-reference paint, and grouped tall explicit paint. The group uses
 a non-identity child coordinate space, and every source keeps an empty `a:avLst` with no adjustment
@@ -646,8 +647,9 @@ errors, PowerPoint quality status, matching baseline case IDs, and the 0.02 SSIM
 Regression baselines must use one earlier clean revision with identical source, ground-truth, and
 runtime-environment fingerprints.
 It derives `native-powerpoint`, `manual-visual`, and `regression`; callers cannot self-attest those
-gates. A capability that requires `bevel-local` must also supply `--bevel-report`, while one that
-requires `camera-local` must supply `--camera-report`. Verification derives either local gate only
+gates. A capability that requires `bevel-local` must also supply `--bevel-report`, one that requires
+`camera-local` must supply `--camera-report`, and one that requires `shadow-local` must supply
+`--shadow-report`. Verification derives a local gate only
 when the clean revision, exact case set, source hashes, ground-truth hashes, native per-slide raster
 hashes, on-disk raster hashes, thresholds, and every local result match. `--passed-gate` records
 separate checks that have already run and does not execute them. A `needsReview` case requires
@@ -658,6 +660,34 @@ the candidate implementation is committed. The command requires a clean tracked 
 HEAD and relevant-file fingerprints, source and ground-truth SHA-256 values, every declared gate,
 no skipped/runtime-failed cases, and an accepted manual verdict for every review row. It writes a
 sanitized receipt atomically and never changes GitHub issues or visual baselines.
+
+The bounded ordinary-shape outer-shadow lane uses one eight-slide case. After evaluating it on a
+clean committed revision, generate and bind its local report:
+
+```bash
+test/e2e/.venv/bin/python test/e2e/scripts/outer_shadow_metrics.py \
+  --case-report test/e2e/reports/capability-loop/outer-shadow-current.json \
+  --out test/e2e/reports/capability-loop/outer-shadow-local-current.json
+
+python3 test/e2e/scripts/run_capability_loop.py verify \
+  --capability drawingml.shape.effect.outer-shadow \
+  --case-report test/e2e/reports/capability-loop/outer-shadow-current.json \
+  --baseline-report test/e2e/reports/capability-loop/outer-shadow-baseline.json \
+  --shadow-report test/e2e/reports/capability-loop/outer-shadow-local-current.json \
+  --oracle powerpoint-macos \
+  --passed-gate source --passed-gate structural --passed-gate unit \
+  --passed-gate browser --passed-gate performance --passed-gate package \
+  --passed-gate package-size --passed-gate typecheck --passed-gate lint \
+  --passed-gate build --passed-gate docs
+```
+
+The local metric derives the relevant slides from the exact ordinary-shape XML path. It measures an
+exterior ring for native/candidate energy ratio, overshoot, cosine, binary IoU, normalized error,
+and centroid displacement. Every measurable positive row must also fail after its candidate shadow
+is erased. The inverse row caps invented darkness. Reports with different revisions, inputs,
+ground truth, raster hashes, thresholds, or visible slide sets are rejected. Promotion applies to
+the seven declared positive rows; the parameter-value lists are an evidence index, not a Cartesian
+product of supported combinations.
 
 DrawingML shape 3D, chart 3D, Office 2017 embedded models, and PresentationML animation are separate
 capability IDs. A verified flat 2D fallback in one lane cannot promote native behavior in another.

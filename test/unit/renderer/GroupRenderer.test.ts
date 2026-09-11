@@ -748,6 +748,39 @@ describe('renderGroup — wrapper element', () => {
     expect(t).not.toContain('scaleY(-1)');
   });
 
+  it('marks descendants when an ancestor group rotates or flips', () => {
+    const cases = [
+      makeGroup([makeSpXml()], { rotation: 45 }),
+      makeGroup([makeSpXml()], { flipH: true }),
+      makeGroup([makeSpXml()], { flipV: true }),
+    ];
+
+    for (const group of cases) {
+      let observed: RenderContext['groupTransformHasRotationOrFlip'];
+      renderGroup(group, createMockRenderContext(), (_childNode, childCtx) => {
+        observed = childCtx.groupTransformHasRotationOrFlip;
+        return document.createElement('div');
+      });
+      expect(observed).toBe(true);
+    }
+  });
+
+  it('preserves a transformed-ancestor marker through an untransformed nested group', () => {
+    const group = makeGroup([makeSpXml()]);
+    let observed: RenderContext['groupTransformHasRotationOrFlip'];
+
+    renderGroup(
+      group,
+      createMockRenderContext({ groupTransformHasRotationOrFlip: true }),
+      (_childNode, childCtx) => {
+        observed = childCtx.groupTransformHasRotationOrFlip;
+        return document.createElement('div');
+      },
+    );
+
+    expect(observed).toBe(true);
+  });
+
   it('renders no children when children array is empty', () => {
     const group = makeGroup([]);
     const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
