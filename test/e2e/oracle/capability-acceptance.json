@@ -743,6 +743,75 @@
       "implementationFingerprint": "80481411323c3332df75ad6319034e1ee21fe81ee88d2a64ca81d260980cc606"
     },
     {
+      "acceptedAt": "2026-09-11T17:22:28.693682Z",
+      "acceptedRevision": "2b37ac02076c6d87931bda9e86a3deeb2649e432",
+      "capabilityId": "drawingml.shape.3d.bottom-bevel-front-material",
+      "caseIds": [
+        "oracle-local-shape3d-0008-bottom-relaxed-inset-matrix"
+      ],
+      "caseInputFingerprints": [
+        "9df342d638c23b3940e36e134d7c8a9985fb4dd505e88871dc2f04ba08b5a354"
+      ],
+      "definitionFingerprint": "1f9bbbe400753ff0ec4261790326e6344059dbbd4eb7b726d0c9eccd7781065d",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "fontProfile": {
+          "faces": [
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "400"
+              },
+              "family": "微软雅黑",
+              "file": {
+                "sha256": "3084f1f88369af6bf9989c909024164d953d1e38d08734f05f28ef24b2f9d577",
+                "sizeBytes": 19701556
+              }
+            },
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "700"
+              },
+              "family": "微软雅黑",
+              "file": {
+                "sha256": "519309b7ab0479c4dc3ace5e291de5a8702175be5586e165bc810267bd4619a5",
+                "sizeBytes": 16880832
+              }
+            }
+          ],
+          "id": "local-powerpoint-microsoft-yahei",
+          "manifest": {
+            "sha256": "2c061837588d1a28aed0f106dfc135766618f4b2092b298cc16c993e3c320e61",
+            "sizeBytes": 432
+          }
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "camera-local",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "performance",
+        "package-size",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "e93da7f47b75cb24bef82e1c025f5db9db53a37eb1c3bfdb03bb0fe4c427012e"
+      ],
+      "implementationFingerprint": "ba3e5ebef5705f1d0193e28aa9c61dcc985a769aabeaa853aa5023a9dae88ebf"
+    },
+    {
       "acceptedAt": "2026-09-09T23:14:22.003351Z",
       "acceptedRevision": "972382885758ac355cf21d9cbe40932d78a008bd",
       "capabilityId": "drawingml.shape.3d.camera-projected-plane",
