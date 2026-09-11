@@ -216,11 +216,19 @@ cd test/e2e
 
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
-For text, shape-adjustment, zero-adjustment flowchart, ordinary-shape effects, bounded static
-DrawingML 3D, composite, and chart interaction cases, use the python-pptx generator. It currently
-defines 179 cases: 59 text, 31 shape-adjustment, 28 flowchart, 1 shape-effect, 19 static 3D,
-20 composite, and 21 chart cases. Each flowchart
-case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
+For text, shape-adjustment, zero-adjustment flowchart, ordinary-shape and text effects, bounded
+static DrawingML 3D, composite, and chart interaction cases, use the python-pptx generator. It
+currently defines 181 cases: 59 text, 31 shape-adjustment, 28 flowchart, 2 shape-effect, 1
+text-effect, 19 static 3D, 20 composite, and 21 chart cases.
+
+The ordinary-shape effect cohort contains the eight-slide outer-shadow matrix and a seven-slide
+reflection matrix with one inverse plus six positive shape-surface rows. The separate one-slide
+live-text reflection case is discovery evidence and is not part of the promoted shape capability.
+The reflection matrix crosses `rect`, `roundRect`, `ellipse`, and `upArrow`, solid and simple
+gradient paint, square/wide/tall bounds, broad blur, distance, and a single unrotated group at
+uniform 1.25 scale. Its local metric is described below.
+
+Each flowchart case maps one shape ID from 61 through 88 to its exact OOXML preset and contains three slides:
 square explicit paint, wide theme-reference paint, and grouped tall explicit paint. The group uses
 a non-identity child coordinate space, and every source keeps an empty `a:avLst` with no adjustment
 guides. The static 3D matrix covers flat opt-out, picture and
@@ -649,7 +657,8 @@ runtime-environment fingerprints.
 It derives `native-powerpoint`, `manual-visual`, and `regression`; callers cannot self-attest those
 gates. A capability that requires `bevel-local` must also supply `--bevel-report`, one that requires
 `camera-local` must supply `--camera-report`, and one that requires `shadow-local` must supply
-`--shadow-report`. Verification derives a local gate only
+`--shadow-report`; a capability that requires `reflection-local` must supply
+`--reflection-report`. Verification derives a local gate only
 when the clean revision, exact case set, source hashes, ground-truth hashes, native per-slide raster
 hashes, on-disk raster hashes, thresholds, and every local result match. `--passed-gate` records
 separate checks that have already run and does not execute them. A `needsReview` case requires
@@ -688,6 +697,34 @@ is erased. The inverse row caps invented darkness. Reports with different revisi
 ground truth, raster hashes, thresholds, or visible slide sets are rejected. Promotion applies to
 the seven declared positive rows; the parameter-value lists are an evidence index, not a Cartesian
 product of supported combinations.
+
+The bounded ordinary-shape reflection lane uses the seven-slide
+`oracle-pypptx-shape-effect-0002-reflection-matrix`. After evaluating it on a clean committed
+revision, generate and bind its local report:
+
+```bash
+test/e2e/.venv/bin/python test/e2e/scripts/reflection_metrics.py \
+  --case-report test/e2e/reports/capability-loop/reflection-current.json \
+  --out test/e2e/reports/capability-loop/reflection-local-current.json
+
+python3 test/e2e/scripts/run_capability_loop.py verify \
+  --capability drawingml.shape.effect.reflection \
+  --case-report test/e2e/reports/capability-loop/reflection-current.json \
+  --baseline-report test/e2e/reports/capability-loop/reflection-baseline.json \
+  --reflection-report test/e2e/reports/capability-loop/reflection-local-current.json \
+  --oracle powerpoint-macos \
+  --passed-gate source --passed-gate structural --passed-gate unit \
+  --passed-gate browser --passed-gate performance --passed-gate package \
+  --passed-gate package-size --passed-gate typecheck --passed-gate lint \
+  --passed-gate build --passed-gate docs
+```
+
+The report derives exactly the positive direct-shape reflection slides from OOXML and binds the
+native and browser raster hashes. It compares reflection density, symmetric energy retention,
+overshoot, field cosine/IoU/error, and centroid displacement, then erases each candidate reflection
+region and requires the mutation to fail. The full-slide native report covers the inverse control.
+Only the six declared positive rows are promoted; the one-slide no-fill live-text case remains
+discovery evidence until it has its own local metric and accepted matrix.
 
 DrawingML shape 3D, chart 3D, Office 2017 embedded models, and PresentationML animation are separate
 capability IDs. A verified flat 2D fallback in one lane cannot promote native behavior in another.

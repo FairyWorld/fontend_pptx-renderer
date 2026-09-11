@@ -324,6 +324,111 @@ test('bounded ordinary outer shadows keep native scale anchors and visible filte
   expect(first.equals(second)).toBe(true);
 });
 
+test('shape reflections stay in local coordinates and isolate cloned SVG references', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseShapeNode } = await import('/src/model/nodes/ShapeNode.ts');
+    const { renderShape } = await import('/src/renderer/ShapeRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+
+    const shapeXml = (id: number, y: number) => `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr><p:cNvPr id="${id}" name="Reflection ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="381000" y="${y * 9525}"/><a:ext cx="1905000" cy="762000"/></a:xfrm>
+          <a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom>
+          <a:gradFill>
+            <a:gsLst>
+              <a:gs pos="0"><a:srgbClr val="5B9BD5"/></a:gs>
+              <a:gs pos="100000"><a:srgbClr val="2F5597"/></a:gs>
+            </a:gsLst>
+            <a:lin ang="5400000" scaled="1"/>
+          </a:gradFill>
+          <a:ln><a:noFill/></a:ln>
+          <a:effectLst>
+            <a:reflection blurRad="9525" stA="52000" endA="300" fadeDir="0"
+                          stPos="0" endPos="35000" dist="76200" dir="5400000"
+                          sy="-100000" algn="bl" rotWithShape="0"/>
+          </a:effectLst>
+        </p:spPr>
+      </p:sp>`;
+    const first = renderShape(parseShapeNode(parseXml(shapeXml(1, 20))), createMockRenderContext());
+    const second = renderShape(
+      parseShapeNode(parseXml(shapeXml(2, 220))),
+      createMockRenderContext(),
+    );
+
+    const host = document.createElement('div');
+    host.id = 'reflection-browser-host';
+    host.style.position = 'relative';
+    host.style.width = '320px';
+    host.style.height = '420px';
+    host.style.background = '#fff';
+    host.append(first, second);
+    document.body.append(host);
+
+    const inspect = (element: HTMLElement) => {
+      const layer = element.querySelector<HTMLElement>(
+        ':scope > [data-pptx-reflection-layer="true"]',
+      )!;
+      const source = layer.querySelector<HTMLElement>(
+        ':scope > [data-pptx-reflection-source="true"]',
+      )!;
+      const wrapperRect = element.getBoundingClientRect();
+      const layerRect = layer.getBoundingClientRect();
+      const originalGradient = element.querySelector<SVGLinearGradientElement>(
+        ':scope > svg linearGradient',
+      )!;
+      const clonedGradient = source.querySelector<SVGLinearGradientElement>('linearGradient')!;
+      const clonedPath = source.querySelector<SVGPathElement>('svg path')!;
+      return {
+        wrapperTop: wrapperRect.top,
+        relativeLayerTop: layerRect.top - wrapperRect.top,
+        layerStyleTop: layer.style.top,
+        sourceLeft: source.style.left,
+        sourceTop: source.style.top,
+        sourceTransform: source.style.transform,
+        maskImage: layer.style.maskImage,
+        legacyReflect: element.style.getPropertyValue('-webkit-box-reflect'),
+        originalGradientId: originalGradient.id,
+        clonedGradientId: clonedGradient.id,
+        clonedPathFill: clonedPath.getAttribute('fill'),
+      };
+    };
+
+    return { first: inspect(first), second: inspect(second) };
+  });
+
+  expect(result.second.wrapperTop - result.first.wrapperTop).toBeCloseTo(200, 4);
+  expect(result.first.relativeLayerTop).toBeCloseTo(88, 4);
+  expect(result.second.relativeLayerTop).toBeCloseTo(result.first.relativeLayerTop, 8);
+  for (const reflection of [result.first, result.second]) {
+    expect(reflection).toMatchObject({
+      layerStyleTop: '88px',
+      sourceLeft: '0px',
+      sourceTop: '0px',
+      legacyReflect: '',
+    });
+    expect(reflection.sourceTransform).toContain('matrix(1, 0, 0, -1');
+    expect(reflection.maskImage).toContain('90deg');
+    expect(reflection.clonedGradientId).not.toBe(reflection.originalGradientId);
+    expect(reflection.clonedPathFill).toBe(`url(#${reflection.clonedGradientId})`);
+  }
+
+  const host = page.locator('#reflection-browser-host');
+  const firstFrame = await host.screenshot();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  const secondFrame = await host.screenshot();
+  expect(firstFrame.equals(secondFrame)).toBe(true);
+});
+
 test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, and disposal', async ({
   page,
 }) => {

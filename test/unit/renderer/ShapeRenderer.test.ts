@@ -4632,7 +4632,7 @@ describe('ShapeRenderer', () => {
     expect(path?.getAttribute('stroke-linejoin')).toBe('round');
   });
 
-  it('applies reflection approximation via -webkit-box-reflect', () => {
+  it('renders a bottom-aligned reflection as an explicit mirrored layer', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -4642,16 +4642,27 @@ describe('ShapeRenderer', () => {
           <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
           <a:solidFill><a:srgbClr val="4472C4"/></a:solidFill>
           <a:effectLst>
-            <a:reflection stA="40000" endA="0" stPos="0" endPos="100000" dist="63500"/>
+            <a:reflection blurRad="6350" stA="40000" endA="0" stPos="0"
+                          endPos="100000" dist="63500" dir="5400000"
+                          sy="-100000" algn="bl" rotWithShape="0"/>
           </a:effectLst>
         </p:spPr>
       </p:sp>
     `;
     const shapeNode = parseShapeNode(parseXml(xml));
     const el = renderShape(shapeNode, createMockRenderContext());
-    const reflect =
-      el.style.getPropertyValue('-webkit-box-reflect') || (el.style as any).webkitBoxReflect || '';
-    expect(reflect).toContain('linear-gradient');
+    const reflection = el.querySelector<HTMLElement>('[data-pptx-reflection-layer="true"]');
+    const source = reflection?.querySelector<HTMLElement>('[data-pptx-reflection-source="true"]');
+
+    expect(el.style.getPropertyValue('-webkit-box-reflect')).toBe('');
+    expect(reflection).toBeTruthy();
+    expect(reflection?.getAttribute('aria-hidden')).toBe('true');
+    expect(reflection?.style.top).toBe('90.6562px');
+    expect(reflection?.style.left).toBe('0px');
+    expect(reflection?.style.filter).toContain('blur(0.6667px)');
+    expect(reflection?.style.maskImage).toContain('180deg');
+    expect(reflection?.style.maskImage).toContain('0.400');
+    expect(source?.style.transform).toContain('matrix(1, 0, 0, -1');
   });
 
   it('renders linear gradient fill on shape', () => {
@@ -6175,8 +6186,9 @@ describe('ShapeRenderer', () => {
 
   // ---- Reflection effect: additional edge cases ----
 
-  it('reflection with default stA and endA values produces valid gradient', () => {
-    // stA and endA omitted → defaults: stA=50000, endA=0
+  it('uses the ECMA-376 reflection defaults when optional attributes are omitted', () => {
+    // ECMA-376 Part 1 CT_ReflectionEffect defaults: stA=100%, endA=0%,
+    // endPos=100%, fadeDir=90deg, sx=sy=100%, and algn=b.
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -6193,15 +6205,17 @@ describe('ShapeRenderer', () => {
     `;
     const shapeNode = parseShapeNode(parseXml(xml));
     const el = renderShape(shapeNode, createMockRenderContext());
-    const reflect =
-      el.style.getPropertyValue('-webkit-box-reflect') || (el.style as any).webkitBoxReflect || '';
-    // Default stA=0.5, endA=0 → gradient goes from rgba(255,255,255,0.500) to rgba(255,255,255,0.000)
-    expect(reflect).toContain('0.500');
-    expect(reflect).toContain('0.000');
-    expect(reflect).toContain('below');
+    const reflection = el.querySelector<HTMLElement>('[data-pptx-reflection-layer="true"]');
+    const source = reflection?.querySelector<HTMLElement>('[data-pptx-reflection-source="true"]');
+
+    expect(reflection?.style.maskImage).toContain('180deg');
+    expect(reflection?.style.maskImage).toContain('1.000');
+    expect(reflection?.style.maskImage).toContain('0.000');
+    expect(reflection?.style.maskImage).toContain('100.0%');
+    expect(source?.style.transform).toContain('matrix(1, 0, 0, 1');
   });
 
-  it('reflection with zero dist produces "below 0.0px" in reflect value', () => {
+  it('anchors a zero-distance vertical reflection at the shape bottom edge', () => {
     const xml = `
       <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
             xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -6211,16 +6225,45 @@ describe('ShapeRenderer', () => {
           <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
           <a:solidFill><a:srgbClr val="ED7D31"/></a:solidFill>
           <a:effectLst>
-            <a:reflection stA="30000" endA="0" dist="0"/>
+            <a:reflection stA="30000" endA="0" dist="0" dir="5400000"
+                          sy="-100000" algn="bl" rotWithShape="0"/>
           </a:effectLst>
         </p:spPr>
       </p:sp>
     `;
     const shapeNode = parseShapeNode(parseXml(xml));
     const el = renderShape(shapeNode, createMockRenderContext());
-    const reflect =
-      el.style.getPropertyValue('-webkit-box-reflect') || (el.style as any).webkitBoxReflect || '';
-    expect(reflect).toContain('below 0.0px');
+    const reflection = el.querySelector<HTMLElement>('[data-pptx-reflection-layer="true"]');
+    expect(reflection?.style.top).toBe('83.9895px');
+  });
+
+  it('keeps a centered no-wrap spAutoFit text box top-aligned by default', () => {
+    const xml = `
+      <p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvSpPr>
+          <p:cNvPr id="502" name="Top aligned text box"/>
+          <p:cNvSpPr txBox="1"/>
+          <p:nvPr/>
+        </p:nvSpPr>
+        <p:spPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="5486400" cy="1280160"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+          <a:noFill/><a:ln><a:noFill/></a:ln>
+        </p:spPr>
+        <p:txBody>
+          <a:bodyPr wrap="none" lIns="0" rIns="0" tIns="0" bIns="0"><a:spAutoFit/></a:bodyPr>
+          <a:lstStyle/>
+          <a:p><a:pPr algn="ctr"/><a:r><a:rPr sz="3400"/><a:t>LIVE REFLECTION</a:t></a:r></a:p>
+        </p:txBody>
+      </p:sp>
+    `;
+    const el = renderShape(parseShapeNode(parseXml(xml)), createMockRenderContext());
+    const textContainer = Array.from(el.querySelectorAll('div')).find(
+      (div) => div.style.flexDirection === 'column',
+    ) as HTMLElement | undefined;
+
+    expect(textContainer?.style.justifyContent).toBe('flex-start');
   });
 
   // ---- effectRef: boundary and skip cases ----

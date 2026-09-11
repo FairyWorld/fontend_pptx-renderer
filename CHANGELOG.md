@@ -21,6 +21,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   ordinary-shape outer shadows. The local gate measures exterior shadow energy, spatial field,
   overlap, centroid, and an erasure mutation so a high full-slide SSIM cannot hide a missing or
   misplaced shadow.
+- Added a seven-slide native PowerPoint matrix and hash-bound `reflection-local` metric for direct
+  ordinary-shape reflections. The matrix contains an inverse and six bounded positive rows across
+  geometry, aspect, paint, blur, fade, distance, and one uniform group scale. The local gate checks
+  reflection energy, spatial field, centroid, and an erasure mutation. A separate live-text row is
+  retained as discovery evidence rather than broadening the promoted shape-surface scope.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
   shapes and pictures, with stable renderer fallback reasons, plus a nineteen-case, fifty-eight-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
@@ -80,6 +85,12 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   native-calibrated blur widths. Only the seven positive matrix rows are promoted. Rotated/flipped
   ancestor groups, unverified parameter combinations, nonuniform scale, skew, custom geometry, 3D,
   effect DAGs, and compound effects retain the existing approximation.
+- Render bounded direct `a:reflection` effects through an explicit shape-local cloned layer with
+  ECMA-376 defaults, affine scale/skew/alignment/direction/distance handling, blur, and a final-space
+  alpha mask. Cloned SVG IDs and references are isolated, so absolute slide offsets and reusable
+  gradients are not applied or shared twice. Only the six declared native matrix rows are promoted;
+  text, picture, group-level, transformed, 3D, and compound-effect combinations remain bounded
+  fallback or discovery paths.
 - Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
   polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
 - Promote finite nonnegative `a:srcRect` picture crops into the bounded static 3D top-bevel lane;

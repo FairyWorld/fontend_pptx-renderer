@@ -12,6 +12,7 @@ import { emuToPx } from '../parser/units';
 import { SafeXmlNode } from '../parser/XmlParser';
 import { hexToRgb } from '../utils/color';
 import { resolveColor } from './StyleResolver';
+import { applyReflectionEffect } from './ReflectionRenderer';
 
 function shouldPropagateGroupFlip(node: BaseNodeData): boolean {
   return node.nodeType !== 'table' && node.nodeType !== 'chart';
@@ -81,19 +82,6 @@ function applyGroupOuterShadow(
   wrapper.style.filter = `drop-shadow(${offsetX.toFixed(1)}px ${offsetY.toFixed(1)}px ${blurPx.toFixed(1)}px ${shadowColor})`;
 }
 
-function applyGroupReflection(wrapper: HTMLElement, reflection: SafeXmlNode): void {
-  const dist = emuToPx(reflection.numAttr('dist') ?? 0);
-  const stA = (reflection.numAttr('stA') ?? 50000) / 100000;
-  const endA = (reflection.numAttr('endA') ?? 0) / 100000;
-  const stPos = Math.max(0, Math.min(100, (reflection.numAttr('stPos') ?? 0) / 1000));
-  const endPos = Math.max(0, Math.min(100, (reflection.numAttr('endPos') ?? 100000) / 1000));
-  const mask = `linear-gradient(to bottom, rgba(255,255,255,${stA.toFixed(3)}) ${stPos.toFixed(1)}%, rgba(255,255,255,${endA.toFixed(3)}) ${endPos.toFixed(1)}%)`;
-  const reflectValue = `below ${dist.toFixed(1)}px ${mask}`;
-  wrapper.style.setProperty('-webkit-box-reflect', reflectValue);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (wrapper.style as any).webkitBoxReflect = reflectValue;
-}
-
 function applyGroupEffects(
   wrapper: HTMLElement,
   node: GroupNodeData,
@@ -110,7 +98,7 @@ function applyGroupEffects(
 
   const reflection = effectLst.child('reflection');
   if (reflection.exists()) {
-    applyGroupReflection(wrapper, reflection);
+    applyReflectionEffect(wrapper, reflection, node.size);
   }
 }
 

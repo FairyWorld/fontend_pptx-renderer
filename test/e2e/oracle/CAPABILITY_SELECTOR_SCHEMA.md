@@ -50,7 +50,9 @@ the direct effect-list child of a normal PresentationML shape, including that sh
 The path must be nonempty. Every step requires its namespace and a nonempty, duplicate-free
 `localNames` list. A selector cannot combine `parent` and `ancestorPath`. The suffix rule permits
 additional package structure above the selected shape while still excluding picture, group-level,
-text-run, and theme effect lists. Omitting both constraints preserves unscoped matching.
+text-run, and theme effect lists. The bounded `a:reflection` capability uses the same three-step
+`p:sp` -> `p:spPr` -> `a:effectLst` suffix, so a text, picture, or group reflection cannot enter the
+ordinary-shape evidence cohort. Omitting both constraints preserves unscoped matching.
 
 This distinction matters for DrawingML 3D. An `a:scene3d` directly under `p:spPr` or `p:grpSpPr`
 is shape/group scene data. The same element directly under `a:bodyPr` is text-body 3D and is

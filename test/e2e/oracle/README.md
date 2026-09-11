@@ -45,7 +45,8 @@ derives native-PowerPoint, manual-review, and regression status, including a mat
 set, identical input/runtime fingerprints from an earlier revision, and the 0.02 SSIM budget. The
 bounded top-bevel capability additionally requires a `--bevel-report`; the camera-plane and bounded
 bottom-front capabilities require a `--camera-report`; bounded ordinary-shape outer shadows require
-a `--shadow-report`. Their derived `bevel-local`, `camera-local`, and `shadow-local` gates bind the exact
+a `--shadow-report`; bounded ordinary-shape reflections require a `--reflection-report`. Their
+derived `bevel-local`, `camera-local`, `shadow-local`, and `reflection-local` gates bind the exact
 case set, source/ground-truth hashes, and per-slide raster hashes to the same clean revision and
 current files. Other `--passed-gate` values only record checks already executed by the caller; they
 are not run by the command. The API promotes any visible per-slide review flag to the case level, so
@@ -76,6 +77,8 @@ a strong average cannot hide a local mismatch. Review rows require an explicit c
   bounded zero-depth cohorts.
 - `../scripts/outer_shadow_metrics.py`: exact-path ordinary-shape exterior-shadow gate with energy,
   field, centroid, inverse, and erasure-sensitivity checks.
+- `../scripts/reflection_metrics.py`: exact-path ordinary-shape reflection-region gate with energy,
+  field, centroid, and erasure-sensitivity checks.
 - `shape` nodes support `shapeTypeId` (numeric `MsoAutoShapeType`) for forward-compatible shape coverage.
 
 4. VBA probe module
@@ -194,7 +197,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 179 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 181 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -204,9 +207,13 @@ ground-truth export. It defines 179 cases under `oracle/cases-pypptx/` with the
 - **Shape adjustments** (31 cases): adjustment handles for roundRect, chevron, arrow, star, donut, cross, trapezoid, blockArc, bevel, triangle, pentagon, can, heart, moon, brace
 - **Zero-adjustment flowcharts** (28 cases, 84 slides): presets in shape IDs 61-88, each with
   square explicit paint, wide theme-reference paint, and grouped-tall rendering
-- **Ordinary-shape effects** (1 case, 8 slides): a direct `a:outerShdw` matrix covering inverse,
+- **Ordinary-shape effects** (2 cases, 15 slides): a direct `a:outerShdw` matrix covering inverse,
   omitted defaults, offset/direction, centered 102% and top-right 92% uniform scale, wide/tall
-  geometry, gradient paint, a single unrotated group at uniform 1.25 scale, and scheme-color modifiers
+  geometry, gradient paint, a single unrotated group at uniform 1.25 scale, and scheme-color
+  modifiers; plus a direct `a:reflection` matrix covering one inverse and six bounded positive rows
+  across shape geometry, aspect, solid/gradient paint, blur, fade, distance, and the same group scale
+- **Text effects** (1 discovery case): live no-fill text reflection retained for comparison and
+  future local-metric work; it is outside the verified ordinary-shape reflection capability
 - **Static DrawingML 3D** (19 cases, 58 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
@@ -242,6 +249,10 @@ cd test/e2e
 # Generate only the bounded ordinary-shape effect matrix.
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-shape-effect-*'
+
+# Generate the separate live-text reflection discovery case.
+.venv/bin/python3 scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-text-effect-*'
 
 # Generate only the bounded static DrawingML 3D matrix.
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
@@ -339,6 +350,16 @@ It erases the candidate exterior shadow on every measurable positive row and req
 to fail. Pass the report to `run_capability_loop.py verify --shadow-report ...`; callers cannot
 self-attest `shadow-local`. The seven positive rows are the promoted combinations; values appearing
 in separate rows are not implicitly cross-combined.
+
+After evaluating `oracle-pypptx-shape-effect-0002-reflection-matrix`, run
+`../scripts/reflection_metrics.py` with its clean API report. The schema-v1 report derives the six
+positive slides from direct `p:sp/p:spPr/a:effectLst/a:reflection` paths, binds source,
+ground-truth, and every visible raster hash, and checks reflection density, symmetric energy
+retention, overshoot, field cosine/IoU/error, and centroid displacement. It erases each candidate
+reflection region and requires the mutation to fail. Pass the report to
+`run_capability_loop.py verify --reflection-report ...`; callers cannot self-attest
+`reflection-local`. The full native report also covers the no-reflection inverse. The separate
+live-text case remains discovery evidence and does not broaden this shape-surface cohort.
 
 On macOS the PowerPoint interactive session must remain available. Error `-9074` can come from a
 locked session, a pending dialog, or a staged `_pptx-input.pptx` left open by an interrupted run.

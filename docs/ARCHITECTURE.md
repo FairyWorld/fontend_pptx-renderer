@@ -226,6 +226,36 @@ source/ground-truth and per-slide raster hashes to one clean renderer revision, 
 darkness energy and field geometry, and must reject a deterministic exterior-shadow erasure. This
 keeps a nearly white full-slide background from masking a locally missing shadow.
 
+### Bounded ordinary-shape reflections
+
+`ShapeRenderer` passes a direct `p:sp/p:spPr/a:effectLst/a:reflection` to
+`ReflectionRenderer`. The helper clones the completed shape wrapper before inserting the effect
+layer, resets the clone to shape-local `left=0` and `top=0`, and rewrites every cloned SVG ID plus
+`url(#...)` or fragment reference. This avoids both double application of the shape's absolute slide
+offset and cross-shape gradient/filter collisions.
+
+The helper resolves the `CT_ReflectionEffect` defaults at the rendering boundary: zero blur,
+distance, direction, and skew; full start alpha at position zero; zero end alpha at position 100%;
+90-degree fade direction; 100% X/Y scale; and bottom alignment. It builds the OOXML affine matrix
+from scale, skew, alignment anchor, direction, and distance, computes the transformed local bounds,
+and places the clone inside an overflow-visible sibling layer. Blur belongs to that layer. The alpha
+mask remains outside the negatively scaled source so the fade direction stays in final visual
+coordinates.
+
+The native capability is restricted to the six positive rows in the seven-slide reflection matrix:
+the declared `rect`, `roundRect`, `ellipse`, and `upArrow` paint/geometry tuples, bottom-left
+vertical reflection, bounded blur/alpha/distance values, no local transform or other effect, and at
+most one unrotated, unflipped group with uniform 1.25 child scale. `GroupRenderer` also applies the
+same helper to a direct group-level reflection as a diagnostic approximation, but that path is not
+promoted by the shape capability. Picture reflection keeps its existing image-specific fallback;
+live no-fill text is retained as separate discovery evidence.
+
+The schema-v1 `reflection-local` report derives positive regions from the exact shape effect path,
+binds source, ground-truth, and raster hashes to the clean renderer revision, and compares reflection
+energy, overshoot, field cosine/IoU/error, and centroid displacement. It must reject an erased
+candidate reflection region. The browser suite separately locks local-coordinate invariance and
+cloned SVG reference isolation.
+
 ### Bounded static DrawingML 3D
 
 `src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,

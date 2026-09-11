@@ -24,6 +24,7 @@ DERIVED_GATES = frozenset(
         "bevel-local",
         "camera-local",
         "shadow-local",
+        "reflection-local",
     }
 )
 SSIM_REGRESSION_BUDGET = 0.02
@@ -84,6 +85,17 @@ SHADOW_FIELD_IOU_THRESHOLD = 0.55
 SHADOW_FIELD_ERROR_THRESHOLD = 0.35
 SHADOW_CENTROID_ERROR_RATIO_THRESHOLD = 0.03
 SHADOW_FIELD_BINARY_THRESHOLD = 2.0
+REFLECTION_BLUR_PAD_MULTIPLIER = 2.0
+REFLECTION_BACKGROUND_NOISE_FLOOR = 2.0
+REFLECTION_MINIMUM_REFERENCE_DENSITY = 2.0
+REFLECTION_INVISIBLE_DENSITY_THRESHOLD = 1.5
+REFLECTION_ENERGY_RATIO_THRESHOLD = 0.85
+REFLECTION_OVERSHOOT_RATIO_THRESHOLD = 1.20
+REFLECTION_FIELD_COSINE_THRESHOLD = 0.95
+REFLECTION_FIELD_IOU_THRESHOLD = 0.75
+REFLECTION_FIELD_ERROR_THRESHOLD = 0.20
+REFLECTION_CENTROID_ERROR_RATIO_THRESHOLD = 0.03
+REFLECTION_FIELD_BINARY_THRESHOLD = 2.0
 
 
 class CapabilityVerificationError(ValueError):
@@ -165,11 +177,13 @@ def _case_hashes(report: Mapping[str, Any], case_id: str) -> tuple[str, str]:
     )
 
 
-def _source_outer_shadow_slide_indices(
+def _source_shape_effect_slide_indices(
     report: Mapping[str, Any],
     case_id: str,
     expected_source_hash: str,
     repo: Path,
+    *,
+    effect_name: str,
 ) -> set[int]:
     provenance = _mapping(report.get("provenance"), f"{case_id} provenance")
     inputs = _mapping(provenance.get("inputs"), f"{case_id} inputs")
@@ -235,7 +249,7 @@ def _source_outer_shadow_slide_indices(
                 f"./{{{presentation_namespace}}}sldIdLst/"
                 f"{{{presentation_namespace}}}sldId"
             )
-            shadow_slides: set[int] = set()
+            effect_slides: set[int] = set()
             for slide_index, slide_id in enumerate(slide_ids):
                 relationship_id = slide_id.get(
                     f"{{{office_relationship_namespace}}}id"
@@ -257,23 +271,53 @@ def _source_outer_shadow_slide_indices(
                         f"{case_id} source OOXML has an invalid slide target"
                     )
                 slide = ElementTree.fromstring(archive.read(relative_part.as_posix()))
-                outer_shadow_path = (
+                effect_path = (
                     f"./{{{presentation_namespace}}}spPr/"
                     f"{{{drawing_namespace}}}effectLst/"
-                    f"{{{drawing_namespace}}}outerShdw"
+                    f"{{{drawing_namespace}}}{effect_name}"
                 )
                 if any(
-                    shape.find(outer_shadow_path) is not None
+                    shape.find(effect_path) is not None
                     for shape in slide.iter(f"{{{presentation_namespace}}}sp")
                 ):
-                    shadow_slides.add(slide_index)
+                    effect_slides.add(slide_index)
     except CapabilityVerificationError:
         raise
     except (BadZipFile, KeyError, ElementTree.ParseError, OSError) as error:
         raise CapabilityVerificationError(
             f"{case_id} source OOXML cannot be verified"
         ) from error
-    return shadow_slides
+    return effect_slides
+
+
+def _source_outer_shadow_slide_indices(
+    report: Mapping[str, Any],
+    case_id: str,
+    expected_source_hash: str,
+    repo: Path,
+) -> set[int]:
+    return _source_shape_effect_slide_indices(
+        report,
+        case_id,
+        expected_source_hash,
+        repo,
+        effect_name="outerShdw",
+    )
+
+
+def _source_reflection_slide_indices(
+    report: Mapping[str, Any],
+    case_id: str,
+    expected_source_hash: str,
+    repo: Path,
+) -> set[int]:
+    return _source_shape_effect_slide_indices(
+        report,
+        case_id,
+        expected_source_hash,
+        repo,
+        effect_name="reflection",
+    )
 
 
 def _case_result(
@@ -2064,6 +2108,279 @@ def _validate_shadow_local(
         raise CapabilityVerificationError("shadow-local report failed")
 
 
+def _validate_reflection_local(
+    report: Mapping[str, Any],
+    current: Mapping[str, Mapping[str, Any]],
+    current_revision: str,
+    repo: Path,
+) -> None:
+    if report.get("schemaVersion") != 1:
+        raise CapabilityVerificationError("reflection-local report requires schemaVersion=1")
+    renderer = _mapping(report.get("renderer"), "reflection-local renderer")
+    if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
+        raise CapabilityVerificationError(
+            "reflection-local report must match the clean native-report revision"
+        )
+    expected_thresholds = {
+        "blurPadMultiplier": REFLECTION_BLUR_PAD_MULTIPLIER,
+        "backgroundNoiseFloor": REFLECTION_BACKGROUND_NOISE_FLOOR,
+        "minimumReferenceReflectionDensity": REFLECTION_MINIMUM_REFERENCE_DENSITY,
+        "invisibleReflectionDensity": REFLECTION_INVISIBLE_DENSITY_THRESHOLD,
+        "reflectionEnergyRatio": REFLECTION_ENERGY_RATIO_THRESHOLD,
+        "reflectionOvershootRatio": REFLECTION_OVERSHOOT_RATIO_THRESHOLD,
+        "reflectionFieldCosine": REFLECTION_FIELD_COSINE_THRESHOLD,
+        "reflectionFieldIou": REFLECTION_FIELD_IOU_THRESHOLD,
+        "reflectionFieldError": REFLECTION_FIELD_ERROR_THRESHOLD,
+        "reflectionCentroidErrorRatio": REFLECTION_CENTROID_ERROR_RATIO_THRESHOLD,
+        "reflectionFieldBinaryThreshold": REFLECTION_FIELD_BINARY_THRESHOLD,
+    }
+    thresholds = _mapping(report.get("thresholds"), "reflection-local thresholds")
+    if thresholds != expected_thresholds:
+        raise CapabilityVerificationError("reflection-local report uses unexpected thresholds")
+
+    values = report.get("caseResults")
+    if not isinstance(values, list) or any(not isinstance(value, Mapping) for value in values):
+        raise CapabilityVerificationError("reflection-local caseResults must be a list of objects")
+    by_case: dict[str, Mapping[str, Any]] = {}
+    for value in values:
+        case_id = value.get("caseId")
+        if not isinstance(case_id, str) or not case_id or case_id in by_case:
+            raise CapabilityVerificationError("reflection-local case IDs must be unique strings")
+        by_case[case_id] = value
+    if set(by_case) != set(current):
+        raise CapabilityVerificationError("reflection-local case IDs must match native reports")
+
+    applicable_count = 0
+    all_cases_passed = True
+    for case_id, value in by_case.items():
+        source_hash, ground_truth_hash = _case_hashes(current[case_id], case_id)
+        source_reflection_slides = _source_reflection_slide_indices(
+            current[case_id], case_id, source_hash, repo
+        )
+        if value.get("sourceSha256") != source_hash or value.get(
+            "groundTruthSha256"
+        ) != ground_truth_hash:
+            raise CapabilityVerificationError(
+                f"{case_id} reflection-local input hashes must match native reports"
+            )
+        slides = value.get("slides")
+        if not isinstance(slides, list) or any(not isinstance(slide, Mapping) for slide in slides):
+            raise CapabilityVerificationError(f"{case_id} reflection-local slides must be objects")
+        native_slide_values = current[case_id].get("perSlide")
+        if not isinstance(native_slide_values, list) or any(
+            not isinstance(slide, Mapping) for slide in native_slide_values
+        ):
+            raise CapabilityVerificationError(
+                f"{case_id} native report is missing per-slide artifacts"
+            )
+        native_slides = {
+            slide.get("slideIdx"): slide
+            for slide in native_slide_values
+            if isinstance(slide.get("slideIdx"), int) and slide.get("hidden") is not True
+        }
+        seen_slide_indices: set[int] = set()
+        slide_passes: list[bool] = []
+        for ordinal, slide in enumerate(slides):
+            context = f"{case_id} reflection-local slide {ordinal}"
+            source_slide_index = slide.get("slideIdx")
+            if (
+                not isinstance(source_slide_index, int)
+                or isinstance(source_slide_index, bool)
+                or source_slide_index < 0
+                or source_slide_index in seen_slide_indices
+            ):
+                raise CapabilityVerificationError(f"{context} index is invalid or duplicated")
+            seen_slide_indices.add(source_slide_index)
+            if source_slide_index not in source_reflection_slides:
+                raise CapabilityVerificationError(
+                    f"{context} reflection requirement does not match source OOXML"
+                )
+            native_slide = native_slides.get(source_slide_index)
+            if native_slide is None:
+                raise CapabilityVerificationError(f"{context} is absent from the native report")
+            native_artifacts = _mapping(
+                native_slide.get("renderArtifacts"), f"{context} native render artifacts"
+            )
+            for kind in ("reference", "candidate"):
+                path_value = slide.get(f"{kind}Path")
+                expected_hash = _sha256(slide.get(f"{kind}Sha256"), f"{context} {kind}")
+                native_artifact = _mapping(
+                    native_artifacts.get(kind), f"{context} native {kind} artifact"
+                )
+                if (
+                    native_artifact.get("path") != path_value
+                    or native_artifact.get("sha256") != expected_hash
+                ):
+                    raise CapabilityVerificationError(
+                        f"{context} does not match native report artifacts"
+                    )
+                if not isinstance(path_value, str) or "\\" in path_value:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                relative = PurePosixPath(path_value)
+                if relative.is_absolute() or ".." in relative.parts or "." in relative.parts:
+                    raise CapabilityVerificationError(f"{context} {kind} path is invalid")
+                artifact = (repo / relative.as_posix()).resolve()
+                try:
+                    artifact.relative_to(repo.resolve())
+                except ValueError as error:
+                    raise CapabilityVerificationError(
+                        f"{context} {kind} path escapes the repository"
+                    ) from error
+                if not artifact.is_file():
+                    raise CapabilityVerificationError(f"{context} {kind} artifact is missing")
+                if hashlib.sha256(artifact.read_bytes()).hexdigest() != expected_hash:
+                    raise CapabilityVerificationError(f"{context} {kind} artifact hash changed")
+
+            if slide.get("reflectionRequired") is not True:
+                raise CapabilityVerificationError(f"{context} reflection requirement is invalid")
+            regions = slide.get("regions")
+            if not isinstance(regions, list) or not regions:
+                raise CapabilityVerificationError(f"{context} regions must be non-empty")
+            for region_index, region_value in enumerate(regions):
+                region = _mapping(region_value, f"{context} region {region_index}")
+                if set(region) != {"x0", "y0", "x1", "y1"}:
+                    raise CapabilityVerificationError(f"{context} region keys are invalid")
+                x0 = _finite_metric(region.get("x0"), f"{context} region x0")
+                y0 = _finite_metric(region.get("y0"), f"{context} region y0")
+                x1 = _finite_metric(region.get("x1"), f"{context} region x1")
+                y1 = _finite_metric(region.get("y1"), f"{context} region y1")
+                if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+                    raise CapabilityVerificationError(f"{context} region is outside slide bounds")
+
+            metrics = _mapping(slide.get("metrics"), f"{context} metrics")
+            if metrics.get("reflectionRequired") is not True:
+                raise CapabilityVerificationError(f"{context} reflection requirement is inconsistent")
+            measurable = metrics.get("reflectionMeasurable")
+            if measurable is not True:
+                raise CapabilityVerificationError(f"{context} reflection must be measurable")
+            reference_density = _finite_metric(
+                metrics.get("referenceReflectionDensity"), f"{context} reference density"
+            )
+            candidate_density = _finite_metric(
+                metrics.get("candidateReflectionDensity"), f"{context} candidate density"
+            )
+            energy_ratio = _finite_metric(
+                metrics.get("reflectionEnergyRatio"), f"{context} energy ratio"
+            )
+            overshoot_ratio = _finite_metric(
+                metrics.get("reflectionOvershootRatio"), f"{context} overshoot ratio"
+            )
+            field_cosine = _finite_metric(
+                metrics.get("reflectionFieldCosine"), f"{context} field cosine"
+            )
+            field_iou = _finite_metric(
+                metrics.get("reflectionFieldIou"), f"{context} field IoU"
+            )
+            field_error = _finite_metric(
+                metrics.get("reflectionFieldError"), f"{context} field error"
+            )
+            centroid_error = _finite_metric(
+                metrics.get("reflectionCentroidErrorRatio"), f"{context} centroid error"
+            )
+            region_pixels = metrics.get("reflectionRegionPixels")
+            if (
+                reference_density < REFLECTION_MINIMUM_REFERENCE_DENSITY
+                or candidate_density < 0
+                or not 0 <= energy_ratio <= 1
+                or overshoot_ratio < 0
+                or not 0 <= field_cosine <= 1
+                or not 0 <= field_iou <= 1
+                or not 0 <= field_error <= 1
+                or centroid_error < 0
+                or not isinstance(region_pixels, int)
+                or isinstance(region_pixels, bool)
+                or region_pixels < 64
+            ):
+                raise CapabilityVerificationError(f"{context} metrics are outside their domains")
+            maximum_density = max(reference_density, candidate_density)
+            expected_energy_ratio = (
+                min(reference_density, candidate_density) / maximum_density
+                if maximum_density > 1e-9
+                else 1.0
+            )
+            expected_overshoot = candidate_density / reference_density
+            if (
+                abs(energy_ratio - expected_energy_ratio) > 1e-9
+                or abs(overshoot_ratio - expected_overshoot) > 1e-9
+            ):
+                raise CapabilityVerificationError(f"{context} metrics are inconsistent")
+            if _mapping(metrics.get("thresholds"), f"{context} thresholds") != expected_thresholds:
+                raise CapabilityVerificationError(f"{context} uses unexpected thresholds")
+
+            sensitivity = _mapping(
+                metrics.get("reflectionSensitivity"), f"{context} sensitivity"
+            )
+            if (
+                sensitivity.get("mutation") != "erase-reflection-region"
+                or sensitivity.get("applicable") is not True
+            ):
+                raise CapabilityVerificationError(f"{context} sensitivity is inconsistent")
+            mutated_density = _finite_metric(
+                sensitivity.get("mutatedCandidateReflectionDensity"),
+                f"{context} mutated candidate density",
+            )
+            mutated_energy_ratio = _finite_metric(
+                sensitivity.get("mutatedReflectionEnergyRatio"),
+                f"{context} mutated energy ratio",
+            )
+            mutated_passed = sensitivity.get("mutatedReflectionPassed")
+            expected_mutated_energy_ratio = (
+                min(reference_density, mutated_density) / max(reference_density, mutated_density)
+                if max(reference_density, mutated_density) > 1e-9
+                else 1.0
+            )
+            if (
+                mutated_density < 0
+                or not 0 <= mutated_energy_ratio <= 1
+                or abs(mutated_energy_ratio - expected_mutated_energy_ratio) > 1e-9
+                or mutated_density > REFLECTION_INVISIBLE_DENSITY_THRESHOLD
+                or mutated_energy_ratio >= REFLECTION_ENERGY_RATIO_THRESHOLD
+                or mutated_passed is not False
+                or sensitivity.get("detected") is not True
+            ):
+                raise CapabilityVerificationError(f"{context} sensitivity is invalid")
+
+            expected_pass = (
+                energy_ratio >= REFLECTION_ENERGY_RATIO_THRESHOLD
+                and overshoot_ratio <= REFLECTION_OVERSHOOT_RATIO_THRESHOLD
+                and field_cosine >= REFLECTION_FIELD_COSINE_THRESHOLD
+                and field_iou >= REFLECTION_FIELD_IOU_THRESHOLD
+                and field_error <= REFLECTION_FIELD_ERROR_THRESHOLD
+                and centroid_error <= REFLECTION_CENTROID_ERROR_RATIO_THRESHOLD
+                and sensitivity.get("detected") is True
+            )
+            if (
+                metrics.get("passed") is not expected_pass
+                or slide.get("passed") is not expected_pass
+            ):
+                raise CapabilityVerificationError(f"{context} pass status is inconsistent")
+            slide_passes.append(expected_pass)
+
+        if seen_slide_indices != source_reflection_slides:
+            raise CapabilityVerificationError(
+                f"{case_id} reflection-local slides must match source OOXML"
+            )
+        applicable = bool(source_reflection_slides)
+        if value.get("applicable") is not applicable:
+            raise CapabilityVerificationError(
+                f"{case_id} reflection-local applicability is inconsistent"
+            )
+        if applicable:
+            applicable_count += 1
+        case_passed = applicable and bool(slide_passes) and all(slide_passes)
+        if value.get("passed") is not case_passed:
+            raise CapabilityVerificationError(
+                f"{case_id} reflection-local pass status is inconsistent"
+            )
+        all_cases_passed = all_cases_passed and case_passed
+        if not case_passed:
+            raise CapabilityVerificationError(f"{case_id} reflection-local report failed")
+    if applicable_count < 1 or report.get("applicableCaseCount") != applicable_count:
+        raise CapabilityVerificationError("reflection-local report requires applicable case evidence")
+    if report.get("passed") is not all_cases_passed or report.get("passed") is not True:
+        raise CapabilityVerificationError("reflection-local report failed")
+
+
 def normalize_native_evaluation_reports(
     capability: CapabilityDefinition,
     reports: Sequence[Mapping[str, Any]],
@@ -2076,6 +2393,7 @@ def normalize_native_evaluation_reports(
     bevel_report: Mapping[str, Any] | None = None,
     camera_report: Mapping[str, Any] | None = None,
     shadow_report: Mapping[str, Any] | None = None,
+    reflection_report: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if oracle not in {"powerpoint-macos", "powerpoint-windows"}:
         raise CapabilityVerificationError(
@@ -2129,6 +2447,10 @@ def normalize_native_evaluation_reports(
     if shadow_report is not None:
         _validate_shadow_local(shadow_report, current, next(iter(revisions)), repo)
         shadow_local_passed = True
+    reflection_local_passed = False
+    if reflection_report is not None:
+        _validate_reflection_local(reflection_report, current, next(iter(revisions)), repo)
+        reflection_local_passed = True
     gates = {
         gate: (
             "passed"
@@ -2139,6 +2461,7 @@ def normalize_native_evaluation_reports(
             or (gate == "bevel-local" and bevel_local_passed)
             or (gate == "camera-local" and camera_local_passed)
             or (gate == "shadow-local" and shadow_local_passed)
+            or (gate == "reflection-local" and reflection_local_passed)
             else "failed"
             if gate == "native-powerpoint"
             else "missing"

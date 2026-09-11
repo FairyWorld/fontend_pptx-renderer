@@ -844,7 +844,7 @@ describe('renderGroup — group-level effects', () => {
     expect(el.style.filter).toBe('');
   });
 
-  it('applies grpSpPr reflection to the group wrapper', () => {
+  it('renders grpSpPr reflection as an explicit mirrored layer', () => {
     const groupSource = xml(`
       <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -865,11 +865,14 @@ describe('renderGroup — group-level effects', () => {
 
     const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
 
-    expect((el.style as any).webkitBoxReflect).toContain('linear-gradient');
-    expect((el.style as any).webkitBoxReflect).toContain('below');
+    const reflection = el.querySelector<HTMLElement>('[data-pptx-reflection-layer="true"]');
+    expect((el.style as any).webkitBoxReflect ?? '').toBe('');
+    expect(reflection?.style.top).toBe('100px');
+    expect(reflection?.style.filter).toContain('blur(1.3333px)');
+    expect(reflection?.style.maskImage).toContain('180deg');
   });
 
-  it('uses reflection defaults when optional alpha and position attributes are omitted', () => {
+  it('uses ECMA-376 defaults for an attribute-empty group reflection', () => {
     const groupSource = xml(`
       <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
                xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
@@ -889,9 +892,11 @@ describe('renderGroup — group-level effects', () => {
 
     const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
 
-    expect((el.style as any).webkitBoxReflect).toContain('below 0.0px');
-    expect((el.style as any).webkitBoxReflect).toContain('0.500');
-    expect((el.style as any).webkitBoxReflect).toContain('100.0%');
+    const reflection = el.querySelector<HTMLElement>('[data-pptx-reflection-layer="true"]');
+    const source = reflection?.querySelector<HTMLElement>('[data-pptx-reflection-source="true"]');
+    expect(reflection?.style.maskImage).toContain('1.000');
+    expect(reflection?.style.maskImage).toContain('100.0%');
+    expect(source?.style.transform).toContain('matrix(1, 0, 0, 1');
   });
 });
 

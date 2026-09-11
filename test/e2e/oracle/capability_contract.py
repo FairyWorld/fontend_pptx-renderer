@@ -36,6 +36,7 @@ GATES = frozenset(
         "bevel-local",
         "camera-local",
         "shadow-local",
+        "reflection-local",
     }
 )
 

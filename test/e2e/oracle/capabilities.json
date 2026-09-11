@@ -352,6 +352,188 @@
       "issueUrls": []
     },
     {
+      "id": "drawingml.shape.effect.reflection",
+      "component": "shape",
+      "renderMode": "native",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "reflection",
+          "ancestorPath": [
+            {
+              "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+              "localNames": [
+                "sp"
+              ]
+            },
+            {
+              "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+              "localNames": [
+                "spPr"
+              ]
+            },
+            {
+              "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+              "localNames": [
+                "effectLst"
+              ]
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "alignment": [
+          "bl"
+        ],
+        "blurRadiusEmu": [
+          6350,
+          177800
+        ],
+        "coexistingEffects": [
+          "reflection-only"
+        ],
+        "combinationPolicy": [
+          "only-listed-verified-matrix-rows"
+        ],
+        "directionOoxmlUnits": [
+          5400000
+        ],
+        "distanceEmu": [
+          "absent-default-zero",
+          38100
+        ],
+        "endAlphaOoxmlPercent": [
+          "absent-default-zero",
+          300
+        ],
+        "endPositionOoxmlPercent": [
+          28000,
+          35000,
+          40000
+        ],
+        "fadeDirectionOoxmlUnits": [
+          "absent-default-5400000"
+        ],
+        "geometry": [
+          "ellipse",
+          "rect",
+          "roundRect",
+          "upArrow"
+        ],
+        "geometryRows": [
+          "rect-standard",
+          "roundRect-wide",
+          "ellipse-tall",
+          "upArrow-wide"
+        ],
+        "groupTransform": [
+          "rotation-0",
+          "flipH-false",
+          "flipV-false"
+        ],
+        "groupScale": [
+          "absent-standalone",
+          "single-level-uniform-1.25"
+        ],
+        "nodeContainer": [
+          "standalone-slide-shape",
+          "single-level-group-child-shape"
+        ],
+        "rotWithShape": [
+          "explicit-zero"
+        ],
+        "scaleXOoxmlPercent": [
+          "absent-default-100000"
+        ],
+        "scaleYOoxmlPercent": [
+          -100000
+        ],
+        "shapeFill": [
+          "explicit-opaque-solid",
+          "explicit-two-stop-opaque-linear-gradient"
+        ],
+        "shapeStroke": [
+          "explicit-noFill"
+        ],
+        "shapeText": [
+          "absent-or-empty"
+        ],
+        "shapeTransform": [
+          "rotation-0",
+          "flipH-false",
+          "flipV-false"
+        ],
+        "skew": [
+          "absent-or-zero"
+        ],
+        "source": [
+          "direct-shape-effect-list"
+        ],
+        "startAlphaOoxmlPercent": [
+          40000,
+          52000
+        ],
+        "startPositionOoxmlPercent": [
+          "absent-default-zero"
+        ],
+        "verifiedMatrixRows": [
+          "rect-solid-blur-6350-alpha-52000-to-300-end-35000",
+          "roundRect-wide-solid-blur-6350-alpha-52000-to-300-end-35000",
+          "ellipse-tall-gradient-blur-6350-alpha-52000-to-300-end-35000",
+          "upArrow-wide-gradient-blur-177800-alpha-40000-end-default-zero-position-28000",
+          "roundRect-solid-blur-6350-alpha-52000-to-300-end-35000-group-1.25",
+          "rect-solid-blur-6350-alpha-52000-to-300-end-40000-dist-38100"
+        ]
+      },
+      "fallback": "Use the explicit cloned-layer approximation outside the verified matrix bounds; keep live text without a visible surface, pictures, group-level effects, other alignment/direction/fade/scale/skew tuples, nested or non-uniform groups, rotation/flip, 3D, effect DAGs, and compound effects as separate follow-on lanes.",
+      "implementationPaths": [
+        "README.md",
+        "CHANGELOG.md",
+        "docs/ARCHITECTURE.md",
+        "docs/TESTING.md",
+        "src/renderer/GroupRenderer.ts",
+        "src/renderer/ReflectionRenderer.ts",
+        "src/renderer/ShapeRenderer.ts",
+        "test/browser/rendering-coverage.spec.ts",
+        "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md",
+        "test/e2e/oracle/README.md",
+        "test/e2e/oracle/capabilities.json",
+        "test/e2e/oracle/capability_contract.py",
+        "test/e2e/oracle/capability_inventory.py",
+        "test/e2e/oracle/capability_verification.py",
+        "test/e2e/scripts/generate_pypptx_cases.py",
+        "test/e2e/scripts/reflection_metrics.py",
+        "test/e2e/scripts/run_capability_loop.py",
+        "test/e2e/test_capability_contract.py",
+        "test/e2e/test_capability_inventory.py",
+        "test/e2e/test_capability_verification.py",
+        "test/e2e/test_pypptx_generator_cases.py",
+        "test/e2e/test_reflection_metrics.py",
+        "test/unit/renderer/GroupRenderer.test.ts",
+        "test/unit/renderer/ShapeRenderer.test.ts"
+      ],
+      "requiredGates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "reflection-local",
+        "performance",
+        "package",
+        "package-size",
+        "typecheck",
+        "lint",
+        "build",
+        "docs"
+      ],
+      "issueUrls": []
+    },
+    {
       "id": "drawingml.shape.geometry.adjustment.donut",
       "component": "shape",
       "renderMode": "native",

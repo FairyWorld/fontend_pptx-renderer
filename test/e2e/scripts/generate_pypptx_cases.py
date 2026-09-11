@@ -1645,6 +1645,230 @@ def _build_shape_effect_cases() -> list[CaseDef]:
             },
         }
     )
+
+    def _apply_reflection(
+        shape,
+        *,
+        attributes: dict[str, int | str],
+    ) -> None:
+        sp_pr = shape._element.spPr
+        _remove_children(sp_pr, ("effectLst", "effectDag"))
+        effect_list = etree.Element(qn("a:effectLst"))
+        etree.SubElement(
+            effect_list,
+            qn("a:reflection"),
+            **{name: str(value) for name, value in attributes.items()},
+        )
+        _insert_before_ext_lst(sp_pr, effect_list)
+
+    common_reflection = {
+        "blurRad": 6350,
+        "stA": 52000,
+        "endA": 300,
+        "endPos": 35000,
+        "dir": 5400000,
+        "sy": -100000,
+        "algn": "bl",
+        "rotWithShape": 0,
+    }
+
+    def _add_reflection_shape(
+        prs,
+        *,
+        shape_type,
+        width: float,
+        height: float,
+        name: str,
+        reflection_attributes: dict[str, int | str] | None,
+        gradient: bool = False,
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_shape(
+            shape_type,
+            _emu((13.333 - width) / 2),
+            _emu(max(0.55, (7.5 - height * 1.65) / 2)),
+            _emu(width),
+            _emu(height),
+        )
+        shape.name = name
+        _style_shape(shape, gradient=gradient)
+        if reflection_attributes is not None:
+            _apply_reflection(shape, attributes=reflection_attributes)
+
+    def _build_reflection_matrix(prs) -> None:
+        _add_reflection_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=4.2,
+            height=2.4,
+            name="No reflection inverse control",
+            reflection_attributes=None,
+        )
+        _add_reflection_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=4.2,
+            height=2.4,
+            name="Solid rectangle common reflection",
+            reflection_attributes=common_reflection,
+        )
+        _add_reflection_shape(
+            prs,
+            shape_type=MSO_SHAPE.ROUNDED_RECTANGLE,
+            width=7.2,
+            height=2.4,
+            name="Wide rounded rectangle common reflection",
+            reflection_attributes=common_reflection,
+        )
+        _add_reflection_shape(
+            prs,
+            shape_type=MSO_SHAPE.OVAL,
+            width=2.8,
+            height=3.4,
+            name="Tall gradient ellipse common reflection",
+            reflection_attributes=common_reflection,
+            gradient=True,
+        )
+        _add_reflection_shape(
+            prs,
+            shape_type=MSO_SHAPE.UP_ARROW,
+            width=4.0,
+            height=2.5,
+            name="Gradient arrow broad blur reflection",
+            reflection_attributes={
+                "blurRad": 177800,
+                "stA": 40000,
+                "endPos": 28000,
+                "dir": 5400000,
+                "sy": -100000,
+                "algn": "bl",
+                "rotWithShape": 0,
+            },
+            gradient=True,
+        )
+
+        grouped_slide = prs.slides.add_slide(prs.slide_layouts[6])
+        group = grouped_slide.shapes.add_group_shape()
+        grouped_shape = group.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            _emu(1.0),
+            _emu(1.0),
+            _emu(4.2),
+            _emu(2.4),
+        )
+        grouped_shape.name = "Grouped reflected rounded rectangle"
+        _style_shape(grouped_shape)
+        _apply_reflection(grouped_shape, attributes=common_reflection)
+        group.left = _emu(4.0415)
+        group.top = _emu(0.85)
+        group.width = _emu(5.25)
+        group.height = _emu(3.0)
+
+        _add_reflection_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=4.2,
+            height=2.4,
+            name="Offset reflection real corpus neighbor",
+            reflection_attributes={
+                "blurRad": 6350,
+                "stA": 52000,
+                "endA": 300,
+                "endPos": 40000,
+                "dist": 38100,
+                "dir": 5400000,
+                "sy": -100000,
+                "algn": "bl",
+                "rotWithShape": 0,
+            },
+        )
+
+    def _build_text_reflection(prs) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        text_shape = slide.shapes.add_textbox(
+            _emu(3.6665),
+            _emu(1.6),
+            _emu(6.0),
+            _emu(1.4),
+        )
+        text_shape.name = "Live text reflection"
+        text_shape.fill.background()
+        text_shape.line.fill.background()
+        text_frame = text_shape.text_frame
+        text_frame.clear()
+        text_frame.margin_left = 0
+        text_frame.margin_right = 0
+        text_frame.margin_top = 0
+        text_frame.margin_bottom = 0
+        paragraph = text_frame.paragraphs[0]
+        paragraph.alignment = PP_ALIGN.CENTER
+        run = paragraph.add_run()
+        run.text = "LIVE REFLECTION"
+        run.font.name = "Arial"
+        run.font.size = Pt(34)
+        run.font.bold = True
+        run.font.color.rgb = RGBColor(0x20, 0x38, 0x64)
+        _apply_reflection(
+            text_shape,
+            attributes={
+                "blurRad": 12700,
+                "stA": 35000,
+                "endPos": 72000,
+                "dir": 5400000,
+                "sy": -100000,
+                "algn": "bl",
+                "rotWithShape": 0,
+            },
+        )
+
+    cases.append(
+        {
+            "name": "oracle-pypptx-shape-effect-0002-reflection-matrix",
+            "build_fn": _build_reflection_matrix,
+            "slide_count": 7,
+            "coverage": {
+                "oracle": "native-powerpoint",
+                "features": [
+                    "p:sp/p:spPr/a:effectLst/a:reflection",
+                    "semantics=inverse|alphaFade|blur|verticalFlip|distance",
+                    "geometry=rect|roundRect|ellipse|upArrow",
+                    "geometry.aspect=square|wide|tall",
+                    "container=standalone|singleLevelUniformUnrotatedGroup",
+                    "paint=explicitSolid|simpleGradient",
+                    "reflection.direction=90deg",
+                    "reflection.scale=sxImplicit100pct|syNegative100pct",
+                    "reflection.alignment=bottomLeft",
+                    "shape.transform=rotation0|flipHFalse|flipVFalse",
+                    "shape3d=absent",
+                ],
+            },
+            "assertions": {
+                "inverseSlideIndices": [0],
+                "positiveReflectionSlideIndices": [1, 2, 3, 4, 5, 6],
+            },
+        }
+    )
+    cases.append(
+        {
+            "name": "oracle-pypptx-text-effect-0001-reflection",
+            "build_fn": _build_text_reflection,
+            "coverage": {
+                "oracle": "native-powerpoint",
+                "features": [
+                    "p:sp/p:spPr/a:effectLst/a:reflection",
+                    "shape.kind=textBox",
+                    "paint=noFillLiveText",
+                    "bodyPr.wrap=none",
+                    "bodyPr.autofit=spAutoFit",
+                    "reflection.direction=90deg",
+                    "reflection.scale=sxImplicit100pct|syNegative100pct",
+                    "reflection.alignment=bottomLeft",
+                    "shape.transform=rotation0|flipHFalse|flipVFalse",
+                ],
+            },
+            "assertions": {"positiveReflectionSlideIndices": [0]},
+        }
+    )
     return cases
 
 

@@ -6,6 +6,7 @@ import { ShapeNodeData, LineEndInfo, TextBody } from '../model/nodes/ShapeNode';
 import { RenderContext } from './RenderContext';
 import { parseOoxmlBool } from '../parser/booleans';
 import { isExternalTargetMode } from '../parser/RelParser';
+import { applyReflectionEffect } from './ReflectionRenderer';
 
 /** True if the text body has at least one non-empty run (avoids covering shapes with empty placeholder text). */
 function hasVisibleText(textBody: TextBody): boolean {
@@ -3142,6 +3143,7 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
           isSingleLineSpAutoFit &&
           !hasExplicitTextAnchor &&
           !isVerticalText &&
+          textWrap !== 'none' &&
           hasCenteredParagraphs
         ) {
           textContainer.style.justifyContent = 'center';
@@ -3855,20 +3857,9 @@ export function renderShape(node: ShapeNodeData, ctx: RenderContext): HTMLElemen
       }
     }
 
-    // Reflection is not directly representable in standard CSS across browsers.
-    // Approximate via -webkit-box-reflect when available (Chromium/WebKit).
     const reflection = effectiveEffectLst.child('reflection');
     if (reflection.exists()) {
-      const dist = emuToPx(reflection.numAttr('dist') ?? 0);
-      const stA = (reflection.numAttr('stA') ?? 50000) / 100000;
-      const endA = (reflection.numAttr('endA') ?? 0) / 100000;
-      const stPos = Math.max(0, Math.min(100, (reflection.numAttr('stPos') ?? 0) / 1000));
-      const endPos = Math.max(0, Math.min(100, (reflection.numAttr('endPos') ?? 100000) / 1000));
-      const mask = `linear-gradient(to bottom, rgba(255,255,255,${stA.toFixed(3)}) ${stPos.toFixed(1)}%, rgba(255,255,255,${endA.toFixed(3)}) ${endPos.toFixed(1)}%)`;
-      const reflectValue = `below ${dist.toFixed(1)}px ${mask}`;
-      wrapper.style.setProperty('-webkit-box-reflect', reflectValue);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (wrapper.style as any).webkitBoxReflect = reflectValue;
+      applyReflectionEffect(wrapper, reflection, { w: minW, h: minH });
     }
   }
 

@@ -4,7 +4,7 @@
 
 A high-fidelity, browser-native PPTX renderer that parses Office Open XML (`.pptx`) files and renders slides as HTML/SVG DOM.
 
-Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded ordinary-shape outer shadows, bounded static DrawingML 3D, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
+Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded ordinary-shape outer shadows and reflections, bounded static DrawingML 3D, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
 
 ## Rendering Example
 
@@ -57,9 +57,10 @@ dirty tree, a changed capability scope, changed implementation files, changed in
 hashes, skipped cases, or an unresolved manual review cannot promote a capability.
 The `verify` command converts raw `/api/evaluate` results into the promotion schema and derives
 native-PowerPoint, manual-review, regression, and capability-specific local gates from those
-results. A capability that requires `shadow-local` must also receive the hash-bound report emitted
-by `outer_shadow_metrics.py`. Other `--passed-gate` values record checks already run by the caller;
-the command does not execute or infer them.
+results. A capability that requires `shadow-local` or `reflection-local` must also receive the
+hash-bound report emitted by `outer_shadow_metrics.py` or `reflection_metrics.py`, respectively.
+Other `--passed-gate` values record checks already run by the caller; the command does not execute
+or infer them.
 
 ## Install
 
@@ -635,6 +636,27 @@ The `shadow-local` gate measures the exterior darkness field, energy, overlap, d
 and an erasure mutation against native PowerPoint rasters; full-slide SSIM alone cannot promote the
 capability.
 
+### Ordinary Shape Reflections — Bounded Native Lane
+
+Direct `p:sp/p:spPr/a:effectLst/a:reflection` effects have a native-oracle-backed lane for the six
+positive combinations in `oracle-pypptx-shape-effect-0002-reflection-matrix`. The matrix covers
+solid and simple-gradient `rect`, `roundRect`, `ellipse`, and `upArrow` shapes, square/wide/tall
+bounds, the common vertical-flip and bottom-left anchor tuple, bounded blur/alpha-fade/distance
+values, and one child of a single unrotated, unflipped group at uniform 1.25 scale. Values listed in
+different rows do not form a supported Cartesian product.
+
+`ReflectionRenderer` creates an explicit shape-local clone instead of relying on
+`-webkit-box-reflect`. It applies the DrawingML affine scale, skew, alignment, direction, distance,
+blur, and alpha ramp in separate layers, rewrites cloned SVG IDs and references, and uses the
+ECMA-376 `CT_ReflectionEffect` defaults when optional attributes are absent. Keeping the clone in
+local coordinates prevents an absolutely positioned shape's slide offset from being applied twice.
+
+The seven-slide matrix contains one no-reflection inverse and six positive rows. Its
+`reflection-local` gate derives regions from the exact source XML path, compares native and browser
+reflection energy, field overlap, cosine, error, and centroid, and must reject a deterministic
+reflection-region erasure. A separate live-text case remains discovery evidence because its local
+appearance still requires review and is outside this promoted shape-surface lane.
+
 ### Static DrawingML 3D — Bounded Top Bevel, Camera Plane, and Bottom Front Material
 
 The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
@@ -956,6 +978,10 @@ Ordinary-shape outer shadows outside the bounded direct-effect matrix above reta
 SVG/CSS approximation. This includes other parameter values, text-bearing or stroked shapes, custom
 geometry, nonuniform or nested group scale, skew, rotated/flipped shape or ancestor coordinates,
 3D, effect DAGs, and compound effect lists. DrawingML shape/picture 3D
+Ordinary-shape reflections outside their six declared positive rows retain the explicit cloned-layer
+approximation. Live text without a visible shape surface, pictures, group-level reflection effects,
+other alignment/direction/fade/scale/skew tuples, nested or nonuniform groups, rotation/flip, 3D,
+effect DAGs, and compound effect lists remain outside the verified reflection scope. DrawingML shape/picture 3D
 outside the bounded circular top-bevel, zero-depth camera-plane, and
 edge-on bottom-bevel front-material tuples above retains the flat 2D fallback. This includes other
 perspective or rotated cameras, nonzero extrusion, other bottom or non-circular bevels, other preset

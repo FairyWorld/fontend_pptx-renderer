@@ -330,7 +330,7 @@ def test_tracked_capability_contract_is_valid():
     history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
 
     validate_acceptance_history(registry, history)
-    assert len(registry.capabilities) == 16
+    assert len(registry.capabilities) == 17
     outer_shadow = registry.by_id()["drawingml.shape.effect.outer-shadow"]
     assert outer_shadow.render_mode == "native"
     assert "shadow-local" in outer_shadow.required_gates
@@ -368,6 +368,38 @@ def test_tracked_capability_contract_is_valid():
         "only-listed-verified-matrix-rows",
     )
     assert len(outer_shadow.scope["verifiedMatrixRows"]) == 7
+    reflection = registry.by_id()["drawingml.shape.effect.reflection"]
+    assert reflection.render_mode == "native"
+    assert "reflection-local" in reflection.required_gates
+    assert tuple(
+        (step.namespace, step.local_names)
+        for step in reflection.selectors[0].ancestor_path
+    ) == (
+        (
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            ("sp",),
+        ),
+        (
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            ("spPr",),
+        ),
+        (
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            ("effectLst",),
+        ),
+    )
+    assert reflection.scope["source"] == ("direct-shape-effect-list",)
+    assert reflection.scope["alignment"] == ("bl",)
+    assert reflection.scope["scaleYOoxmlPercent"] == (-100000,)
+    assert reflection.scope["groupScale"] == (
+        "absent-standalone",
+        "single-level-uniform-1.25",
+    )
+    assert reflection.scope["rotWithShape"] == ("explicit-zero",)
+    assert reflection.scope["combinationPolicy"] == (
+        "only-listed-verified-matrix-rows",
+    )
+    assert len(reflection.scope["verifiedMatrixRows"]) == 6
     top_bevel = registry.by_id()["drawingml.shape.3d.top-bevel-contour"]
     assert top_bevel.scope["bevelPresetEncoding"] == (
         "explicit-circle",

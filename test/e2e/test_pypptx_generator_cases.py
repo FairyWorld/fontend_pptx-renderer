@@ -111,7 +111,7 @@ def test_cjk_text_layout_matrix_is_registered():
     }
 
     assert expected_names.issubset(text_names)
-    assert len(text_names) == 59
+    assert len(text_names) == 60
 
 
 def test_cjk_text_layout_matrix_serializes_autofit_and_spacing_ooxml(tmp_path: Path):
@@ -541,7 +541,8 @@ def test_outer_shadow_matrix_is_registered_and_serializes_exact_ooxml(tmp_path: 
     ]
 
     assert [case["name"] for case in cases] == [
-        "oracle-pypptx-shape-effect-0001-outer-shadow-matrix"
+        "oracle-pypptx-shape-effect-0001-outer-shadow-matrix",
+        "oracle-pypptx-shape-effect-0002-reflection-matrix",
     ]
     case = cases[0]
     assert case["slide_count"] == 8
@@ -672,6 +673,168 @@ def test_outer_shadow_matrix_is_registered_and_serializes_exact_ooxml(tmp_path: 
     )
     assert roots[7].xpath(
         "boolean(.//a:outerShdw/a:schemeClr/a:alpha[@val='35000'])",
+        namespaces=ns,
+    )
+
+
+def test_reflection_matrix_serializes_exact_direct_shape_ooxml(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-shape-effect-0002-reflection-matrix"
+    )
+    assert case["slide_count"] == 7
+
+    case_json = generator._write_case_json(case, tmp_path / "definitions")
+    payload = __import__("json").loads(case_json.read_text(encoding="utf-8"))
+    assert len(payload["slides"]) == 7
+    assert payload["assertions"] == {
+        "inverseSlideIndices": [0],
+        "positiveReflectionSlideIndices": [1, 2, 3, 4, 5, 6],
+    }
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        roots = [
+            etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 8)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    assert not roots[0].xpath(".//a:reflection", namespaces=ns)
+    for root in roots[1:]:
+        assert len(
+            root.xpath(
+                ".//p:sp/p:spPr/a:effectLst/a:reflection",
+                namespaces=ns,
+            )
+        ) == 1
+        assert not root.xpath(
+            ".//a:outerShdw | .//a:innerShdw | .//a:glow | .//a:softEdge | .//a:effectDag",
+            namespaces=ns,
+        )
+        assert not root.xpath(".//a:scene3d | .//a:sp3d", namespaces=ns)
+
+    expected_attributes = [
+        {
+            "blurRad": "6350",
+            "stA": "52000",
+            "endA": "300",
+            "endPos": "35000",
+            "dir": "5400000",
+            "sy": "-100000",
+            "algn": "bl",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "6350",
+            "stA": "52000",
+            "endA": "300",
+            "endPos": "35000",
+            "dir": "5400000",
+            "sy": "-100000",
+            "algn": "bl",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "6350",
+            "stA": "52000",
+            "endA": "300",
+            "endPos": "35000",
+            "dir": "5400000",
+            "sy": "-100000",
+            "algn": "bl",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "177800",
+            "stA": "40000",
+            "endPos": "28000",
+            "dir": "5400000",
+            "sy": "-100000",
+            "algn": "bl",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "6350",
+            "stA": "52000",
+            "endA": "300",
+            "endPos": "35000",
+            "dir": "5400000",
+            "sy": "-100000",
+            "algn": "bl",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "6350",
+            "stA": "52000",
+            "endA": "300",
+            "endPos": "40000",
+            "dist": "38100",
+            "dir": "5400000",
+            "sy": "-100000",
+            "algn": "bl",
+            "rotWithShape": "0",
+        },
+    ]
+    for root, expected in zip(roots[1:], expected_attributes, strict=True):
+        reflection = root.xpath(
+            ".//p:sp/p:spPr/a:effectLst/a:reflection",
+            namespaces=ns,
+        )[0]
+        assert dict(reflection.attrib) == expected
+
+    assert roots[3].xpath("boolean(.//p:sp/p:spPr/a:gradFill)", namespaces=ns)
+    assert roots[4].xpath(
+        "boolean(.//p:sp/p:spPr/a:prstGeom[@prst='upArrow'])",
+        namespaces=ns,
+    )
+    assert roots[5].xpath("boolean(.//p:grpSp/p:sp)", namespaces=ns)
+
+
+def test_text_reflection_case_keeps_live_text_as_separate_discovery_evidence(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-text-effect-0001-reflection"
+    )
+    assert case.get("slide_count", 1) == 1
+
+    case_json = generator._write_case_json(case, tmp_path / "definitions")
+    payload = __import__("json").loads(case_json.read_text(encoding="utf-8"))
+    assert payload["assertions"] == {"positiveReflectionSlideIndices": [0]}
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        root = etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    reflection = root.xpath(
+        ".//p:sp/p:spPr/a:effectLst/a:reflection",
+        namespaces=ns,
+    )
+    assert len(reflection) == 1
+    assert dict(reflection[0].attrib) == {
+        "blurRad": "12700",
+        "stA": "35000",
+        "endPos": "72000",
+        "dir": "5400000",
+        "sy": "-100000",
+        "algn": "bl",
+        "rotWithShape": "0",
+    }
+    assert root.xpath(
+        "boolean(.//p:sp/p:spPr/a:noFill) and boolean(.//p:sp/p:txBody//a:t)",
         namespaces=ns,
     )
 

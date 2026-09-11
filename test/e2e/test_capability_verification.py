@@ -601,6 +601,134 @@ def shadow_report(
     }
 
 
+def _bind_reflection_source(case: dict, peers: tuple[dict, ...], repo: Path) -> None:
+    case_id = case["testFile"]
+    source_path = repo / "test/e2e/testdata/cases" / case_id / "source.pptx"
+    source_path.parent.mkdir(parents=True, exist_ok=True)
+    with ZipFile(source_path, "w", ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "ppt/presentation.xml",
+            """<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>""",
+        )
+        archive.writestr(
+            "ppt/_rels/presentation.xml.rels",
+            """<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide" Target="slides/slide1.xml"/></Relationships>""",
+        )
+        archive.writestr(
+            "ppt/slides/slide1.xml",
+            """<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:sp><p:spPr><a:effectLst><a:reflection blurRad="6350" stA="52000" endA="300" endPos="35000" dir="5400000" sy="-100000" algn="bl" rotWithShape="0"/></a:effectLst></p:spPr></p:sp></p:spTree></p:cSld></p:sld>""",
+        )
+    source_hash = hashlib.sha256(source_path.read_bytes()).hexdigest()
+    source = {
+        "path": source_path.relative_to(repo).as_posix(),
+        "sizeBytes": source_path.stat().st_size,
+        "sha256": source_hash,
+    }
+    for report in (case, *peers):
+        report["provenance"]["inputs"]["sourcePptx"] = dict(source)
+
+
+def reflection_report(
+    case: dict,
+    repo: Path,
+    *,
+    baseline_reports: tuple[dict, ...] = (),
+    passed: bool = True,
+) -> dict:
+    case_id = case["testFile"]
+    _bind_reflection_source(case, baseline_reports, repo)
+    reports_dir = repo / "test/e2e/reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    reference_path = reports_dir / f"{case_id}_reflection_pdf.png"
+    candidate_path = reports_dir / f"{case_id}_reflection_html.png"
+    reference_path.write_bytes(b"native-reflection-reference")
+    candidate_path.write_bytes(b"renderer-reflection-candidate")
+    reference_hash = hashlib.sha256(reference_path.read_bytes()).hexdigest()
+    candidate_hash = hashlib.sha256(candidate_path.read_bytes()).hexdigest()
+    artifacts = {
+        "reference": {
+            "path": reference_path.relative_to(repo).as_posix(),
+            "sizeBytes": reference_path.stat().st_size,
+            "sha256": reference_hash,
+        },
+        "candidate": {
+            "path": candidate_path.relative_to(repo).as_posix(),
+            "sizeBytes": candidate_path.stat().st_size,
+            "sha256": candidate_hash,
+        },
+    }
+    case["perSlide"] = [
+        {"slideIdx": 0, "hidden": False, "renderArtifacts": artifacts}
+    ]
+    thresholds = {
+        "blurPadMultiplier": 2.0,
+        "backgroundNoiseFloor": 2.0,
+        "minimumReferenceReflectionDensity": 2.0,
+        "invisibleReflectionDensity": 1.5,
+        "reflectionEnergyRatio": 0.85,
+        "reflectionOvershootRatio": 1.2,
+        "reflectionFieldCosine": 0.95,
+        "reflectionFieldIou": 0.75,
+        "reflectionFieldError": 0.2,
+        "reflectionCentroidErrorRatio": 0.03,
+        "reflectionFieldBinaryThreshold": 2.0,
+    }
+    metrics = {
+        "reflectionRequired": True,
+        "reflectionMeasurable": True,
+        "referenceReflectionDensity": 4.0,
+        "candidateReflectionDensity": 4.0 if passed else 1.0,
+        "reflectionEnergyRatio": 1.0 if passed else 0.25,
+        "reflectionOvershootRatio": 1.0 if passed else 0.25,
+        "reflectionFieldCosine": 1.0 if passed else 0.5,
+        "reflectionFieldIou": 1.0 if passed else 0.4,
+        "reflectionFieldError": 0.0 if passed else 0.5,
+        "reflectionCentroidErrorRatio": 0.0 if passed else 0.1,
+        "reflectionRegionPixels": 100,
+        "reflectionSensitivity": {
+            "mutation": "erase-reflection-region",
+            "applicable": True,
+            "mutatedCandidateReflectionDensity": 0.0,
+            "mutatedReflectionEnergyRatio": 0.0,
+            "mutatedReflectionPassed": False,
+            "detected": True,
+        },
+        "thresholds": thresholds,
+        "passed": passed,
+    }
+    return {
+        "schemaVersion": 1,
+        "renderer": dict(case["provenance"]["renderer"]),
+        "thresholds": thresholds,
+        "applicableCaseCount": 1,
+        "passed": passed,
+        "caseResults": [
+            {
+                "caseId": case_id,
+                "sourceSha256": case["provenance"]["inputs"]["sourcePptx"]["sha256"],
+                "groundTruthSha256": case["provenance"]["inputs"]["groundTruth"][
+                    "combinedSha256"
+                ],
+                "applicable": True,
+                "passed": passed,
+                "slides": [
+                    {
+                        "slideIdx": 0,
+                        "reflectionRequired": True,
+                        "referencePath": artifacts["reference"]["path"],
+                        "candidatePath": artifacts["candidate"]["path"],
+                        "referenceSha256": reference_hash,
+                        "candidateSha256": candidate_hash,
+                        "regions": [{"x0": 0.2, "y0": 0.5, "x1": 0.8, "y1": 0.9}],
+                        "metrics": metrics,
+                        "passed": passed,
+                    }
+                ],
+            }
+        ],
+    }
+
+
 def test_normalizes_native_reports_into_promotion_evidence(tmp_path: Path):
     repo, capability = capability_fixture(tmp_path)
     current = [native_report("donut-thin"), native_report("donut-thick")]
@@ -840,6 +968,85 @@ def test_derives_shadow_local_gate_from_matching_artifact_evidence(tmp_path: Pat
         shadow_report=shadow_report(current, repo, baseline_reports=(baseline,)),
     )
     assert verified["gates"]["shadow-local"] == "passed"
+
+
+def test_derives_reflection_local_gate_from_matching_artifact_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "reflection-local"),
+    )
+    current = native_report("reflection-matrix")
+    baseline = native_report("reflection-matrix", revision="b" * 40)
+
+    missing = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+    )
+    assert missing["gates"]["reflection-local"] == "missing"
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        reflection_report=reflection_report(
+            current, repo, baseline_reports=(baseline,)
+        ),
+    )
+    assert verified["gates"]["reflection-local"] == "passed"
+
+
+def test_rejects_reflection_local_erasure_sensitivity_tampering(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "reflection-local"),
+    )
+    current = native_report("reflection-matrix")
+    baseline = native_report("reflection-matrix", revision="b" * 40)
+    report = reflection_report(current, repo, baseline_reports=(baseline,))
+    report["caseResults"][0]["slides"][0]["metrics"]["reflectionSensitivity"][
+        "detected"
+    ] = False
+
+    with pytest.raises(CapabilityVerificationError, match="sensitivity"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            reflection_report=report,
+        )
+
+
+def test_rejects_invalid_reflection_local_region(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "reflection-local"),
+    )
+    current = native_report("reflection-matrix")
+    baseline = native_report("reflection-matrix", revision="b" * 40)
+    report = reflection_report(current, repo, baseline_reports=(baseline,))
+    report["caseResults"][0]["slides"][0]["regions"][0]["x1"] = 1.2
+
+    with pytest.raises(CapabilityVerificationError, match="region"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[baseline],
+            reflection_report=report,
+        )
 
 
 def test_rejects_shadow_local_erasure_sensitivity_tampering(tmp_path: Path):

@@ -345,6 +345,11 @@ def command_verify(args: argparse.Namespace) -> int:
             if args.shadow_report
             else None
         ),
+        reflection_report=(
+            _load_json(_path(args.reflection_report, repo, args.reflection_report))
+            if args.reflection_report
+            else None
+        ),
     )
     if verification["renderer"]["revision"] != revision:
         raise CapabilityLoopError("native case reports do not match current HEAD")
@@ -486,6 +491,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--bevel-report")
     verify.add_argument("--camera-report")
     verify.add_argument("--shadow-report")
+    verify.add_argument("--reflection-report")
     verify.add_argument("--out")
     verify.set_defaults(handler=command_verify)
 

@@ -422,6 +422,19 @@ def _case_matrix(capability: CapabilityDefinition) -> dict[str, list[Any]]:
         matrix["container"] = ["standalone", "grouped"]
         matrix["geometry"] = ["rect", "roundRect", "ellipse"]
         matrix["paint"] = ["solid", "simple-gradient", "scheme-color-modifiers"]
+    if capability.id == "drawingml.shape.effect.reflection":
+        matrix["caseId"] = [
+            "no-reflection-inverse",
+            "rect-common-alpha-fade",
+            "wide-roundrect-common-alpha-fade",
+            "tall-gradient-ellipse",
+            "wide-gradient-arrow-broad-blur",
+            "grouped-roundrect",
+            "rect-distance-neighbor",
+        ]
+        matrix["container"] = ["standalone", "grouped"]
+        matrix["geometry"] = ["rect", "roundRect", "ellipse", "upArrow"]
+        matrix["paint"] = ["solid", "simple-gradient"]
     if ".3d." in capability.id:
         matrix["operations"] = ["malformed-input", "resource-bounds", "deterministic-disposal"]
     return {key: matrix[key] for key in sorted(matrix)}
