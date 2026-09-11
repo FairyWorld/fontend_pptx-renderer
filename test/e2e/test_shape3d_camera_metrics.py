@@ -211,6 +211,7 @@ def test_custom_geometry_metric_accepts_scaled_equivalent_two_contour_silhouette
     assert metrics["tolerantBoundsScore"] > 0.99
     assert metrics["foregroundAreaRatio"] > 0.98
     assert metrics["colorScore"] > 0.99
+    assert metrics["thresholds"]["verticalSquashRatio"] == 0.20
     assert metrics["squashSensitivity"]["mutation"] == "vertical-squash"
     assert metrics["squashSensitivity"]["mutatedPassed"] is False
     assert metrics["squashSensitivity"]["detected"] is True

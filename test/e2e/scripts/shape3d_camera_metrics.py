@@ -1571,6 +1571,7 @@ def _custom_geometry_core_metrics(
             "foregroundAreaRatio": foreground_area_ratio_threshold,
             "centroidScore": 0.99,
             "colorScore": color_score_threshold,
+            "verticalSquashRatio": CUSTOM_VERTICAL_SQUASH_RATIO,
         },
         "passed": passed,
     }
