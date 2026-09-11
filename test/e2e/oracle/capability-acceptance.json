@@ -746,6 +746,56 @@
       "implementationFingerprint": "a8b24502a48e64d4b296fc01d28fe6b2b4ecf15ccce79f86c3d4d749607387be"
     },
     {
+      "acceptedAt": "2026-09-11T02:20:32.136133Z",
+      "acceptedRevision": "9aebc1be0063511b7282e1dfad964a7586ba3ea5",
+      "capabilityId": "drawingml.shape.3d.camera-projected-plane",
+      "caseIds": [
+        "oracle-pypptx-shape3d-0013-camera-projection-matrix",
+        "oracle-pypptx-shape3d-0014-scene-only-plane-matrix",
+        "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix",
+        "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
+        "oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix"
+      ],
+      "caseInputFingerprints": [
+        "23a154711dd9beb2d78c9033a5a6c77e31b826770cf32d851a232d7aa426778c",
+        "6def7ec046ed633f1b32d94fabcc78286e9edef036d2150088a6431cca637ce2",
+        "424bf37e7342738d61342e7dc10fe9c1298cdc4e46b7d0201b482b047a4f34cb",
+        "40877ea9906e324f0a44201356ce46dbf1f245da8f1617555d2ca07ce5bdb447",
+        "4445bd83dee18ef4658376e9174c1ac79cf68fd40add59056d3f1a97b2506d7d"
+      ],
+      "definitionFingerprint": "3ff0a5bc879ce7335b59d5b4a4663881cf9dcb1d92086904eca630ada4c983cf",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "camera-local",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "performance",
+        "package-size",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "1bc3df21cabf2bf9c8bd044c055f47a552c4c6a2cd91875b60d17e53893d64fa",
+        "31fb431f119affa9cb57d2471a37c3df90bbeca493aabfde81f508746ba30c32",
+        "6ca1fa9e2e6ba102891e25790c03a00d7326ee787f498591adf814e91af72588",
+        "fd9088ccb27742916eef21c12ea7b5a8634b186e8d3a7c62fa7c395a942ff378",
+        "2e4674078d58e3d9575d49ac8b496a3a793d14812731bb8d0d14f8cf64a01d84"
+      ],
+      "implementationFingerprint": "54f353587ac656947ff18c1dc86d179631a02a825bf66f20ea849bd53bfbfee3"
+    },
+    {
       "acceptedAt": "2026-09-08T21:07:47.622348Z",
       "acceptedRevision": "452641ee7da127c27f36df1c541e6ed307877380",
       "capabilityId": "drawingml.shape.3d.top-bevel-contour",
