@@ -530,6 +530,144 @@ def test_flowchart_zero_adjustment_case_json_records_all_three_slides(tmp_path: 
             "paint=explicitSolid|themeStyleReference",
         ],
     }
+
+
+def test_outer_shadow_matrix_is_registered_and_serializes_exact_ooxml(tmp_path: Path):
+    generator = _load_generator_module()
+    cases = [
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-shape-effect-")
+    ]
+
+    assert [case["name"] for case in cases] == [
+        "oracle-pypptx-shape-effect-0001-outer-shadow-matrix"
+    ]
+    case = cases[0]
+    assert case["slide_count"] == 8
+
+    case_json = generator._write_case_json(case, tmp_path / "definitions")
+    payload = __import__("json").loads(case_json.read_text(encoding="utf-8"))
+    assert len(payload["slides"]) == 8
+    assert payload["assertions"] == {
+        "inverseSlideIndices": [0],
+        "positiveShadowSlideIndices": [1, 2, 3, 4, 5, 6, 7],
+    }
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        roots = [
+            etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 9)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    assert not roots[0].xpath(".//a:outerShdw", namespaces=ns)
+    for root in roots[1:]:
+        assert len(
+            root.xpath(
+                ".//p:sp/p:spPr/a:effectLst/a:outerShdw",
+                namespaces=ns,
+            )
+        ) == 1
+        assert not root.xpath(
+            ".//a:innerShdw | .//a:reflection | .//a:glow | .//a:softEdge | .//a:effectDag",
+            namespaces=ns,
+        )
+        assert not root.xpath(".//a:scene3d | .//a:sp3d", namespaces=ns)
+
+    geometries = [
+        root.xpath("string(.//p:sp/p:spPr/a:prstGeom/@prst)", namespaces=ns)
+        for root in roots
+    ]
+    assert geometries == [
+        "rect",
+        "rect",
+        "roundRect",
+        "ellipse",
+        "rect",
+        "rect",
+        "roundRect",
+        "rect",
+    ]
+
+    expected_attributes = [
+        {"blurRad": "127000", "rotWithShape": "0"},
+        {
+            "blurRad": "50800",
+            "dist": "38100",
+            "dir": "5400000",
+            "algn": "tl",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "101600",
+            "dist": "76200",
+            "dir": "2700000",
+            "algn": "ctr",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "50800",
+            "dist": "0",
+            "dir": "0",
+            "sx": "102000",
+            "sy": "102000",
+            "algn": "ctr",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "76200",
+            "dist": "63500",
+            "dir": "8100000",
+            "sx": "92000",
+            "sy": "92000",
+            "algn": "tr",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "76200",
+            "dist": "50800",
+            "dir": "2700000",
+            "rotWithShape": "0",
+        },
+        {
+            "blurRad": "101600",
+            "dist": "50800",
+            "dir": "5400000",
+            "sx": "100000",
+            "sy": "100000",
+            "algn": "b",
+            "rotWithShape": "0",
+        },
+    ]
+    for root, expected in zip(roots[1:], expected_attributes, strict=True):
+        shadow = root.xpath(
+            ".//p:sp/p:spPr/a:effectLst/a:outerShdw",
+            namespaces=ns,
+        )[0]
+        assert dict(shadow.attrib) == expected
+
+    assert roots[3].xpath("boolean(.//p:sp/p:spPr/a:gradFill)", namespaces=ns)
+    assert roots[6].xpath("boolean(.//p:grpSp/p:sp)", namespaces=ns)
+    assert roots[7].xpath(
+        "boolean(.//a:outerShdw/a:schemeClr[@val='accent2']/a:lumMod[@val='60000'])",
+        namespaces=ns,
+    )
+    assert roots[7].xpath(
+        "boolean(.//a:outerShdw/a:schemeClr/a:lumOff[@val='10000'])",
+        namespaces=ns,
+    )
+    assert roots[7].xpath(
+        "boolean(.//a:outerShdw/a:schemeClr/a:alpha[@val='35000'])",
+        namespaces=ns,
+    )
+
+
 def test_static_shape3d_matrix_is_registered():
     generator = _load_generator_module()
     names = {

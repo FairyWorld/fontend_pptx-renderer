@@ -1410,8 +1410,250 @@ def _build_flowchart_zero_adjustment_cases() -> list[CaseDef]:
 
 
 # ---------------------------------------------------------------------------
-# P1b: Bounded static DrawingML 3D
+# P1b: Bounded ordinary-shape effects
 # ---------------------------------------------------------------------------
+
+
+def _build_shape_effect_cases() -> list[CaseDef]:
+    """Build native-oracle matrices for effects applied directly to ordinary shapes."""
+    cases: list[CaseDef] = []
+
+    def _set_simple_gradient(shape) -> None:
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(0x3A, 0x7B, 0xD5)
+        sp_pr = shape._element.spPr
+        solid_fill = sp_pr.find(qn("a:solidFill"))
+        if solid_fill is None:
+            raise RuntimeError("shadow probe shape has no solid fill to replace")
+        index = sp_pr.index(solid_fill)
+        sp_pr.remove(solid_fill)
+        gradient = etree.Element(qn("a:gradFill"), rotWithShape="1")
+        stops = etree.SubElement(gradient, qn("a:gsLst"))
+        first = etree.SubElement(stops, qn("a:gs"), pos="0")
+        etree.SubElement(first, qn("a:srgbClr"), val="3A7BD5")
+        second = etree.SubElement(stops, qn("a:gs"), pos="100000")
+        etree.SubElement(second, qn("a:srgbClr"), val="74C0FC")
+        etree.SubElement(gradient, qn("a:lin"), ang="5400000", scaled="1")
+        sp_pr.insert(index, gradient)
+
+    def _style_shape(shape, *, gradient: bool = False) -> None:
+        if gradient:
+            _set_simple_gradient(shape)
+        else:
+            shape.fill.solid()
+            shape.fill.fore_color.rgb = RGBColor(0x3A, 0x7B, 0xD5)
+        shape.line.fill.background()
+
+    def _apply_outer_shadow(
+        shape,
+        *,
+        attributes: dict[str, int | str],
+        color_kind: str = "srgbClr",
+        color_value: str = "000000",
+        color_modifiers: tuple[tuple[str, int], ...] = (("alpha", 35000),),
+    ) -> None:
+        sp_pr = shape._element.spPr
+        _remove_children(sp_pr, ("effectLst", "effectDag"))
+        effect_list = etree.Element(qn("a:effectLst"))
+        shadow = etree.SubElement(
+            effect_list,
+            qn("a:outerShdw"),
+            **{name: str(value) for name, value in attributes.items()},
+        )
+        color = etree.SubElement(shadow, qn(f"a:{color_kind}"), val=color_value)
+        for modifier, value in color_modifiers:
+            etree.SubElement(color, qn(f"a:{modifier}"), val=str(value))
+        _insert_before_ext_lst(sp_pr, effect_list)
+
+    def _add_standalone_shape(
+        prs,
+        *,
+        shape_type,
+        width: float,
+        height: float,
+        name: str,
+        shadow_attributes: dict[str, int | str] | None,
+        gradient: bool = False,
+        shadow_color_kind: str = "srgbClr",
+        shadow_color_value: str = "000000",
+        shadow_color_modifiers: tuple[tuple[str, int], ...] = (("alpha", 35000),),
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        shape = slide.shapes.add_shape(
+            shape_type,
+            _emu((13.333 - width) / 2),
+            _emu((7.5 - height) / 2),
+            _emu(width),
+            _emu(height),
+        )
+        shape.name = name
+        _style_shape(shape, gradient=gradient)
+        if shadow_attributes is not None:
+            _apply_outer_shadow(
+                shape,
+                attributes=shadow_attributes,
+                color_kind=shadow_color_kind,
+                color_value=shadow_color_value,
+                color_modifiers=shadow_color_modifiers,
+            )
+
+    def _build_outer_shadow_matrix(prs) -> None:
+        _add_standalone_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=5.2,
+            height=3.2,
+            name="No outer shadow inverse control",
+            shadow_attributes=None,
+        )
+        _add_standalone_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=5.2,
+            height=3.2,
+            name="Rectangle blur with standard offset scale and alignment defaults",
+            shadow_attributes={"blurRad": 127000, "rotWithShape": 0},
+        )
+        _add_standalone_shape(
+            prs,
+            shape_type=MSO_SHAPE.ROUNDED_RECTANGLE,
+            width=8.0,
+            height=3.2,
+            name="Wide rounded rectangle common offset shadow",
+            shadow_attributes={
+                "blurRad": 50800,
+                "dist": 38100,
+                "dir": 5400000,
+                "algn": "tl",
+                "rotWithShape": 0,
+            },
+        )
+        _add_standalone_shape(
+            prs,
+            shape_type=MSO_SHAPE.OVAL,
+            width=3.2,
+            height=5.4,
+            name="Tall gradient ellipse directional shadow",
+            shadow_attributes={
+                "blurRad": 101600,
+                "dist": 76200,
+                "dir": 2700000,
+                "algn": "ctr",
+                "rotWithShape": 0,
+            },
+            gradient=True,
+        )
+        _add_standalone_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=5.2,
+            height=3.2,
+            name="Rectangle 102 percent centered shadow scale",
+            shadow_attributes={
+                "blurRad": 50800,
+                "dist": 0,
+                "dir": 0,
+                "sx": 102000,
+                "sy": 102000,
+                "algn": "ctr",
+                "rotWithShape": 0,
+            },
+        )
+        _add_standalone_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=5.2,
+            height=3.2,
+            name="Rectangle 92 percent top right scaled shadow",
+            shadow_attributes={
+                "blurRad": 76200,
+                "dist": 63500,
+                "dir": 8100000,
+                "sx": 92000,
+                "sy": 92000,
+                "algn": "tr",
+                "rotWithShape": 0,
+            },
+        )
+
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        group = slide.shapes.add_group_shape()
+        grouped_shape = group.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            _emu(1.0),
+            _emu(1.0),
+            _emu(5.2),
+            _emu(3.0),
+        )
+        grouped_shape.name = "Grouped rounded rectangle outer shadow"
+        _style_shape(grouped_shape)
+        _apply_outer_shadow(
+            grouped_shape,
+            attributes={
+                "blurRad": 76200,
+                "dist": 50800,
+                "dir": 2700000,
+                "rotWithShape": 0,
+            },
+        )
+        group.left = _emu(3.4)
+        group.top = _emu(1.55)
+        group.width = _emu(6.5)
+        group.height = _emu(4.0)
+
+        _add_standalone_shape(
+            prs,
+            shape_type=MSO_SHAPE.RECTANGLE,
+            width=5.2,
+            height=3.2,
+            name="Scheme color outer shadow modifiers",
+            shadow_attributes={
+                "blurRad": 101600,
+                "dist": 50800,
+                "dir": 5400000,
+                "sx": 100000,
+                "sy": 100000,
+                "algn": "b",
+                "rotWithShape": 0,
+            },
+            shadow_color_kind="schemeClr",
+            shadow_color_value="accent2",
+            shadow_color_modifiers=(("lumMod", 60000), ("lumOff", 10000), ("alpha", 35000)),
+        )
+
+    cases.append(
+        {
+            "name": "oracle-pypptx-shape-effect-0001-outer-shadow-matrix",
+            "build_fn": _build_outer_shadow_matrix,
+            "slide_count": 8,
+            "coverage": {
+                "oracle": "native-powerpoint",
+                "features": [
+                    "p:sp/p:spPr/a:effectLst/a:outerShdw",
+                    "semantics=inverse|defaults|offset|direction|uniformScale|colorModifiers",
+                    "geometry=rect|roundRect|ellipse",
+                    "geometry.aspect=square|wide|tall",
+                    "container=standalone|unrotatedGroup",
+                    "paint=explicitSolid|simpleGradient",
+                    "shadow.color=srgbClr|schemeClr+lumMod+lumOff+alpha",
+                    "shadow.skew=absent",
+                    "shape.transform=rotation0|flipHFalse|flipVFalse",
+                    "shape3d=absent",
+                ],
+            },
+            "assertions": {
+                "inverseSlideIndices": [0],
+                "positiveShadowSlideIndices": [1, 2, 3, 4, 5, 6, 7],
+            },
+        }
+    )
+    return cases
+
+
+# ---------------------------------------------------------------------------
+# P1c: Bounded static DrawingML 3D
+# ---------------------------------------------------------------------------
+
 
 def _build_shape3d_cases() -> list[CaseDef]:
     """Build a narrow native-oracle matrix for orthographic circle top bevels."""
@@ -3564,6 +3806,7 @@ def _build_all_case_defs(*, include_local_shape3d: bool = False) -> list[CaseDef
     all_cases.extend(_build_text_cases())
     all_cases.extend(_build_shape_adj_cases())
     all_cases.extend(_build_flowchart_zero_adjustment_cases())
+    all_cases.extend(_build_shape_effect_cases())
     all_cases.extend(_build_shape3d_cases())
     if include_local_shape3d:
         all_cases.extend(_build_local_shape3d_cases())
