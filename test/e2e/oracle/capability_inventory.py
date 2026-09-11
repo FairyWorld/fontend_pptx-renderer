@@ -381,30 +381,45 @@ def scan_corpus(
 def _corpus_role(
     aliases: tuple[str, ...],
     representative_alias_globs: tuple[str, ...],
+    validation_alias_globs: tuple[str, ...],
 ) -> str:
-    if not representative_alias_globs:
-        return "representative"
-    return (
-        "representative"
-        if any(
-            fnmatch.fnmatchcase(alias, pattern)
-            for alias in aliases
-            for pattern in representative_alias_globs
+    if representative_alias_globs:
+        return (
+            "representative"
+            if any(
+                fnmatch.fnmatchcase(alias, pattern)
+                for alias in aliases
+                for pattern in representative_alias_globs
+            )
+            else "validation"
         )
-        else "validation"
-    )
+    if validation_alias_globs:
+        return (
+            "validation"
+            if all(
+                any(
+                    fnmatch.fnmatchcase(alias, pattern)
+                    for pattern in validation_alias_globs
+                )
+                for alias in aliases
+            )
+            else "representative"
+        )
+    return "representative"
 
 
-def _representative_alias_globs(
+def _alias_globs(
     values: Sequence[str],
     report: InventoryReport,
+    *,
+    role: str,
 ) -> tuple[str, ...]:
     patterns = tuple(values)
     if any(not isinstance(pattern, str) or not pattern.strip() for pattern in patterns):
-        raise ValueError("representative alias globs must be non-empty strings")
+        raise ValueError(f"{role} alias globs must be non-empty strings")
     patterns = tuple(pattern.strip() for pattern in patterns)
     if len(patterns) != len(set(patterns)):
-        raise ValueError("representative alias globs contain duplicates")
+        raise ValueError(f"{role} alias globs contain duplicates")
     all_aliases = tuple(
         alias
         for package in (*report.packages, *report.rejected_packages)
@@ -416,7 +431,7 @@ def _representative_alias_globs(
         if not any(fnmatch.fnmatchcase(alias, pattern) for alias in all_aliases)
     ]
     if unmatched:
-        raise ValueError(f"representative alias globs matched no packages: {', '.join(unmatched)}")
+        raise ValueError(f"{role} alias globs matched no packages: {', '.join(unmatched)}")
     return patterns
 
 
@@ -424,10 +439,27 @@ def inventory_to_dict(
     report: InventoryReport,
     *,
     representative_alias_globs: Sequence[str] = (),
+    validation_alias_globs: Sequence[str] = (),
 ) -> dict:
-    patterns = _representative_alias_globs(representative_alias_globs, report)
+    if representative_alias_globs and validation_alias_globs:
+        raise ValueError("representative and validation alias globs are mutually exclusive")
+    representative_patterns = _alias_globs(
+        representative_alias_globs,
+        report,
+        role="representative",
+    )
+    validation_patterns = _alias_globs(
+        validation_alias_globs,
+        report,
+        role="validation",
+    )
     package_roles = {
-        package.package_id: _corpus_role(package.aliases, patterns) for package in report.packages
+        package.package_id: _corpus_role(
+            package.aliases,
+            representative_patterns,
+            validation_patterns,
+        )
+        for package in report.packages
     }
     representative_count = sum(role == "representative" for role in package_roles.values())
     return {
@@ -439,9 +471,14 @@ def inventory_to_dict(
         "uniqueRejectedPackageCount": len(report.rejected_packages),
         "corpusClassification": {
             "mode": (
-                "explicit-representative-alias-globs" if patterns else "all-representative"
+                "explicit-representative-alias-globs"
+                if representative_patterns
+                else "explicit-validation-alias-globs"
+                if validation_patterns
+                else "all-representative"
             ),
-            "representativeAliasGlobs": list(patterns),
+            "representativeAliasGlobs": list(representative_patterns),
+            "validationAliasGlobs": list(validation_patterns),
             "representativeUniquePackageCount": representative_count,
             "validationUniquePackageCount": len(report.packages) - representative_count,
         },
@@ -464,7 +501,11 @@ def inventory_to_dict(
                 "packageId": package.package_id,
                 "sha256": package.sha256,
                 "aliases": list(package.aliases),
-                "corpusRole": _corpus_role(package.aliases, patterns),
+                "corpusRole": _corpus_role(
+                    package.aliases,
+                    representative_patterns,
+                    validation_patterns,
+                ),
                 "reasonCode": package.reason_code,
                 "reason": package.reason,
             }
@@ -478,6 +519,7 @@ def write_inventory(
     path: Path,
     *,
     representative_alias_globs: Sequence[str] = (),
+    validation_alias_globs: Sequence[str] = (),
 ) -> Path:
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -485,6 +527,7 @@ def write_inventory(
         inventory_to_dict(
             report,
             representative_alias_globs=representative_alias_globs,
+            validation_alias_globs=validation_alias_globs,
         ),
         ensure_ascii=False,
         indent=2,

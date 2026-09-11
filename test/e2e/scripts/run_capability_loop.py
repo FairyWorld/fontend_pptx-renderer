@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 import os
@@ -138,10 +139,29 @@ def command_inventory(args: argparse.Namespace) -> int:
     corpus_values = args.corpus or ["test/e2e/testdata/cases"]
     roots = [Path(value) if Path(value).is_absolute() else repo / value for value in corpus_values]
     report = scan_corpus(roots, registry)
+    default_case_policy = (
+        args.corpus is None
+        and not args.representative_alias
+        and not args.validation_alias
+    )
+    default_validation_pattern = "corpus-0/*oracle-*"
+    validation_alias_globs = tuple(args.validation_alias)
+    if default_case_policy and any(
+        fnmatch.fnmatchcase(alias, default_validation_pattern)
+        for package in (*report.packages, *report.rejected_packages)
+        for alias in package.aliases
+    ):
+        validation_alias_globs = (default_validation_pattern,)
     payload = inventory_to_dict(
         report,
         representative_alias_globs=tuple(args.representative_alias),
+        validation_alias_globs=validation_alias_globs,
     )
+    if default_case_policy:
+        payload["corpusClassification"]["mode"] = "default-testdata-case-convention"
+        payload["corpusClassification"]["validationAliasGlobs"] = [
+            default_validation_pattern
+        ]
     revision, dirty = detect_renderer_git_state(repo)
     payload["renderer"] = {"revision": revision, "dirty": dirty}
     if args.issues:
@@ -455,6 +475,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "alias glob for representative documents; repeat as needed. "
             "When present, unmatched packages are validation fixtures"
+        ),
+    )
+    inventory.add_argument(
+        "--validation-alias",
+        action="append",
+        default=[],
+        help=(
+            "alias glob for generated validation fixtures; repeat as needed. "
+            "When present, unmatched packages are representative documents"
         ),
     )
     inventory.add_argument("--issues")

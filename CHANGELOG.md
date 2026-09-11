@@ -83,6 +83,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ### Changed
 
+- Classify default `oracle-*` case aliases as validation fixtures during capability inventory while
+  keeping other local case aliases representative. Custom corpora can select either representative
+  or validation globs, and a representative alias wins when byte-identical content also has a
+  validation alias. This prevents generated oracle volume from reinforcing its own capability rank.
 - Added a bounded native-verified whole-group camera projection for the exact
   `perspectiveLeft`/95-degree/two-picture tuple. It applies one homography to the completed live child
   layer, rejects transformed or 3D-scene ancestors and unsupported child formats, and preserves

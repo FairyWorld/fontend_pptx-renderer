@@ -31,8 +31,12 @@ and theme effects while still matching shapes nested in groups. The two constrai
 mutually exclusive; see `CAPABILITY_SELECTOR_SCHEMA.md` for the tracked contract.
 
 The default inventory limits match the renderer safety contract: 4,000 ZIP entries, 32 MiB per
-decoded entry, and 256 MiB decoded in total. Ranking counts byte-identical PPTX files once. A dirty
-report, missing or changed inputs, stale relevant implementation files, skipped required cases,
+decoded entry, and 256 MiB decoded in total. The default `testdata/cases` scan classifies aliases
+containing `oracle-` as validation fixtures and all other aliases as representative documents.
+Custom scans may use either repeatable `--representative-alias` or `--validation-alias` globs; the
+two modes are mutually exclusive. Ranking counts byte-identical PPTX files once, gives a package
+representative status when any of its aliases is representative, and ranks representative demand
+before total validation volume. A dirty report, missing or changed inputs, stale relevant implementation files, skipped required cases,
 failed structural checks, or an unresolved manual-review row blocks promotion. Corpus scans isolate
 and report rejected packages instead of losing all other observations; use `--fail-on-rejected` for
 a strict nonzero exit after the report is written. Unknown, verified, and externally blocked rows

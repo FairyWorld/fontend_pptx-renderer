@@ -187,6 +187,9 @@ Case directories under `test/e2e/testdata/cases/{stem}/` each contain `source.pp
 The binary corpus under `test/e2e/testdata/` is local and ignored. Keep reproducible case
 definitions, coverage metadata, generators, and runbook changes tracked. Never commit licensed
 font binaries; use an ignored testdata font profile and local file/symlink instead.
+`pnpm capability:inventory` treats aliases containing `oracle-` as validation fixtures and other
+default-case aliases as representative documents. Preserve that distinction when adding local
+ground-truth matrices so generated case volume cannot raise its own capability rank.
 
 ## E2E Test Suite (`test/e2e/`)
 

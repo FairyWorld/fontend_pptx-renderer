@@ -621,10 +621,12 @@ pnpm capability:check
 # Scan the default ignored testdata/cases corpus
 pnpm capability:inventory
 
-# Add more local corpora and an optional read-only issue snapshot
+# Add more local corpora, classify generated fixtures, and attach an optional issue snapshot
 python3 test/e2e/scripts/run_capability_loop.py inventory \
   --corpus test/e2e/testdata/cases \
   --corpus test/e2e/testdata/windows-cases \
+  --validation-alias 'corpus-0/*oracle-*' \
+  --validation-alias 'corpus-1/*oracle-*' \
   --issues docs/agent-tmp/open-issues.json
 ```
 
@@ -638,9 +640,19 @@ unrelated namespaces do not count. A rejected package is isolated and recorded w
 a stable reason so the rest of a private corpus still produces evidence; add `--fail-on-rejected`
 when any rejected package must also make the command exit nonzero.
 
+For the default `test/e2e/testdata/cases` corpus, aliases containing `oracle-` are validation
+fixtures and every other alias is representative. This keeps generated shape, SmartArt, text, and
+effect matrices available as coverage evidence without letting their volume raise the demand rank
+of the capability that generated them. Custom scans can instead provide either repeatable
+`--representative-alias` globs (unmatched packages become validation) or repeatable
+`--validation-alias` globs (unmatched packages become representative). The modes are mutually
+exclusive. Byte-identical packages are still counted once; if their aliases span both roles, the
+representative alias wins.
+
 Ranking is lexicographic and retains every input dimension: impact, currently reproduced issues,
-unique observed packages, failure type, native-oracle readiness, dependency depth, then capability
-ID. It does not generate a weighted quality percentage. `unknown`, stable `verified`, and externally
+unique representative packages, all unique observed packages, failure type, native-oracle
+readiness, dependency depth, then capability ID. It does not generate a weighted quality
+percentage. `unknown`, stable `verified`, and externally
 `blocked` rows remain visible in the ledger but do not enter the executable queue. An open issue only
 contributes demand after the issue snapshot explicitly records a current reproduction.
 Selecting anything other than the first executable row requires `work-packet --selection-reason`;

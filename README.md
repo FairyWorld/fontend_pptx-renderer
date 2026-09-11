@@ -55,6 +55,11 @@ Inventory, ledger, ranking, work-packet, and verification reports stay under the
 the public `supported` claim additionally requires a fresh `verified` receipt. A report from a
 dirty tree, a changed capability scope, changed implementation files, changed input/ground-truth
 hashes, skipped cases, or an unresolved manual review cannot promote a capability.
+The default inventory treats case aliases containing `oracle-` as generated validation fixtures
+and all other aliases as representative documents, so adding an oracle cannot increase its own
+representative-demand score. For a custom mixed corpus, pass either repeatable
+`--representative-alias` globs or repeatable `--validation-alias` globs; the two modes are mutually
+exclusive. If byte-identical content has both roles, its representative alias takes precedence.
 The `verify` command converts raw `/api/evaluate` results into the promotion schema and derives
 native-PowerPoint, manual-review, regression, and capability-specific local gates from those
 results. A capability that requires `shadow-local` or `reflection-local` must also receive the

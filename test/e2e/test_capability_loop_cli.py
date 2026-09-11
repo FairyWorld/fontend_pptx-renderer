@@ -203,6 +203,78 @@ def test_inventory_is_deterministic_and_rejects_unsafe_zip(tmp_path: Path):
     assert rejected["rejectedPackages"][0]["reasonCode"] == "unsafe-zip-member"
 
 
+def test_inventory_cli_accepts_validation_alias_globs(tmp_path: Path):
+    repo, registry, _ = create_repo(tmp_path)
+    corpus = repo / "corpus"
+    ordinary = corpus / "customer-deck"
+    oracle = corpus / "oracle-generated-case"
+    ordinary.mkdir(parents=True)
+    oracle.mkdir(parents=True)
+    write_donut_pptx(ordinary / "source.pptx")
+    write_donut_pptx(oracle / "source.pptx")
+    with ZipFile(oracle / "source.pptx", "a") as archive:
+        archive.writestr("validation-marker.txt", "oracle")
+    output = repo / "inventory.json"
+
+    result = run_cli(
+        "inventory",
+        "--repo-root",
+        repo,
+        "--registry",
+        registry,
+        "--corpus",
+        corpus,
+        "--validation-alias",
+        "corpus-0/oracle-*",
+        "--out",
+        output,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    roles = {
+        package["aliases"][0]: package["corpusRole"] for package in payload["packages"]
+    }
+    assert roles == {
+        "corpus-0/customer-deck/source.pptx": "representative",
+        "corpus-0/oracle-generated-case/source.pptx": "validation",
+    }
+
+
+def test_default_inventory_classifies_oracle_named_cases_as_validation(tmp_path: Path):
+    repo, registry, _ = create_repo(tmp_path)
+    corpus = repo / "test/e2e/testdata/cases"
+    ordinary = corpus / "customer-deck"
+    oracle = corpus / "oracle-generated-case"
+    ordinary.mkdir(parents=True)
+    oracle.mkdir(parents=True)
+    write_donut_pptx(ordinary / "source.pptx")
+    write_donut_pptx(oracle / "source.pptx")
+    with ZipFile(oracle / "source.pptx", "a") as archive:
+        archive.writestr("validation-marker.txt", "oracle")
+    output = repo / "inventory.json"
+
+    result = run_cli(
+        "inventory",
+        "--repo-root",
+        repo,
+        "--registry",
+        registry,
+        "--out",
+        output,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["corpusClassification"] == {
+        "mode": "default-testdata-case-convention",
+        "representativeAliasGlobs": [],
+        "validationAliasGlobs": ["corpus-0/*oracle-*"],
+        "representativeUniquePackageCount": 1,
+        "validationUniquePackageCount": 1,
+    }
+
+
 def test_rank_and_work_packet_keep_unreproduced_issue_out_of_demand(tmp_path: Path):
     repo, registry, acceptance = create_repo(tmp_path)
     corpus = repo / "corpus"

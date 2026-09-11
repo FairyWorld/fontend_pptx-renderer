@@ -408,6 +408,7 @@ def test_inventory_classifies_explicit_representative_aliases_without_rescanning
     assert payload["corpusClassification"] == {
         "mode": "explicit-representative-alias-globs",
         "representativeAliasGlobs": ["corpus-0/representative/*"],
+        "validationAliasGlobs": [],
         "representativeUniquePackageCount": 1,
         "validationUniquePackageCount": 1,
     }
@@ -417,6 +418,76 @@ def test_inventory_classifies_explicit_representative_aliases_without_rescanning
             scan_corpus([corpus], registry),
             representative_alias_globs=("corpus-0/misspelled/*",),
         )
+
+
+def test_inventory_classifies_explicit_validation_aliases_as_the_complement(
+    tmp_path: Path,
+    registry,
+):
+    corpus = tmp_path / "corpus"
+    representative = corpus / "customer-deck"
+    validation = corpus / "oracle-pypptx-shape3d-0001"
+    representative.mkdir(parents=True)
+    validation.mkdir(parents=True)
+    write_test_pptx(representative / "source.pptx")
+    write_test_pptx(
+        validation / "source.pptx",
+        slide_xml=SLIDE_WITH_SCENE_AND_SP3D.replace('contourW="12700"', 'contourW="25400"'),
+    )
+
+    payload = inventory_to_dict(
+        scan_corpus([corpus], registry),
+        validation_alias_globs=("corpus-0/oracle-*",),
+    )
+
+    roles_by_alias = {
+        package["aliases"][0]: package["corpusRole"] for package in payload["packages"]
+    }
+    assert roles_by_alias == {
+        "corpus-0/customer-deck/source.pptx": "representative",
+        "corpus-0/oracle-pypptx-shape3d-0001/source.pptx": "validation",
+    }
+    assert payload["corpusClassification"] == {
+        "mode": "explicit-validation-alias-globs",
+        "representativeAliasGlobs": [],
+        "validationAliasGlobs": ["corpus-0/oracle-*"],
+        "representativeUniquePackageCount": 1,
+        "validationUniquePackageCount": 1,
+    }
+
+    with pytest.raises(ValueError, match="mutually exclusive"):
+        inventory_to_dict(
+            scan_corpus([corpus], registry),
+            representative_alias_globs=("corpus-0/customer-*",),
+            validation_alias_globs=("corpus-0/oracle-*",),
+        )
+
+
+def test_validation_aliases_do_not_demote_an_identical_representative_package(
+    tmp_path: Path,
+    registry,
+):
+    corpus = tmp_path / "corpus"
+    representative = corpus / "customer-deck"
+    validation = corpus / "oracle-generated-case"
+    representative.mkdir(parents=True)
+    validation.mkdir(parents=True)
+    source = write_test_pptx(representative / "source.pptx")
+    (validation / "source.pptx").write_bytes(source.read_bytes())
+
+    payload = inventory_to_dict(
+        scan_corpus([corpus], registry),
+        validation_alias_globs=("corpus-0/oracle-*",),
+    )
+
+    assert len(payload["packages"]) == 1
+    assert payload["packages"][0]["aliases"] == [
+        "corpus-0/customer-deck/source.pptx",
+        "corpus-0/oracle-generated-case/source.pptx",
+    ]
+    assert payload["packages"][0]["corpusRole"] == "representative"
+    assert payload["corpusClassification"]["representativeUniquePackageCount"] == 1
+    assert payload["corpusClassification"]["validationUniquePackageCount"] == 0
 
 
 def test_scan_corpus_records_one_rejected_package_and_continues(tmp_path: Path, registry):
