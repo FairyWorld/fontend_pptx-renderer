@@ -557,6 +557,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
         "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
         "oracle-pypptx-shape3d-0018-donut-shadow-interpolation-matrix",
+        "oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix",
     }
 
 
@@ -589,6 +590,7 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         "oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix",
         "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
         "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
+        "oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix",
     }
     for name in positive_names:
         root = roots[name]
@@ -1271,6 +1273,90 @@ def test_static_shape3d_donut_shadow_interpolation_matrix_crosses_aspect_and_adj
             "a:scene3d.lightRig=threePt:t",
             "a:sp3d.extrusionH=0",
             "a:sp3d.bevelT=circle",
+        ],
+    }
+
+
+def test_static_shape3d_perspective_custom_geometry_matrix_crosses_aspect_and_fill(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"]
+        == "oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix"
+    )
+    assert case["slide_count"] == 6
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        roots = [
+            etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 7)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    expected_aspects = [(1, 1), (5, 2), (16, 27)] * 2
+    expected_fills = ["2F75B5"] * 3 + ["FFFFFF"] * 3
+    for root, (aspect_width, aspect_height), fill in zip(
+        roots, expected_aspects, expected_fills, strict=True
+    ):
+        targets = root.xpath(".//p:sp[p:spPr/a:scene3d]", namespaces=ns)
+        assert len(targets) == 1
+        target = targets[0]
+        ext = target.xpath("p:spPr/a:xfrm/a:ext", namespaces=ns)[0]
+        width = int(ext.get("cx"))
+        height = int(ext.get("cy"))
+        assert width * aspect_height == height * aspect_width
+        assert target.xpath("boolean(p:spPr/a:custGeom)", namespaces=ns)
+        assert not target.xpath("p:spPr/a:prstGeom", namespaces=ns)
+        assert target.xpath("count(p:spPr/a:custGeom/a:pathLst/a:path/a:moveTo) >= 2", namespaces=ns)
+        assert target.xpath("count(p:spPr/a:custGeom/a:pathLst/a:path/a:cubicBezTo) >= 4", namespaces=ns)
+        assert target.xpath("count(p:spPr/a:custGeom/a:pathLst/a:path/a:close) >= 2", namespaces=ns)
+        assert target.xpath(
+            "boolean(p:spPr/a:solidFill/a:srgbClr[@val=$fill])",
+            namespaces=ns,
+            fill=fill,
+        )
+        assert target.xpath("boolean(p:spPr/a:ln/a:noFill)", namespaces=ns)
+        assert not target.xpath("p:style", namespaces=ns)
+        assert target.xpath(
+            "boolean(p:spPr/a:scene3d/a:camera"
+            "[@prst='perspectiveRelaxedModerately'][@fov='7200000']"
+            "/a:rot[@lat='18590633'][@lon='0'][@rev='0'])",
+            namespaces=ns,
+        )
+        assert target.xpath(
+            "boolean(p:spPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'])",
+            namespaces=ns,
+        )
+        assert not target.xpath("p:spPr/a:sp3d", namespaces=ns)
+        assert not target.xpath("p:spPr/a:effectLst | p:spPr/a:effectDag", namespaces=ns)
+        assert not target.xpath("p:txBody//a:t[string-length(.) > 0]", namespaces=ns)
+
+    payload = __import__("json").loads(
+        generator._write_case_json(case, tmp_path).read_text(encoding="utf-8")
+    )
+    assert len(payload["slides"]) == 6
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "features": [
+            "p:sp.custGeom=multiContourCubic",
+            "geometry.aspect=square|wide|tall",
+            "matrix=crossProduct(3x2)",
+            "container=standalone",
+            "paint=explicitSolidBlue|explicitSolidWhite",
+            "a:scene3d.camera=perspectiveRelaxedModerately",
+            "a:scene3d.camera.rot=18590633,0,0",
+            "a:scene3d.camera.fov=7200000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d=absent",
+            "effects=absent",
         ],
     }
 

@@ -2314,6 +2314,109 @@ def _build_shape3d_cases() -> list[CaseDef]:
         ],
     )
 
+    def _replace_with_multi_contour_cubic_geometry(shape) -> None:
+        cust_geom = shape._element.spPr.find(qn("a:custGeom"))
+        if cust_geom is None:
+            raise RuntimeError("custom camera probe has no a:custGeom")
+        path_list = cust_geom.find(qn("a:pathLst"))
+        if path_list is None:
+            raise RuntimeError("custom camera probe has no a:pathLst")
+        for child in list(path_list):
+            path_list.remove(child)
+
+        path = etree.SubElement(path_list, qn("a:path"), w="1000", h="1000")
+
+        def move_to(x: int, y: int) -> None:
+            command = etree.SubElement(path, qn("a:moveTo"))
+            etree.SubElement(command, qn("a:pt"), x=str(x), y=str(y))
+
+        def line_to(x: int, y: int) -> None:
+            command = etree.SubElement(path, qn("a:lnTo"))
+            etree.SubElement(command, qn("a:pt"), x=str(x), y=str(y))
+
+        def cubic_to(*points: tuple[int, int]) -> None:
+            command = etree.SubElement(path, qn("a:cubicBezTo"))
+            for x, y in points:
+                etree.SubElement(command, qn("a:pt"), x=str(x), y=str(y))
+
+        move_to(0, 500)
+        cubic_to((0, 120), (280, 0), (450, 160))
+        cubic_to((560, 270), (480, 500), (300, 580))
+        line_to(0, 720)
+        etree.SubElement(path, qn("a:close"))
+
+        move_to(560, 180)
+        cubic_to((700, 20), (1000, 120), (950, 430))
+        cubic_to((920, 680), (680, 900), (520, 720))
+        cubic_to((410, 590), (450, 320), (560, 180))
+        etree.SubElement(path, qn("a:close"))
+
+    def _add_perspective_custom_geometry_probe(
+        prs,
+        *,
+        width: float,
+        height: float,
+        fill: tuple[int, int, int],
+    ) -> None:
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        if fill == (255, 255, 255):
+            slide.background.fill.solid()
+            slide.background.fill.fore_color.rgb = RGBColor(0x20, 0x38, 0x64)
+        builder = slide.shapes.build_freeform(
+            0,
+            0,
+            scale=(Inches(width) / 1000, Inches(height) / 1000),
+        )
+        builder.add_line_segments([(1000, 0), (1000, 1000), (0, 1000)], close=True)
+        shape = builder.convert_to_shape(
+            Inches((13.333 - width) / 2),
+            Inches((7.5 - height) / 2),
+        )
+        shape.name = "Perspective custom geometry camera plane"
+        _replace_with_multi_contour_cubic_geometry(shape)
+        style = shape._element.find(qn("p:style"))
+        if style is not None:
+            shape._element.remove(style)
+        shape.fill.solid()
+        shape.fill.fore_color.rgb = RGBColor(*fill)
+        shape.line.fill.background()
+        _apply_flat_shape3d_scene(
+            shape,
+            camera_preset="perspectiveRelaxedModerately",
+            camera_rotation=(18590633, 0, 0),
+            field_of_view=7200000,
+            include_shape_format=False,
+        )
+
+    def _build_perspective_custom_geometry_plane_matrix(prs) -> None:
+        for fill in ((47, 117, 181), (255, 255, 255)):
+            for width, height in ((4.2, 4.2), (8.0, 3.2), (3.2, 5.4)):
+                _add_perspective_custom_geometry_probe(
+                    prs,
+                    width=width,
+                    height=height,
+                    fill=fill,
+                )
+
+    _add(
+        "perspective-custom-geometry-plane-matrix",
+        _build_perspective_custom_geometry_plane_matrix,
+        slide_count=6,
+        features=[
+            "p:sp.custGeom=multiContourCubic",
+            "geometry.aspect=square|wide|tall",
+            "matrix=crossProduct(3x2)",
+            "container=standalone",
+            "paint=explicitSolidBlue|explicitSolidWhite",
+            "a:scene3d.camera=perspectiveRelaxedModerately",
+            "a:scene3d.camera.rot=18590633,0,0",
+            "a:scene3d.camera.fov=7200000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d=absent",
+            "effects=absent",
+        ],
+    )
+
     return cases
 
 
