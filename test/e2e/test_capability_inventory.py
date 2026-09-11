@@ -17,6 +17,13 @@ from oracle.capability_inventory import (
 
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 C_NS = "http://schemas.openxmlformats.org/drawingml/2006/chart"
+P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
+
+
+def write_json(path: Path, payload: object) -> Path:
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
 
 SLIDE_WITH_SCENE_AND_SP3D = f"""
 <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -231,6 +238,72 @@ def test_text_body_scene3d_does_not_count_as_shape_scene3d(tmp_path: Path, regis
     assert "drawingml.text.3d.scene" in observation.capability_ids
     assert "drawingml.shape.3d.scene" not in observation.capability_ids
     assert "drawingml.shape.3d.camera-projected-plane" not in observation.capability_ids
+
+
+def test_scan_pptx_matches_exact_ancestor_path_without_counting_other_outer_shadows(
+    tmp_path: Path,
+):
+    entry = {
+        "id": "drawingml.shape.effect.outer-shadow",
+        "component": "shape",
+        "renderMode": "approximate",
+        "impact": "fidelity",
+        "selectors": [
+            {
+                "partGlob": "ppt/**/*.xml",
+                "namespace": A_NS,
+                "localName": "outerShdw",
+                "ancestorPath": [
+                    {"namespace": P_NS, "localNames": ["sp"]},
+                    {"namespace": P_NS, "localNames": ["spPr"]},
+                    {"namespace": A_NS, "localNames": ["effectLst"]},
+                ],
+            }
+        ],
+        "scope": {"source": "direct-shape-effect-list"},
+        "fallback": "Render a bounded shadow approximation.",
+        "implementationPaths": ["src/renderer/ShapeRenderer.ts"],
+        "requiredGates": ["source", "unit"],
+        "issueUrls": [],
+    }
+    registry = load_capability_registry(
+        write_json(
+            tmp_path / "outer-shadow-capabilities.json",
+            {"schemaVersion": 1, "capabilities": [entry]},
+        )
+    )
+    target = f"""
+    <p:sld xmlns:p="{P_NS}" xmlns:a="{A_NS}">
+      <p:cSld><p:spTree><p:grpSp>
+        <p:sp><p:spPr><a:effectLst><a:outerShdw/></a:effectLst></p:spPr></p:sp>
+      </p:grpSp></p:spTree></p:cSld>
+    </p:sld>
+    """
+    unrelated = f"""
+    <p:sld xmlns:p="{P_NS}" xmlns:a="{A_NS}">
+      <p:cSld><p:spTree>
+        <p:pic><p:spPr><a:effectLst><a:outerShdw/></a:effectLst></p:spPr></p:pic>
+        <p:grpSp><p:grpSpPr><a:effectLst><a:outerShdw/></a:effectLst></p:grpSpPr></p:grpSp>
+        <p:sp>
+          <p:spPr/>
+          <p:txBody><a:p><a:r><a:rPr><a:effectLst><a:outerShdw/></a:effectLst></a:rPr></a:r></a:p></p:txBody>
+        </p:sp>
+        <a:effectStyle><a:effectLst><a:outerShdw/></a:effectLst></a:effectStyle>
+      </p:spTree></p:cSld>
+    </p:sld>
+    """
+
+    target_observation = scan_pptx(
+        write_test_pptx(tmp_path / "target.pptx", slide_xml=target, chart_xml=None),
+        registry,
+    )
+    unrelated_observation = scan_pptx(
+        write_test_pptx(tmp_path / "unrelated.pptx", slide_xml=unrelated, chart_xml=None),
+        registry,
+    )
+
+    assert target_observation.capability_ids == ("drawingml.shape.effect.outer-shadow",)
+    assert unrelated_observation.capability_ids == ()
 
 
 @pytest.mark.parametrize(

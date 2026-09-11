@@ -153,6 +153,80 @@ def test_selector_parent_scope_rejects_incomplete_or_duplicate_names(tmp_path: P
         )
 
 
+def test_selector_ancestor_path_is_parsed_immutably_and_changes_its_fingerprint(
+    tmp_path: Path,
+):
+    unscoped_entry = capability()
+    scoped_entry = capability()
+    scoped_entry["selectors"][0]["ancestorPath"] = [
+        {
+            "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "localNames": ["sp"],
+        },
+        {
+            "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "localNames": ["spPr"],
+        },
+    ]
+    unscoped_registry = load_capability_registry(
+        write_json(
+            tmp_path / "unscoped.json",
+            {"schemaVersion": 1, "capabilities": [unscoped_entry]},
+        )
+    )
+    scoped_registry = load_capability_registry(
+        write_json(
+            tmp_path / "scoped.json",
+            {"schemaVersion": 1, "capabilities": [scoped_entry]},
+        )
+    )
+
+    selector = scoped_registry.capabilities[0].selectors[0]
+    assert tuple(
+        (step.namespace, step.local_names) for step in selector.ancestor_path
+    ) == (
+        (
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            ("sp",),
+        ),
+        (
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            ("spPr",),
+        ),
+    )
+    assert capability_definition_fingerprint(scoped_registry.capabilities[0]) != (
+        capability_definition_fingerprint(unscoped_registry.capabilities[0])
+    )
+
+
+def test_selector_ancestor_path_rejects_empty_steps_and_parent_combination(tmp_path: Path):
+    empty = capability()
+    empty["selectors"][0]["ancestorPath"] = []
+    with pytest.raises(ValueError, match="ancestorPath must be a non-empty list"):
+        load_capability_registry(
+            write_json(
+                tmp_path / "empty-ancestor-path.json",
+                {"schemaVersion": 1, "capabilities": [empty]},
+            )
+        )
+
+    combined = capability()
+    combined["selectors"][0]["parent"] = {
+        "namespace": "urn:test",
+        "localNames": ["spPr"],
+    }
+    combined["selectors"][0]["ancestorPath"] = [
+        {"namespace": "urn:test", "localNames": ["sp", "spPr"]}
+    ]
+    with pytest.raises(ValueError, match="cannot combine parent and ancestorPath"):
+        load_capability_registry(
+            write_json(
+                tmp_path / "combined-ancestor-parent.json",
+                {"schemaVersion": 1, "capabilities": [combined]},
+            )
+        )
+
+
 def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Path):
     registry_path = write_json(
         tmp_path / "capabilities.json",

@@ -44,14 +44,23 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 @dataclass(frozen=True)
+class XmlAncestorStep:
+    """One namespace/name constraint in a root-to-parent XML ancestor path."""
+
+    namespace: str
+    local_names: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class XmlSelector:
-    """One element selector with an optional direct-parent namespace/name constraint."""
+    """One element selector with optional parent or ancestor-path constraints."""
 
     part_glob: str
     namespace: str
     local_name: str
     parent_namespace: str | None
     parent_local_names: tuple[str, ...]
+    ancestor_path: tuple[XmlAncestorStep, ...]
     attributes: Mapping[str, tuple[str, ...]]
 
 
@@ -182,9 +191,11 @@ def _parse_selector(value: Any, index: int, capability_id: str) -> XmlSelector:
     _check_keys(
         value,
         required={"partGlob", "namespace", "localName"},
-        optional={"attributes", "parent"},
+        optional={"ancestorPath", "attributes", "parent"},
         label=label,
     )
+    if "parent" in value and "ancestorPath" in value:
+        raise ValueError(f"{label} cannot combine parent and ancestorPath")
     parent_namespace: str | None = None
     parent_local_names: tuple[str, ...] = ()
     if "parent" in value:
@@ -204,6 +215,34 @@ def _parse_selector(value: Any, index: int, capability_id: str) -> XmlSelector:
             parent_value["localNames"],
             f"{label} parent localNames",
         )
+    ancestor_path: tuple[XmlAncestorStep, ...] = ()
+    if "ancestorPath" in value:
+        ancestor_path_value = value["ancestorPath"]
+        if not isinstance(ancestor_path_value, list) or not ancestor_path_value:
+            raise ValueError(f"{label} ancestorPath must be a non-empty list")
+        steps: list[XmlAncestorStep] = []
+        for step_index, step_value in enumerate(ancestor_path_value):
+            step_label = f"{label} ancestorPath step {step_index}"
+            if not isinstance(step_value, dict):
+                raise ValueError(f"{step_label} must be an object")
+            _check_keys(
+                step_value,
+                required={"namespace", "localNames"},
+                label=step_label,
+            )
+            steps.append(
+                XmlAncestorStep(
+                    namespace=_nonempty_string(
+                        step_value["namespace"],
+                        f"{step_label} namespace",
+                    ),
+                    local_names=_unique_strings(
+                        step_value["localNames"],
+                        f"{step_label} localNames",
+                    ),
+                )
+            )
+        ancestor_path = tuple(steps)
     attributes_value = value.get("attributes", {})
     if not isinstance(attributes_value, dict):
         raise ValueError(f"{label} attributes must be an object")
@@ -220,6 +259,7 @@ def _parse_selector(value: Any, index: int, capability_id: str) -> XmlSelector:
         local_name=_nonempty_string(value["localName"], f"{label} localName"),
         parent_namespace=parent_namespace,
         parent_local_names=parent_local_names,
+        ancestor_path=ancestor_path,
         attributes=MappingProxyType(attributes),
     )
 
@@ -357,6 +397,19 @@ def capability_definition_fingerprint(capability: CapabilityDefinition) -> str:
                         }
                     }
                     if selector.parent_namespace is not None
+                    else {}
+                ),
+                **(
+                    {
+                        "ancestorPath": [
+                            {
+                                "localNames": list(step.local_names),
+                                "namespace": step.namespace,
+                            }
+                            for step in selector.ancestor_path
+                        ]
+                    }
+                    if selector.ancestor_path
                     else {}
                 ),
             }

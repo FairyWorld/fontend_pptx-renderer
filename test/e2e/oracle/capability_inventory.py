@@ -165,16 +165,30 @@ def _selector_matches(
     namespace: str,
     local_name: str,
     attributes: dict[str, str],
-    parent_namespace: str | None,
-    parent_local_name: str | None,
+    ancestors: Sequence[tuple[str, str]],
 ) -> bool:
     if selector.namespace != namespace or selector.local_name != local_name:
         return False
+    parent_namespace, parent_local_name = ancestors[-1] if ancestors else (None, None)
     if selector.parent_namespace is not None and (
         selector.parent_namespace != parent_namespace
         or parent_local_name not in selector.parent_local_names
     ):
         return False
+    if selector.ancestor_path:
+        if len(ancestors) < len(selector.ancestor_path):
+            return False
+        path = ancestors[-len(selector.ancestor_path) :]
+        if any(
+            step.namespace != ancestor_namespace
+            or ancestor_local_name not in step.local_names
+            for step, (ancestor_namespace, ancestor_local_name) in zip(
+                selector.ancestor_path,
+                path,
+                strict=True,
+            )
+        ):
+            return False
     return all(
         _attribute_matches(_attribute_value(attributes, name), accepted)
         for name, accepted in selector.attributes.items()
@@ -198,7 +212,6 @@ def _scan_xml_part(
         for event, element in events:
             namespace, local_name = _split_tag(element.tag)
             if event == "start":
-                parent_namespace, parent_local_name = ancestors[-1] if ancestors else (None, None)
                 attributes = dict(element.attrib)
                 for capability in capabilities:
                     if any(
@@ -208,8 +221,7 @@ def _scan_xml_part(
                             namespace,
                             local_name,
                             attributes,
-                            parent_namespace,
-                            parent_local_name,
+                            ancestors,
                         )
                         for selector in capability.selectors
                     ):
