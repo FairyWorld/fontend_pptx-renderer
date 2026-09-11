@@ -218,8 +218,8 @@ This generates/reuses ground truth for all SmartArt layouts available on the loc
 
 For text, shape-adjustment, zero-adjustment flowchart, ordinary-shape and text effects, bounded
 static DrawingML 3D, composite, and chart interaction cases, use the python-pptx generator. It
-currently defines 181 cases: 59 text, 31 shape-adjustment, 28 flowchart, 2 shape-effect, 1
-text-effect, 19 static 3D, 20 composite, and 21 chart cases.
+currently defines 182 cases: 59 text, 31 shape-adjustment, 28 flowchart, 2 shape-effect, 1
+text-effect, 20 static 3D, 20 composite, and 21 chart cases.
 
 The ordinary-shape effect cohort contains the eight-slide outer-shadow matrix and a seven-slide
 reflection matrix with one inverse plus six positive shape-surface rows. The separate one-slide
@@ -236,12 +236,13 @@ shape containers, `twoPt:t` and `threePt:t` lighting, donut/ellipse/rect/roundRe
 wide/tall aspect ratios, a non-identity group, and the light rotation plus implicit defaults
 observed in the local `model-platform` corpus. Its real-property sentinel also retains the coexisting picture
 outline and outer shadow so the 3D effect is not tested in isolation from its actual container.
-The nineteen cases are one opt-out control, nine single-slide positive bevel cases, one three-slide
+The twenty cases are one opt-out control, nine single-slide positive bevel cases, one three-slide
 ellipse matrix, one five-slide donut endpoint/context matrix, one nine-slide donut
 aspect/adjustment interpolation matrix, one six-slide omitted/explicit bevel-default matrix,
 two six-slide camera-plane matrices, one three-slide
-`perspectiveLeft` editable-text matrix, one four-slide `perspectiveRight` picture matrix, and one
-six-slide `perspectiveRelaxedModerately` custom-geometry matrix. The first
+`perspectiveLeft` editable-text matrix, one four-slide `perspectiveRight` picture matrix, one
+six-slide `perspectiveRelaxedModerately` custom-geometry matrix, and one eight-slide native-verified
+`perspectiveLeft` picture-group matrix. The first
 camera-plane row covers identity and 20°/30° rotated `orthographicFront`, then square, wide, tall,
 theme-fill, and non-identity-group `perspectiveRelaxedModerately` rendering at the exact verified
 120° field of view and camera rotation. The second proves scene-only implicit zero depth across
@@ -257,7 +258,12 @@ corpus; the last three picture rows isolate horizontal, vertical, and combined n
 `a:srcRect` crops against the existing no-crop control. The fifth camera matrix crosses one bounded
 two-contour numeric line/cubic custom geometry over square, wide, and tall physical bounds with
 explicit `#2F75B5` and `#FFFFFF` paint. It omits style, effects, and `a:sp3d` while retaining the
-exact 120° field of view, camera rotation, and `threePt:t` light tuple. The ellipse row spans square explicit paint, wide theme-reference paint,
+exact 120° field of view, camera rotation, and `threePt:t` light tuple. The group matrix
+crosses square, wide, tall, and a nested real-corpus-like source-crop context against
+scene-absent inverses. Its target has exactly two direct embedded stretch-filled rectangular
+pictures, positive group/child extents, the exact `perspectiveLeft` 95-degree/25-degree-longitude
+tuple, and no target effects, local transform, transformed ancestor, or ancestor 3D scene.
+Coordinate-only ancestors remain eligible. The ellipse row spans square explicit paint, wide theme-reference paint,
 and a tall ellipse under a non-identity group transform. The donut row spans the `0..50000`
 adjustment bounds, the `25000` default, an adjusted wide theme-fill shape, and an adjusted grouped
 tall shape. Together
@@ -326,7 +332,7 @@ per-slide PNG. The generator refreshes tracked case metadata even when cached lo
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
 The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
-into tracked `oracle/cases-pypptx/` and do not change the 177-case default matrix.
+into tracked `oracle/cases-pypptx/` and do not change the 182-case default matrix.
 
 The top-bevel capability also has a region-level lighting gate. After clean native API reports for
 cases 0001-0012 and 0017-0018 have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
@@ -394,6 +400,9 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_camera_metrics.py \
   --out test/e2e/reports/capability-loop/shape3d-camera-local-<revision>.json
 ```
 
+Include the native group matrix in the same report:
+`--case-report test/e2e/reports/capability-loop/current-<revision>-oracle-pypptx-shape3d-0020-perspective-left-picture-group-matrix.json`.
+
 Run the bounded bottom-front capability against its own clean native report:
 
 ```bash
@@ -402,7 +411,7 @@ test/e2e/.venv/bin/python test/e2e/scripts/shape3d_camera_metrics.py \
   --out test/e2e/reports/capability-loop/shape3d-bottom-front-local-<revision>.json
 ```
 
-This schema-v6 gate derives each applicable modality from source OOXML and binds both raster hashes
+This schema-v7 gate derives each applicable modality from source OOXML and binds both raster hashes
 to the native API report. Solid rows extract the largest saturated four-corner plane independently
 from renderer DOM bounds: normalized corner score must be at least `0.98`, material-band color
 score at least `0.97`, and a measurable native gradient requires at least `0.65` range ratio and
@@ -417,7 +426,9 @@ tolerant edge F1 `0.90`; this makes crop/content errors visible even when the ou
 correct. Custom-geometry rows use the same `0.25%` raster tolerance and require foreground F1
 `0.95`, bounds score `0.98`, candidate/reference foreground area ratio `0.90`, centroid score
 `0.99`, and color score `0.98`. Raw IoU and raw bounds stay in the report for diagnosis. The verifier recomputes pass
-status and derived ratios from fixed thresholds. It also requires deterministic mutation controls
+status and derived ratios from fixed thresholds. A `picture-group` row uses the picture corner,
+rectified-color, edge, and crop-mutation thresholds for the composed child surface. Schema-v6
+reports remain accepted for existing modalities. It also requires deterministic mutation controls
 to fail: exterior-shadow erasure on every measurable shadow row and a 12% left crop plus rescale on
 every rectified picture row. Bottom-front rows require normalized corner score `0.98`, mean RGB
 error no greater than `1.0` across three interior material bands, and rejection after restoring the
@@ -742,7 +753,7 @@ uses cases 0001-0012 plus 0017-0018 and the same fourteen earlier-revision basel
 the derived `bevel-local` report, explicit manual verdicts for review rows, and the `source`,
 `structural`, `unit`, `browser`, `performance`, `package-size`, and `docs` caller-run gates.
 
-The separate `drawingml.shape.3d.camera-projected-plane` cohort uses cases 0013-0016 and 0019. It promotes
+The separate `drawingml.shape.3d.camera-projected-plane` cohort uses cases 0013-0016, 0019, and 0020. It promotes
 exact zero-depth solid rectangles, two scene-only no-fill live-text tuples, and one live-picture
 tuple with absent or bounded nonnegative source crop. It also promotes one standalone custom-path
 family with a `1000×1000` coordinate space, identity text rectangle, at least two closed numeric
@@ -754,18 +765,25 @@ independent bounds, and
 local body properties outside the registry's `wrap`, anchor, and autofit tuples. Its exact cameras, paint values,
 aspect ratios, container rows, and implicit-depth semantics are declared in the registry. The
 picture row additionally excludes visible outlines, non-rectangular geometry, `a:fillRect`, tiles,
-style references, picture background fills, blip effects, and degenerate crops. Verification uses
-all earlier/current report pairs plus the derived schema-v6 `camera-local`
-plane/custom/text/picture report
+style references, picture background fills, blip effects, and degenerate crops. The group row
+requires exactly two direct embedded stretch-filled rectangular pictures, positive group and child
+extents, the exact `perspectiveLeft` 95-degree/25-degree-longitude tuple, and no target effects,
+local transform, transformed/effect-bearing ancestor, or ancestor 3D scene. Verification uses
+all earlier/current report pairs plus the derived schema-v7 `camera-local`
+plane/custom/text/picture/picture-group report
 and the same caller-run gate classes. The broad
 `drawingml.shape.3d.scene` fallback remains in inventory as a conservative residual, so observing a
 verified narrow tuple cannot hide unimplemented scene values.
+
+Case 0020 supplies the native group evidence: square/wide/tall and nested source-crop positives are
+paired with scene-absent inverses. Group reflection composition remains browser/real-corpus
+diagnostic evidence and is intentionally outside the promoted native matrix.
 
 The separate `drawingml.shape.3d.bottom-bevel-front-material` cohort promotes only the exact
 standalone opaque rectangle rows declared in the registry: default-size `relaxedInset`/`circle`
 bottom bevel, `orthographicFront`, bounded `threePt:t` rotation, zero depth, `dkEdge` or implicit
 material, and the three verified aspect ratios. It retains live centered text, emits a uniform
-native front-face color, draws no bottom rim, and requires the schema-v6 bottom-material modality
+native front-face color, draws no bottom rim, and requires the schema-v7 bottom-material modality
 plus its restored-flat-fill mutation.
 
 Other perspective and arbitrary rotations, nonzero extrusion, materials and bottom bevels outside

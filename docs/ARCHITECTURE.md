@@ -260,7 +260,7 @@ cloned SVG reference isolation.
 
 `src/model/nodes/Shape3D.ts` parses direct `a:scene3d` and `a:sp3d` children into typed camera,
 field-of-view, zoom, light, bevel, contour, extrusion, material, and color observations. It attaches
-those observations to both shape and picture nodes; only malformed numeric values become parse issues. Serialization
+those observations to shape, picture, and group nodes; only malformed numeric values become parse issues. Serialization
 removes the retained `SafeXmlNode` color source while preserving its JSON-safe observation, so
 detection remains independent from renderer support policy. `CT_Bevel` omission is resolved at the
 model boundary: `prst` defaults to `circle`, while `w` and `h` default independently to 76200 EMU
@@ -269,7 +269,8 @@ bevel plan.
 
 `src/renderer/Shape3DRenderer.ts` is a narrow decision and effect layer. It returns either an
 `orthographic-top-bevel` plan, a `camera-projected-plane` plan, a
-`camera-projected-text-plane` plan, a `camera-projected-picture-plane` plan, or an explicit
+`camera-projected-text-plane` plan, a `camera-projected-picture-plane` plan, a bounded
+`camera-projected-group-plane` plan, or an explicit
 flat-fallback reason before touching the DOM. The camera-plane plan records whether its SVG source
 is the verified rectangular preset or bounded custom-path profile.
 The top-bevel plan requires all of the following:
@@ -386,22 +387,35 @@ interpolation for the native-verified camera tuple. For the exact text tuples,
 `projectiveTransformToCssMatrix3d()` solves a rectangle-to-quad
 homography and applies it after text layout, while preserving the text DOM. The picture path applies
 the same homography to the existing crop-clipping stage, preserving the image pipeline and its
-source-crop semantics. For the custom SVG lane, the same homography projects each absolute line
+source-crop semantics. The group path creates one child layer in group coordinates,
+renders the two supported pictures into it, and applies the homography only after child layout.
+This preserves sibling composition and avoids projecting each child around a separate origin. It
+requires positive explicit group and child-coordinate extents, exactly two direct embedded
+stretch-filled rectangular picture children, optional valid source crops, no target shape format or
+effects, and no local or ancestor rotation, flip, or 3D scene. Coordinate-only ancestors remain
+eligible. Its native-calibrated lighting response applies a bounded log-aspect brightness correction
+to the live child content and a low-alpha white overlay after child rendering.
+`RenderContext.groupAncestorHas3dScene` propagates scene ancestry even when an ancestor
+falls back, preventing nested partial projection. For the custom SVG lane, the same homography projects each absolute line
 point directly. A projective transform maps polynomial cubics to rational cubics, so the renderer
 adaptively flattens each supported cubic in projected screen space with a maximum `0.25px` error,
 ten subdivision levels, and bounded token/point budgets while preserving closed contours and
 even-odd fill. This is independent planar math and does not introduce a mesh or WebGL dependency.
 
-The twenty-five-slide camera native matrix covers identity and rotated orthographic controls, explicit
+The twenty-five-slide leaf camera native matrix covers identity and rotated orthographic controls, explicit
 `a:sp3d`, scene-only implicit depth, square/wide/tall perspective shapes, explicit and theme paint,
 a non-identity group, two square/wide/tall live-text camera tuples, and four live-picture rows with
 absent, horizontal, vertical, and asymmetric source crops. It also crosses the bounded custom-path
 silhouette over square/wide/tall physical bounds and explicit blue/white paint. Public solid-paint
-support remains limited to the exact registry rows. The schema-v6 local metric binds the
+support remains limited to the exact registry rows. A separate eight-slide native group matrix crosses
+square/wide/tall standalone groups and a nested source-cropped group under a coordinate-only ancestor
+against scene-absent inverses. The schema-v7 local metric binds the
 exact native rasters and checks normalized four-corner geometry, material color, gradient response,
 and required external-shadow evidence for solid planes; resolution-tolerant foreground, bounds, and
 ink retention for live text; and inverse-projected picture color plus tolerant edge fidelity for
-picture planes, in addition to the full-page oracle gate. Custom rows require tolerant foreground
+picture planes, in addition to the full-page oracle gate. Its `picture-group` modality reuses the
+picture corner, rectified-color, edge, and crop-mutation checks for the composed surface; schema-v6
+reports remain backward compatible for the existing modalities. Custom rows require tolerant foreground
 F1 `0.95`, tolerant bounds score `0.98`, candidate/reference foreground area ratio `0.90`, centroid
 score `0.99`, and color score `0.98`. Bottom-front rows add normalized corner
 coverage and three interior material bands with mean RGB error at most `1.0`. The report also runs
@@ -414,13 +428,17 @@ still passes its target metric.
 The contour remains a separate SVG path, shape text stays outside the lighting group, and a 3D
 picture's ordinary outline remains centered on its source bounds. Unique per-effect IDs prevent
 cross-slide collisions. Existing wrapper transforms, outer shadows, media ownership, and cleanup
-remain in their owning renderers.
+remain in their owning renderers. Group reflection remains diagnostic outside the promoted
+group-camera matrix, but its clone is now created
+after child rendering so the reflected source contains the completed subtree, including a projected
+child layer.
 
 Anything outside the registry's bounded tuples stays on the existing flat path with a stable planner reason.
 Other perspective and rotated cameras, nonzero extrusion, materials/bevels/lights outside the
 verified top-bevel, camera-plane, and bottom-front tuples, negative
 or degenerate picture source crops, custom geometry outside the exact path profile or verified
-physical bounds, gradient/pattern/group/image-filled shapes, tiled pictures,
+physical bounds, gradient/pattern/group/image-filled leaf shapes, tiled pictures, arbitrary group
+scene tuples or child mixtures,
 chart `view3D`, and Office 2017 `model3d` are separate capability lanes. The raster lighting backend
 can consume arbitrary silhouettes, but support is still constrained by the planner and native
 evidence. This is bounded static rendering, not a general mesh or PowerPoint material engine.

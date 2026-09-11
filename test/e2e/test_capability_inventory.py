@@ -207,7 +207,10 @@ def test_scan_pptx_separates_shape_group_and_text_body_scene3d_by_parent(tmp_pat
 
     assert "drawingml.shape.3d.scene" in observation.capability_ids
     assert "drawingml.text.3d.scene" in observation.capability_ids
-    assert "drawingml.shape.3d.camera-projected-plane" not in observation.capability_ids
+    assert "drawingml.shape.3d.camera-projected-plane" in observation.capability_ids
+    assert observation.matching_parts["drawingml.shape.3d.camera-projected-plane"] == (
+        "ppt/slides/slide1.xml",
+    )
     assert observation.matching_parts["drawingml.shape.3d.scene"] == ("ppt/slides/slide1.xml",)
     assert observation.matching_parts["drawingml.text.3d.scene"] == ("ppt/slides/slide1.xml",)
 

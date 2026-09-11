@@ -2,7 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseXml } from '../../../src/parser/XmlParser';
 import { parseShapeNode } from '../../../src/model/nodes/ShapeNode';
 import {
+  applyStaticGroup3DPlane,
   appendStaticShape3DEffects,
+  buildStaticGroup3DPlan,
   buildStaticShape3DPlan,
   solidBevelShadowStrength,
 } from '../../../src/renderer/Shape3DRenderer';
@@ -66,6 +68,14 @@ const perspectiveRightPictureCameraScene = `
     <a:lightRig rig="threePt" dir="t"/>
   </a:scene3d>`;
 
+const perspectiveLeftPictureGroupScene = `
+  <a:scene3d>
+    <a:camera prst="perspectiveLeft" fov="5700000">
+      <a:rot lat="0" lon="1500000" rev="0"/>
+    </a:camera>
+    <a:lightRig rig="threePt" dir="t"/>
+  </a:scene3d>`;
+
 const bottomBevelFrontScene = `
   <a:scene3d>
     <a:camera prst="orthographicFront"/>
@@ -89,6 +99,132 @@ afterEach(() => {
   } else {
     delete (HTMLImageElement.prototype as Partial<HTMLImageElement>).decode;
   }
+});
+
+describe('bounded group camera planner', () => {
+  const target = {
+    width: 190.58194225721786,
+    height: 68.32419947506562,
+    childKinds: ['pic', 'pic'] as const,
+    hasSupportedPictureChildren: true,
+    hasValidChildCoordinateSpace: true,
+    container: 'group' as const,
+    hasTransformedAncestor: false,
+    hasSceneAncestor: false,
+    rotation: 0,
+    flipH: false,
+    flipV: false,
+  };
+
+  it('builds the native-backed perspective-left plan inside coordinate-only ancestor groups', () => {
+    const plan = buildStaticGroup3DPlan(
+      parseShape3D(perspectiveLeftPictureGroupScene, ''),
+      target,
+      createMockRenderContext({
+        presentation: { ...createMockRenderContext().presentation, width: 1280 },
+      }),
+    );
+
+    expect(plan).toMatchObject({
+      mode: 'camera-projected-group-plane',
+      surface: 'group',
+      geometry: 'rect',
+      camera: {
+        kind: 'perspective',
+        preset: 'perspectiveLeft',
+        rotation: { latitude: 0, longitude: 25, revolution: 0 },
+        fieldOfView: 95,
+      },
+      lighting: { color: '#FFFFFF', opacity: 0.02 },
+    });
+    if (plan.mode !== 'camera-projected-group-plane') throw new Error('expected group plan');
+    expect(plan.corners[0].x).toBeGreaterThan(10);
+    expect(plan.corners[1].x).toBeGreaterThan(180);
+    expect(plan.lighting.brightness).toBeCloseTo(1.0402, 3);
+  });
+
+  it('uses native aspect anchors for whole-group picture lighting', () => {
+    const properties = parseShape3D(perspectiveLeftPictureGroupScene, '');
+    const context = createMockRenderContext();
+    const brightness = [
+      buildStaticGroup3DPlan(properties, { ...target, width: 307.2, height: 518.4 }, context),
+      buildStaticGroup3DPlan(properties, { ...target, width: 403.2, height: 403.2 }, context),
+      buildStaticGroup3DPlan(properties, { ...target, width: 768, height: 307.2 }, context),
+    ].map((plan) =>
+      plan.mode === 'camera-projected-group-plane' ? plan.lighting.brightness : NaN,
+    );
+
+    expect(brightness[0]).toBeGreaterThan(brightness[1]);
+    expect(brightness[1]).toBeGreaterThan(brightness[2]);
+    expect(brightness).toEqual([
+      expect.closeTo(1.089, 3),
+      expect.closeTo(1.0725, 4),
+      expect.closeTo(1.0436, 3),
+    ]);
+  });
+
+  it.each([
+    [
+      'camera-field-of-view',
+      perspectiveLeftPictureGroupScene.replace('5700000', '5760000'),
+      target,
+    ],
+    ['camera-rotation', perspectiveLeftPictureGroupScene.replace('1500000', '1440000'), target],
+    [
+      'parent-container',
+      perspectiveLeftPictureGroupScene,
+      { ...target, hasTransformedAncestor: true },
+    ],
+    ['parent-container', perspectiveLeftPictureGroupScene, { ...target, hasSceneAncestor: true }],
+    ['group-child-profile', perspectiveLeftPictureGroupScene, { ...target, childKinds: ['pic'] }],
+    [
+      'group-child-profile',
+      perspectiveLeftPictureGroupScene,
+      { ...target, hasSupportedPictureChildren: false },
+    ],
+    [
+      'group-child-profile',
+      perspectiveLeftPictureGroupScene,
+      { ...target, hasValidChildCoordinateSpace: false },
+    ],
+    [
+      'backdrop',
+      perspectiveLeftPictureGroupScene.replace('</a:scene3d>', '<a:backdrop/></a:scene3d>'),
+      target,
+    ],
+    [
+      'effect-list-conflict',
+      perspectiveLeftPictureGroupScene,
+      { ...target, hasGroupEffects: true },
+    ],
+    ['shape-transform', perspectiveLeftPictureGroupScene, { ...target, rotation: 1 }],
+  ])('keeps a diagnostic flat fallback for %s', (reason, scene, candidate) => {
+    const properties = parseShape3D(
+      scene,
+      '',
+      candidate.hasGroupEffects ? '<a:effectLst><a:outerShdw blurRad="12700"/></a:effectLst>' : '',
+    );
+    const { hasGroupEffects: _ignored, ...plannerTarget } = candidate;
+    expect(buildStaticGroup3DPlan(properties, plannerTarget, createMockRenderContext())).toEqual({
+      mode: 'flat',
+      reason,
+    });
+  });
+
+  it('applies the group homography once to a live child layer', () => {
+    const plan = buildStaticGroup3DPlan(
+      parseShape3D(perspectiveLeftPictureGroupScene, ''),
+      target,
+      createMockRenderContext(),
+    );
+    const layer = document.createElement('div');
+
+    expect(applyStaticGroup3DPlane(layer, plan)).toBe(true);
+    expect(layer.dataset.pptxShape3dProjectedGroupPlane).toBe('perspective');
+    expect(layer.style.transformOrigin).toBe('0px 0px');
+    expect(layer.style.transform).toMatch(/^matrix3d\(/);
+    expect(applyStaticGroup3DPlane(layer, plan)).toBe(false);
+  });
 });
 
 function installShape3DRasterMocks() {

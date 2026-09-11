@@ -1889,6 +1889,7 @@ def _build_shape3d_cases() -> list[CaseDef]:
         features: list[str],
         slide_count: int = 1,
         assertions: dict | None = None,
+        claim: str | None = None,
     ):
         nonlocal seq
         seq += 1
@@ -1900,6 +1901,8 @@ def _build_shape3d_cases() -> list[CaseDef]:
                 "features": features,
             },
         }
+        if claim is not None:
+            case["coverage"]["claim"] = claim
         if slide_count != 1:
             case["slide_count"] = slide_count
         if assertions is not None:
@@ -2878,6 +2881,121 @@ def _build_shape3d_cases() -> list[CaseDef]:
             "a:scene3d.lightRig=threePt:t",
             "a:sp3d=absent",
             "effects=absent",
+        ],
+    )
+
+    def _apply_flat_group3d_scene(group) -> None:
+        group_properties = group._element.grpSpPr
+        _remove_children(group_properties, ("scene3d", "sp3d"))
+        scene3d = etree.Element(qn("a:scene3d"))
+        camera = etree.SubElement(
+            scene3d,
+            qn("a:camera"),
+            prst="perspectiveLeft",
+            fov="5700000",
+        )
+        etree.SubElement(camera, qn("a:rot"), lat="0", lon="1500000", rev="0")
+        etree.SubElement(scene3d, qn("a:lightRig"), rig="threePt", dir="t")
+        _insert_before_ext_lst(group_properties, scene3d)
+
+    def _add_two_picture_group(
+        shape_collection,
+        *,
+        left: float,
+        top: float,
+        width: float,
+        height: float,
+        apply_scene: bool,
+        source_crop: dict[str, float] | None = None,
+    ):
+        group = shape_collection.add_group_shape()
+        first = group.shapes.add_picture(
+            _shape3d_fixture_image(),
+            _emu(0),
+            _emu(0),
+            _emu(4.0),
+            _emu(1.2),
+        )
+        first.name = "Group camera picture upper"
+        second = group.shapes.add_picture(
+            _shape3d_fixture_image(),
+            _emu(0),
+            _emu(1.2),
+            _emu(4.0),
+            _emu(1.2),
+        )
+        second.name = "Group camera picture lower"
+        if source_crop is not None:
+            for picture in (first, second):
+                for edge, value in source_crop.items():
+                    setattr(picture, f"crop_{edge}", value)
+        group.left = _emu(left)
+        group.top = _emu(top)
+        group.width = _emu(width)
+        group.height = _emu(height)
+        if apply_scene:
+            _apply_flat_group3d_scene(group)
+        return group
+
+    def _build_perspective_left_picture_group_matrix(prs) -> None:
+        for width, height, nested in (
+            (4.2, 4.2, False),
+            (8.0, 3.2, False),
+            (3.2, 5.4, False),
+            (5.0, 2.0, True),
+        ):
+            for apply_scene in (True, False):
+                slide = prs.slides.add_slide(prs.slide_layouts[6])
+                if nested:
+                    outer = slide.shapes.add_group_shape()
+                    _add_two_picture_group(
+                        outer.shapes,
+                        left=0.4,
+                        top=0.3,
+                        width=width,
+                        height=height,
+                        apply_scene=apply_scene,
+                        source_crop={
+                            "left": 0.01075,
+                            "top": 0.41240,
+                            "right": 0.01135,
+                            "bottom": 0.41024,
+                        },
+                    )
+                    outer.left = _emu((13.333 - width) / 2)
+                    outer.top = _emu((7.5 - height) / 2)
+                else:
+                    _add_two_picture_group(
+                        slide.shapes,
+                        left=(13.333 - width) / 2,
+                        top=(7.5 - height) / 2,
+                        width=width,
+                        height=height,
+                        apply_scene=apply_scene,
+                    )
+
+    _add(
+        "perspective-left-picture-group-matrix",
+        _build_perspective_left_picture_group_matrix,
+        slide_count=8,
+        claim="native-verified-bounded-picture-group-camera-plane",
+        assertions={
+            "inverseSlideIndices": [1, 3, 5, 7],
+            "positiveGroupCameraSlideIndices": [0, 2, 4, 6],
+        },
+        features=[
+            "p:grpSp/p:grpSpPr/a:scene3d",
+            "children=twoDirectStretchPngPictures",
+            "pictureSourceCrop=absent|realCorpusAsymmetric",
+            "geometry.aspect=square|wide|tall",
+            "semantics=positive|sceneAbsentInverse",
+            "container=standalone|coordinateOnlyAncestor",
+            "a:scene3d.camera=perspectiveLeft",
+            "a:scene3d.camera.rot=0,1500000,0",
+            "a:scene3d.camera.fov=5700000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d=absent",
+            "targetGroup.effects=absent",
         ],
     )
 

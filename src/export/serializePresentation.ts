@@ -201,6 +201,7 @@ function serializeNode(
     }
     case 'group': {
       const g = node as GroupNodeData;
+      base.shape3d = serializeShape3D(g.shape3d);
       const children: SerializedNode[] = [];
       for (const childXml of g.children) {
         try {

@@ -659,7 +659,7 @@ appearance still requires review and is outside this promoted shape-surface lane
 
 ### Static DrawingML 3D — Bounded Top Bevel, Camera Plane, and Bottom Front Material
 
-The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes and pictures and preserves the
+The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes, pictures, and groups and preserves the
 parsed observations in serialized model output. A native-oracle-backed static subset renders an
 orthographic circular top bevel and optional contour with silhouette-aware lighting:
 
@@ -713,11 +713,14 @@ rendering is unavailable, the vector fallback remains visible. Text stays outsid
 overlay, picture outlines remain centered on the source bounds, and group transforms retain the
 existing coordinate mapping.
 
-The separate camera-plane lane has four bounded zero-depth modalities. Preset solid rectangles
+The separate camera-plane lane has four native-verified zero-depth leaf modalities and one
+native-verified whole-group modality. Preset solid rectangles
 become SVG quadrilaterals. One standalone multi-contour custom-path family is projected directly as
 SVG. No-fill text planes and stretch-filled pictures retain their live DOM content and
 receive a CSS `matrix3d` homography, so text remains selectable and picture crop stays in the normal
-image pipeline. The solid matrix contains
+image pipeline. The group path lays out two direct live picture children first and then applies one
+homography to their shared child layer, preserving child composition and source crop.
+The solid matrix contains
 `orthographicFront` with absent rotation, `orthographicFront` with exactly `lat=20°`, `lon=30°`,
 `rev=0°`, and `perspectiveRelaxedModerately` with `fov=120°` and exactly
 `lat=18590633/60000°`, `lon=0°`, `rev=0°`. The live-text rows are
@@ -725,11 +728,12 @@ image pipeline. The solid matrix contains
 `lon=19532225/60000°`, `rev=0°`, plus `perspectiveLeft` with `fov=120°`, absent explicit
 rotation, and the preset's implicit `lat=0°`, `lon=20°`, `rev=0°`. The picture row uses
 `perspectiveRight` with `fov=95°`, absent explicit rotation, and implicit `lat=0°`, `lon=-20°`,
-`rev=0°`. All rows use an unrotated `threePt:t` light.
+`rev=0°`. The group row uses `perspectiveLeft` with `fov=95°` and explicit
+`lat=0°`, `lon=25°`, `rev=0°`. All rows use an unrotated `threePt:t` light.
 
-Twenty-five native slides cover the original six explicit-`a:sp3d` solid controls, scene-only solid,
+Nineteen native slides cover the original six explicit-`a:sp3d` solid controls, scene-only solid,
 two live-text square/wide/tall matrices, and a four-slide picture matrix spanning absent,
-horizontal, vertical, and asymmetric source crops. Six additional rows cross the bounded custom
+horizontal, vertical, and asymmetric source crops. Six additional native rows cross the bounded custom
 silhouette over square/wide/tall physical bounds with explicit `#2F75B5` and `#FFFFFF` paint. That
 custom lane requires one `1000×1000` path, an identity text rectangle, present but empty guide and
 handle lists, at least two closed contours made only from numeric `moveTo`, `lnTo`, `cubicBezTo`,
@@ -742,7 +746,7 @@ The contrasting-right row requires `anchor="ctr"`; the perspective-left row requ
 be absent so Office's top default applies. Vertical text and independent text bounds remain outside
 this lane. Picture rows require rectangular `a:stretch` without `a:fillRect`, style references,
 visible outlines, picture background fills, or direct blip effects; source crops must be finite,
-nonnegative, and leave positive visible width and height. All four modalities exclude local
+nonnegative, and leave positive visible width and height. The four promoted leaf modalities exclude local
 rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion color,
 material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
 its resolved `outerShdw` is applied to the visible projected polygon with a filter region covering
@@ -750,6 +754,16 @@ the projected four-corner bounds. Blur and distance follow the plane's measured 
 projection scale; orthographic rows apply their native-calibrated `0.95` footprint factor. The
 camera-local gate requires at least `0.70` of measurable native shadow energy. Live-text rows omit
 the entire shape style.
+
+The eight-slide native group matrix crosses square, wide, tall, and a nested real-corpus-like
+source-crop row against scene-absent inverses. The target group must have explicit positive `a:ext` and
+`a:chExt`, exactly two direct embedded PNG pictures using rectangular stretch fill, optional finite
+nonnegative source crops, no target `a:sp3d` or effects, and no rotated, flipped, or 3D-scene
+ancestor. Coordinate-only ancestor groups are accepted. Its bounded `threePt:t` response applies a
+continuous log-aspect brightness correction plus a low-alpha white lighting layer. Native PowerPoint
+rasters, manual review, full-page regression, and crop-sensitive local metrics promote this exact
+group tuple. Reflected ancestors remain a separate diagnostic composition case; group reflection now
+clones the completed child subtree but is outside this verified group-camera lane.
 
 The separate bottom-bevel front-material lane covers a native-verified edge-on case without
 inventing depth. It requires a standalone, non-placeholder `rect` with an explicit opaque
@@ -771,11 +785,13 @@ PowerPoint evidence. Custom cubics become rational under projective mapping, so 
 lane adaptively flattens them in projected screen space with at most `0.25px` error while preserving
 closed contours and even-odd fill. A dedicated gate compares normalized four-corner geometry, three material
 color bands, gradient range, gradient direction, and source-required external shadow energy and
-direction for solid planes. Schema v6 keeps raw foreground IoU and bounds for live-text diagnosis,
+direction for solid planes. Schema v7 keeps raw foreground IoU and bounds for live-text diagnosis,
 then gates on bidirectional foreground F1 and bounds after a resolution-normalized `0.25%` raster
 tolerance, plus grayscale ink-density retention. It inverse-projects picture planes to a fixed
 rectangle and gates their content with color similarity and tolerant edge F1, so a correct outer
-quadrilateral cannot hide a wrong crop. The tolerance absorbs font and image rasterization
+quadrilateral cannot hide a wrong crop. The `picture-group` modality applies the same
+corner, rectified-color, edge, and crop-mutation checks to the composed group surface. Schema v6
+reports remain accepted for the already verified modalities. The tolerance absorbs font and image rasterization
 differences while preserving semantic failures against the same hashed native rasters.
 Custom-path rows require tolerant foreground F1 `0.95`, bounds score `0.98`, foreground area ratio
 `0.90`, centroid score `0.99`, and color score `0.98`.
@@ -791,8 +807,8 @@ failure modes.
 This support does not include camera values outside that exact plane matrix, nonzero extrusion,
 arbitrary light rotation, other bevel presets, tiled pictures, negative or degenerate source crops,
 custom geometry outside the exact numeric path profile or verified bounds,
-gradient/pattern/group/image-filled shapes, other text-body/style combinations, or pixel-identical
-PowerPoint material simulation.
+gradient/pattern/group/image-filled leaf shapes, arbitrary group scenes or child mixtures, other
+text-body/style combinations, or pixel-identical PowerPoint material simulation.
 Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
 claim remains limited to native-verified `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular
 pictures. Star, freeform, rotation, and glow probes stay in an opt-in ignored discovery matrix until
@@ -977,17 +993,18 @@ Dev pages at `http://127.0.0.1:5173`:
 Ordinary-shape outer shadows outside the bounded direct-effect matrix above retain the existing
 SVG/CSS approximation. This includes other parameter values, text-bearing or stroked shapes, custom
 geometry, nonuniform or nested group scale, skew, rotated/flipped shape or ancestor coordinates,
-3D, effect DAGs, and compound effect lists. DrawingML shape/picture 3D
+3D, effect DAGs, and compound effect lists.
 Ordinary-shape reflections outside their six declared positive rows retain the explicit cloned-layer
 approximation. Live text without a visible shape surface, pictures, group-level reflection effects,
 other alignment/direction/fade/scale/skew tuples, nested or nonuniform groups, rotation/flip, 3D,
-effect DAGs, and compound effect lists remain outside the verified reflection scope. DrawingML shape/picture 3D
-outside the bounded circular top-bevel, zero-depth camera-plane, and
+effect DAGs, and compound effect lists remain outside the verified reflection scope.
+DrawingML shape/picture 3D outside the bounded circular top-bevel, zero-depth camera-plane, and
 edge-on bottom-bevel front-material tuples above retains the flat 2D fallback. This includes other
 perspective or rotated cameras, nonzero extrusion, other bottom or non-circular bevels, other preset
 materials, unsupported lighting, tiled pictures,
 custom geometry outside the exact camera-path profile, and unsupported paint, text, stroke,
-transform, or effect combinations. True 3D chart
+transform, or effect combinations. Group scenes outside the exact native-verified two-picture tuple
+above remain flat. True 3D chart
 perspective/depth/surface meshes, Office 2017 embedded 3D
 models, animations/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing
 embedded OLE objects, and slide notes rendering are outside the verified native scope. Available OLE

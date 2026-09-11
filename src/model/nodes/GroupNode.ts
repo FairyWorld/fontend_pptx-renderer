@@ -5,9 +5,12 @@
 import { SafeXmlNode } from '../../parser/XmlParser';
 import { BaseNodeData, Position, Size, parseBaseProps } from './BaseNode';
 import { emuToPx } from '../../parser/units';
+import { parseShape3DProperties, type Shape3DProperties } from './Shape3D';
 
 export interface GroupNodeData extends BaseNodeData {
   nodeType: 'group';
+  /** Group-level DrawingML scene retained for bounded whole-group camera projection. */
+  shape3d?: Shape3DProperties;
   /** Layout identity resolved through a diagram frame's layout relationship. */
   diagramLayoutId?: string;
   childOffset: Position;
@@ -57,6 +60,7 @@ export function parseGroupNode(grpNode: SafeXmlNode): GroupNodeData {
   return {
     ...base,
     nodeType: 'group',
+    shape3d: parseShape3DProperties(grpSpPr),
     childOffset,
     childExtent,
     children,

@@ -867,6 +867,7 @@ def test_static_shape3d_matrix_is_registered():
         "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
         "oracle-pypptx-shape3d-0018-donut-shadow-interpolation-matrix",
         "oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix",
+        "oracle-pypptx-shape3d-0020-perspective-left-picture-group-matrix",
     }
 
 
@@ -900,6 +901,7 @@ def test_static_shape3d_matrix_serializes_bounded_ooxml(tmp_path: Path):
         "oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix",
         "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
         "oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix",
+        "oracle-pypptx-shape3d-0020-perspective-left-picture-group-matrix",
     }
     for name in positive_names:
         root = roots[name]
@@ -1666,6 +1668,115 @@ def test_static_shape3d_perspective_custom_geometry_matrix_crosses_aspect_and_fi
             "a:scene3d.lightRig=threePt:t",
             "a:sp3d=absent",
             "effects=absent",
+        ],
+    }
+
+
+def test_static_shape3d_picture_group_matrix_serializes_exact_scene_inverse_and_parent_rows(
+    tmp_path: Path,
+):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"]
+        == "oracle-pypptx-shape3d-0020-perspective-left-picture-group-matrix"
+    )
+    assert case["slide_count"] == 8
+
+    pptx_path = tmp_path / "source.pptx"
+    generator._generate_pptx(case, pptx_path)
+    with ZipFile(pptx_path) as zf:
+        roots = [
+            etree.fromstring(zf.read(f"ppt/slides/slide{index}.xml"))
+            for index in range(1, 9)
+        ]
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    positive_indices = {0, 2, 4, 6}
+    for index, root in enumerate(roots):
+        scene_groups = root.xpath(".//p:grpSp[p:grpSpPr/a:scene3d]", namespaces=ns)
+        if index in positive_indices:
+            assert len(scene_groups) == 1
+            target = scene_groups[0]
+            assert len(target.xpath("./p:pic", namespaces=ns)) == 2
+            assert target.xpath(
+                "boolean(p:grpSpPr/a:scene3d/a:camera"
+                "[@prst='perspectiveLeft'][@fov='5700000']"
+                "/a:rot[@lat='0'][@lon='1500000'][@rev='0'])",
+                namespaces=ns,
+            )
+            assert target.xpath(
+                "boolean(p:grpSpPr/a:scene3d/a:lightRig[@rig='threePt'][@dir='t'])",
+                namespaces=ns,
+            )
+            assert not target.xpath(
+                "p:grpSpPr/a:sp3d | p:grpSpPr/a:effectLst | p:grpSpPr/a:effectDag",
+                namespaces=ns,
+            )
+        else:
+            assert not scene_groups
+
+    for index in (0, 1):
+        ext = roots[index].xpath(".//p:grpSp/p:grpSpPr/a:xfrm/a:ext", namespaces=ns)[0]
+        assert int(ext.get("cx")) == int(ext.get("cy"))
+    for index in (2, 3):
+        ext = roots[index].xpath(".//p:grpSp/p:grpSpPr/a:xfrm/a:ext", namespaces=ns)[0]
+        assert int(ext.get("cx")) * 2 == int(ext.get("cy")) * 5
+    for index in (4, 5):
+        ext = roots[index].xpath(".//p:grpSp/p:grpSpPr/a:xfrm/a:ext", namespaces=ns)[0]
+        assert int(ext.get("cx")) * 27 == int(ext.get("cy")) * 16
+
+    for index in (6, 7):
+        target = roots[index].xpath(".//p:grpSp[p:pic]", namespaces=ns)[0]
+        assert target.xpath("count(ancestor::p:grpSp) = 1", namespaces=ns)
+        assert not target.xpath(
+            "ancestor::p:grpSp/p:grpSpPr/a:effectLst | "
+            "ancestor::p:grpSp/p:grpSpPr/a:effectDag",
+            namespaces=ns,
+        )
+        source_crops = target.xpath("./p:pic/p:blipFill/a:srcRect", namespaces=ns)
+        assert len(source_crops) == 2
+        assert all(
+            crop.attrib == {
+                "l": "1075",
+                "t": "41240",
+                "r": "1135",
+                "b": "41024",
+            }
+            for crop in source_crops
+        )
+
+    for index in range(6):
+        assert not roots[index].xpath(".//p:pic/p:blipFill/a:srcRect", namespaces=ns)
+
+    payload = __import__("json").loads(
+        generator._write_case_json(case, tmp_path).read_text(encoding="utf-8")
+    )
+    assert len(payload["slides"]) == 8
+    assert payload["assertions"] == {
+        "inverseSlideIndices": [1, 3, 5, 7],
+        "positiveGroupCameraSlideIndices": [0, 2, 4, 6],
+    }
+    assert payload["coverage"] == {
+        "oracle": "native-powerpoint",
+        "claim": "native-verified-bounded-picture-group-camera-plane",
+        "features": [
+            "p:grpSp/p:grpSpPr/a:scene3d",
+            "children=twoDirectStretchPngPictures",
+            "pictureSourceCrop=absent|realCorpusAsymmetric",
+            "geometry.aspect=square|wide|tall",
+            "semantics=positive|sceneAbsentInverse",
+            "container=standalone|coordinateOnlyAncestor",
+            "a:scene3d.camera=perspectiveLeft",
+            "a:scene3d.camera.rot=0,1500000,0",
+            "a:scene3d.camera.fov=5700000",
+            "a:scene3d.lightRig=threePt:t",
+            "a:sp3d=absent",
+            "targetGroup.effects=absent",
         ],
     }
 

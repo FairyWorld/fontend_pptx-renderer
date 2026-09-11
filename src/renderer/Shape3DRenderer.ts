@@ -71,6 +71,8 @@ type StaticShape3DFallbackReason =
   | 'backdrop'
   | 'z-position'
   | 'extrusion-paint'
+  | 'group-child-profile'
+  | 'group-shape-format'
   | 'projection-out-of-range';
 
 interface StaticShape3DSourceCrop {
@@ -217,12 +219,163 @@ export interface StaticShape3DPictureCameraPlan {
   };
 }
 
+interface StaticGroup3DTarget {
+  width: number;
+  height: number;
+  /** Provenance is retained so nested, coordinate-only groups can be distinguished. */
+  container: 'standalone-slide' | 'group';
+  /** Rotated or flipped ancestors change the projection basis and remain outside this slice. */
+  hasTransformedAncestor?: boolean;
+  /** An ancestor scene would compound or partially omit camera semantics. */
+  hasSceneAncestor?: boolean;
+  rotation?: number;
+  flipH?: boolean;
+  flipV?: boolean;
+  /** Direct OOXML child element names, kept in document order. */
+  childKinds: readonly string[];
+  /** True only for the bounded embedded, stretched, rectangular picture profile. */
+  hasSupportedPictureChildren: boolean;
+  /** True only when explicit positive child extents define a stable group coordinate space. */
+  hasValidChildCoordinateSpace: boolean;
+}
+
+interface StaticGroup3DCameraPlan {
+  mode: 'camera-projected-group-plane';
+  surface: 'group';
+  geometry: 'rect';
+  bounds: { width: number; height: number };
+  corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint];
+  camera: {
+    kind: 'perspective';
+    preset: 'perspectiveLeft';
+    rotation: Shape3DRotation;
+    fieldOfView: number;
+  };
+  lighting: {
+    brightness: number;
+    color: '#FFFFFF';
+    opacity: 0.02;
+  };
+}
+
+type StaticGroup3DPlan = StaticShape3DFlatPlan | StaticGroup3DCameraPlan;
+
+function groupPictureLighting(width: number, height: number): StaticGroup3DCameraPlan['lighting'] {
+  const aspect = width / height;
+  // Native case 0020 pins a modest three-point-light material lift across tall, square, and wide
+  // group planes. Interpolating in log-aspect space keeps the response continuous for the nearby
+  // real-corpus aspect while clamping extrapolation outside the measured range.
+  const brightness = Math.max(1.04, Math.min(1.09, 1.0725 - Math.log(aspect) * 0.0315));
+  return {
+    brightness: Number(brightness.toFixed(4)),
+    color: '#FFFFFF',
+    opacity: 0.02,
+  };
+}
+
 export type StaticShape3DPlan =
   | StaticShape3DFlatPlan
   | StaticShape3DSupportedPlan
   | StaticShape3DCameraPlan
   | StaticShape3DTextCameraPlan
   | StaticShape3DPictureCameraPlan;
+
+/**
+ * Build the exact whole-group camera tuple found in the representative native `truescale` deck.
+ * All other group scene combinations remain flat with a diagnostic reason.
+ */
+export function buildStaticGroup3DPlan(
+  properties: Shape3DProperties | undefined,
+  target: StaticGroup3DTarget,
+  ctx: RenderContext,
+): StaticGroup3DPlan {
+  if (!properties) return flat('missing-properties');
+  if (properties.parseIssues.length > 0) return flat('parse-issue', properties.parseIssues);
+  if (
+    !Number.isFinite(target.width) ||
+    !Number.isFinite(target.height) ||
+    target.width <= 0 ||
+    target.height <= 0
+  ) {
+    return flat('invalid-bounds');
+  }
+  if ((target.rotation ?? 0) !== 0 || target.flipH || target.flipV) {
+    return flat('shape-transform');
+  }
+  if (target.hasTransformedAncestor || target.hasSceneAncestor) {
+    return flat('parent-container');
+  }
+  if (
+    target.childKinds.length !== 2 ||
+    target.childKinds.some((kind) => kind !== 'pic') ||
+    !target.hasSupportedPictureChildren ||
+    !target.hasValidChildCoordinateSpace
+  ) {
+    return flat('group-child-profile');
+  }
+  if (properties.effectKinds.length > 0) return flat('effect-list-conflict');
+  if (properties.shape) return flat('group-shape-format');
+
+  const scene = properties.scene;
+  if (!scene) return flat('missing-scene');
+  if (!scene.cameraPreset) return flat('missing-camera');
+  if (scene.hasBackdrop) return flat('backdrop');
+  if (scene.cameraPreset !== 'perspectiveLeft') return flat('camera-preset');
+  if (scene.fieldOfView === undefined || Math.abs(scene.fieldOfView - 95) > 1e-6) {
+    return flat('camera-field-of-view');
+  }
+  if (!rotationEquals(scene.cameraRotation, { latitude: 0, longitude: 25, revolution: 0 })) {
+    return flat('camera-rotation');
+  }
+  if (scene.cameraZoom !== undefined) return flat('camera-zoom');
+  if (!scene.lightRig) return flat('missing-light-rig');
+  if (scene.lightRig !== 'threePt') return flat('light-rig');
+  if (scene.lightDirection !== 't') return flat('light-direction');
+  if (scene.lightRotation) return flat('light-rotation');
+
+  const projection = projectFlatPlane({
+    kind: 'perspective',
+    width: target.width,
+    height: target.height,
+    presentationWidth: ctx.presentation.width,
+    rotation: scene.cameraRotation!,
+    fieldOfView: scene.fieldOfView,
+    presetViewportScale: PERSPECTIVE_LEFT_VIEWPORT_SCALE,
+  });
+  if (!projection) return flat('projection-out-of-range');
+  return {
+    mode: 'camera-projected-group-plane',
+    surface: 'group',
+    geometry: 'rect',
+    bounds: { width: target.width, height: target.height },
+    corners: projection.corners,
+    camera: {
+      kind: 'perspective',
+      preset: 'perspectiveLeft',
+      rotation: scene.cameraRotation!,
+      fieldOfView: scene.fieldOfView,
+    },
+    lighting: groupPictureLighting(target.width, target.height),
+  };
+}
+
+/** Apply one camera homography to the live group child layer. */
+export function applyStaticGroup3DPlane(
+  childLayer: HTMLElement,
+  plan: StaticGroup3DPlan | undefined,
+): boolean {
+  if (plan?.mode !== 'camera-projected-group-plane' || childLayer.style.transform) return false;
+  const transform = projectiveTransformToCssMatrix3d(
+    plan.bounds.width,
+    plan.bounds.height,
+    plan.corners,
+  );
+  if (!transform) return false;
+  childLayer.dataset.pptxShape3dProjectedGroupPlane = plan.camera.kind;
+  childLayer.style.transformOrigin = '0px 0px';
+  childLayer.style.transform = transform;
+  return true;
+}
 
 /** Apply the supported camera homography to live text without rasterizing its DOM content. */
 export function applyStaticShape3DTextPlane(

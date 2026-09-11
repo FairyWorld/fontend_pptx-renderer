@@ -331,6 +331,13 @@ def test_tracked_capability_contract_is_valid():
 
     validate_acceptance_history(registry, history)
     assert len(registry.capabilities) == 17
+    camera_plane = registry.by_id()["drawingml.shape.3d.camera-projected-plane"]
+    scene_selector = next(
+        selector for selector in camera_plane.selectors if selector.local_name == "scene3d"
+    )
+    assert scene_selector.parent_local_names == ("spPr", "grpSpPr")
+    assert camera_plane.scope["nodeKinds"] == ("shape", "picture", "group")
+    assert "camera-local" in camera_plane.required_gates
     outer_shadow = registry.by_id()["drawingml.shape.effect.outer-shadow"]
     assert outer_shadow.render_mode == "native"
     assert "shadow-local" in outer_shadow.required_gates

@@ -14,12 +14,14 @@ from scripts.shape3d_camera_metrics import (
     compute_bottom_bevel_front_metrics,
     compute_camera_plane_metrics,
     compute_custom_geometry_camera_metrics,
+    compute_group_picture_camera_metrics,
     compute_picture_camera_metrics,
     compute_text_camera_metrics,
     extract_camera_shadow_slide_indices,
     extract_camera_slide_indices,
     extract_bottom_bevel_front_slide_indices,
     extract_custom_geometry_camera_slide_indices,
+    extract_group_picture_camera_slide_indices,
     extract_picture_camera_slide_indices,
     extract_text_camera_slide_indices,
 )
@@ -634,6 +636,170 @@ def test_extracts_only_exact_perspective_right_picture_plane_tuple(tmp_path):
             archive.writestr(f"ppt/slides/slide{index}.xml", negative)
 
     assert extract_picture_camera_slide_indices(source) == {0}
+
+
+def test_extracts_only_bounded_perspective_left_picture_groups(tmp_path):
+    source = tmp_path / "camera-picture-group.pptx"
+    picture = """
+      <p:pic><p:nvPicPr><p:cNvPr id="2" name="Picture"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+        <p:blipFill><a:blip r:embed="rId2"/><a:srcRect l="1000" t="40000" r="1000" b="40000"/>
+          <a:stretch><a:fillRect/></a:stretch></p:blipFill>
+        <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1000" cy="500"/></a:xfrm>
+          <a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>"""
+    scene = """
+      <a:scene3d><a:camera prst="perspectiveLeft" fov="5700000">
+        <a:rot lat="0" lon="1500000" rev="0"/></a:camera>
+        <a:lightRig rig="threePt" dir="t"/></a:scene3d>"""
+
+    def group(scene_xml=scene, first_picture=picture):
+        return f"""
+          <p:grpSp><p:nvGrpSpPr><p:cNvPr id="1" name="Group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+            <p:grpSpPr><a:xfrm><a:off x="100" y="100"/><a:ext cx="2000" cy="1000"/>
+              <a:chOff x="0" y="0"/><a:chExt cx="2000" cy="1000"/></a:xfrm>{scene_xml}</p:grpSpPr>
+            {first_picture}{picture.replace('id="2"', 'id="3"')}</p:grpSp>"""
+
+    def slide(content):
+        return f"""
+          <p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <p:cSld><p:spTree>{content}</p:spTree></p:cSld></p:sld>"""
+
+    nested = f"""
+      <p:grpSp><p:nvGrpSpPr/><p:grpSpPr><a:xfrm><a:off x="100" y="100"/>
+        <a:ext cx="4000" cy="2000"/><a:chOff x="0" y="0"/><a:chExt cx="4000" cy="2000"/>
+      </a:xfrm></p:grpSpPr>{group()}</p:grpSp>"""
+    rotated_parent = nested.replace('<p:grpSpPr><a:xfrm>', '<p:grpSpPr><a:xfrm rot="60000">', 1)
+    scene_parent = nested.replace(
+        "</a:xfrm></p:grpSpPr>", f"</a:xfrm>{scene}</p:grpSpPr>", 1
+    )
+    effect_parent = nested.replace(
+        "</a:xfrm></p:grpSpPr>",
+        "</a:xfrm><a:effectLst><a:reflection/></a:effectLst></p:grpSpPr>",
+        1,
+    )
+    wrong_fov = group(scene.replace('fov="5700000"', 'fov="5760000"'))
+    blip_effect = group(first_picture=picture.replace('/><a:srcRect', '><a:alphaModFix amt="50000"/></a:blip><a:srcRect'))
+
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "ppt/presentation.xml",
+            '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldSz cx="10000" cy="6000"/></p:presentation>',
+        )
+        for index, content in enumerate(
+            (
+                group(),
+                wrong_fov,
+                blip_effect,
+                nested,
+                rotated_parent,
+                scene_parent,
+                effect_parent,
+            ),
+            start=1,
+        ):
+            archive.writestr(f"ppt/slides/slide{index}.xml", slide(content))
+
+    assert extract_group_picture_camera_slide_indices(source) == {0, 3}
+
+
+def test_group_picture_metric_uses_the_union_of_split_picture_foreground():
+    reference = _picture_plane_specimen(
+        600,
+        360,
+        ((0.16, 0.20), (0.84, 0.14), (0.84, 0.86), (0.16, 0.80)),
+    )
+    reference[:, 270:330] = 255
+
+    matching = compute_group_picture_camera_metrics(reference, reference.copy())
+    missing_right = reference.copy()
+    missing_right[:, 330:] = 255
+    regressed = compute_group_picture_camera_metrics(reference, missing_right)
+
+    assert matching["passed"] is True
+    assert regressed["passed"] is False
+    assert regressed["cornerScore"] < 0.98
+
+
+def test_camera_report_routes_group_picture_scene_to_picture_group_modality(tmp_path):
+    repo = tmp_path / "repo"
+    case_id = "camera-picture-group"
+    source = repo / f"test/e2e/testdata/cases/{case_id}/source.pptx"
+    source.parent.mkdir(parents=True)
+    with ZipFile(source, "w", ZIP_DEFLATED) as archive:
+        archive.writestr(
+            "ppt/presentation.xml",
+            '<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sldSz cx="10000" cy="6000"/></p:presentation>',
+        )
+        archive.writestr(
+            "ppt/slides/slide1.xml",
+            '''<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+              <p:cSld><p:spTree><p:grpSp><p:nvGrpSpPr/><p:grpSpPr><a:xfrm>
+                <a:off x="100" y="100"/><a:ext cx="2000" cy="1000"/>
+                <a:chOff x="0" y="0"/><a:chExt cx="2000" cy="1000"/></a:xfrm>
+                <a:scene3d><a:camera prst="perspectiveLeft" fov="5700000">
+                  <a:rot lat="0" lon="1500000" rev="0"/></a:camera>
+                  <a:lightRig rig="threePt" dir="t"/></a:scene3d></p:grpSpPr>
+                <p:pic><p:nvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/>
+                  <a:stretch/></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="0"/>
+                  <a:ext cx="2000" cy="500"/></a:xfrm></p:spPr></p:pic>
+                <p:pic><p:nvPicPr><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/>
+                  <a:stretch/></p:blipFill><p:spPr><a:xfrm><a:off x="0" y="500"/>
+                  <a:ext cx="2000" cy="500"/></a:xfrm></p:spPr></p:pic>
+              </p:grpSp></p:spTree></p:cSld></p:sld>''',
+        )
+    image = _picture_plane_specimen(
+        600,
+        360,
+        ((0.34, 0.22), (0.67, 0.27), (0.67, 0.78), (0.34, 0.83)),
+    )
+    reports_dir = repo / "test/e2e/reports"
+    reports_dir.mkdir(parents=True)
+    reference_path = reports_dir / f"{case_id}_slide0_pdf.png"
+    candidate_path = reports_dir / f"{case_id}_slide0_html.png"
+    Image.fromarray(image).save(reference_path)
+    Image.fromarray(image).save(candidate_path)
+
+    def artifact(path):
+        return {
+            "path": path.relative_to(repo).as_posix(),
+            "sizeBytes": path.stat().st_size,
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+
+    native = {
+        "testFile": case_id,
+        "provenance": {
+            "renderer": {"revision": "a" * 40, "dirty": False},
+            "inputs": {
+                "sourcePptx": {
+                    "path": source.relative_to(repo).as_posix(),
+                    "sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                },
+                "groundTruth": {"combinedSha256": "f" * 64},
+            },
+        },
+        "perSlide": [
+            {
+                "slideIdx": 0,
+                "hidden": False,
+                "renderArtifacts": {
+                    "reference": artifact(reference_path),
+                    "candidate": artifact(candidate_path),
+                },
+            }
+        ],
+    }
+    native_path = repo / "native.json"
+    native_path.write_text(json.dumps(native), encoding="utf-8")
+
+    report = build_camera_report([native_path], repo, reports_dir)
+
+    assert report["schemaVersion"] == 7
+    assert report["passed"] is True
+    assert report["caseResults"][0]["slides"][0]["modality"] == "picture-group"
 
 
 def test_camera_report_binds_exact_native_rasters_and_rejects_hash_drift(tmp_path):

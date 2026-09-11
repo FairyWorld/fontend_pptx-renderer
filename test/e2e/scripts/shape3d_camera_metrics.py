@@ -770,6 +770,203 @@ def extract_picture_camera_slide_indices(source_pptx: Path) -> set[int]:
     return indices
 
 
+def _is_supported_group_picture_child(picture) -> bool:
+    if picture.find("p:style", NS) is not None:
+        return False
+    if picture.xpath("boolean(p:nvPicPr/p:nvPr/p:videoFile | p:nvPicPr/p:nvPr/p:audioFile)", namespaces=NS):
+        return False
+    blip_fill = picture.find("p:blipFill", NS)
+    shape_properties = picture.find("p:spPr", NS)
+    if blip_fill is None or shape_properties is None:
+        return False
+    blip = blip_fill.find("a:blip", NS)
+    stretch = blip_fill.find("a:stretch", NS)
+    if (
+        blip is None
+        or not blip.get(f"{{{R_NS}}}embed")
+        or len(blip) != 0
+        or stretch is None
+        or blip_fill.find("a:tile", NS) is not None
+        or not _supported_source_crop(blip_fill.find("a:srcRect", NS))
+    ):
+        return False
+    if len(stretch) > 1:
+        return False
+    if len(stretch) == 1 and (
+        etree.QName(stretch[0]).localname != "fillRect"
+        or len(stretch[0]) != 0
+        or len(stretch[0].attrib) != 0
+    ):
+        return False
+
+    transform = shape_properties.find("a:xfrm", NS)
+    extent = transform.find("a:ext", NS) if transform is not None else None
+    if transform is None or extent is None:
+        return False
+    try:
+        width = float(extent.get("cx", "nan"))
+        height = float(extent.get("cy", "nan"))
+    except ValueError:
+        return False
+    if (
+        not math.isfinite(width)
+        or not math.isfinite(height)
+        or width <= 0
+        or height <= 0
+        or any(
+            not _zero_or_absent(transform.get(name))
+            for name in ("rot", "flipH", "flipV")
+        )
+    ):
+        return False
+    geometry = shape_properties.find("a:prstGeom", NS)
+    if geometry is not None and (
+        geometry.get("prst") != "rect"
+        or len(geometry.findall("a:avLst/*", NS)) != 0
+    ):
+        return False
+    if shape_properties.xpath(
+        "boolean(a:custGeom | a:scene3d | a:sp3d | a:effectLst | a:effectDag | a:ln | "
+        "a:solidFill | a:gradFill | a:pattFill | a:blipFill | a:grpFill)",
+        namespaces=NS,
+    ):
+        return False
+    return True
+
+
+def _group_has_transform(group) -> bool:
+    transform = group.find("p:grpSpPr/a:xfrm", NS)
+    return bool(
+        transform is not None
+        and any(
+            not _zero_or_absent(transform.get(name))
+            for name in ("rot", "flipH", "flipV")
+        )
+    )
+
+
+def _is_supported_group_picture_camera(
+    group,
+    *,
+    ancestor_transformed: bool,
+    ancestor_has_scene: bool,
+    ancestor_has_effect: bool,
+) -> bool:
+    group_properties = group.find("p:grpSpPr", NS)
+    transform = group_properties.find("a:xfrm", NS) if group_properties is not None else None
+    if group_properties is None or transform is None:
+        return False
+    extent = transform.find("a:ext", NS)
+    child_extent = transform.find("a:chExt", NS)
+    if extent is None or child_extent is None:
+        return False
+    try:
+        dimensions = tuple(
+            float(value)
+            for value in (
+                extent.get("cx", "nan"),
+                extent.get("cy", "nan"),
+                child_extent.get("cx", "nan"),
+                child_extent.get("cy", "nan"),
+            )
+        )
+    except ValueError:
+        return False
+    if (
+        ancestor_transformed
+        or ancestor_has_scene
+        or ancestor_has_effect
+        or any(not math.isfinite(value) or value <= 0 for value in dimensions)
+        or _group_has_transform(group)
+        or group_properties.find("a:sp3d", NS) is not None
+        or group_properties.find("a:effectLst", NS) is not None
+        or group_properties.find("a:effectDag", NS) is not None
+    ):
+        return False
+    scene = group_properties.find("a:scene3d", NS)
+    if scene is None or scene.find("a:backdrop", NS) is not None:
+        return False
+    camera = scene.find("a:camera", NS)
+    light = scene.find("a:lightRig", NS)
+    if (
+        camera is None
+        or camera.get("prst") != "perspectiveLeft"
+        or camera.get("fov") != "5700000"
+        or camera.get("zoom") is not None
+        or not _rotation_matches(camera.find("a:rot", NS), (0, 1500000, 0))
+        or light is None
+        or light.get("rig") != "threePt"
+        or light.get("dir") != "t"
+        or light.find("a:rot", NS) is not None
+    ):
+        return False
+    children = [
+        child
+        for child in group
+        if etree.QName(child).localname in {"sp", "pic", "grpSp", "graphicFrame", "cxnSp"}
+    ]
+    return len(children) == 2 and all(
+        etree.QName(child).localname == "pic" and _is_supported_group_picture_child(child)
+        for child in children
+    )
+
+
+def _find_group_picture_camera_slides(
+    container,
+    *,
+    ancestor_transformed: bool,
+    ancestor_has_scene: bool,
+    ancestor_has_effect: bool,
+) -> bool:
+    for group in container.findall("p:grpSp", NS):
+        if _is_supported_group_picture_camera(
+            group,
+            ancestor_transformed=ancestor_transformed,
+            ancestor_has_scene=ancestor_has_scene,
+            ancestor_has_effect=ancestor_has_effect,
+        ):
+            return True
+        group_properties = group.find("p:grpSpPr", NS)
+        if _find_group_picture_camera_slides(
+            group,
+            ancestor_transformed=ancestor_transformed or _group_has_transform(group),
+            ancestor_has_scene=ancestor_has_scene
+            or bool(group_properties is not None and group_properties.find("a:scene3d", NS) is not None),
+            ancestor_has_effect=ancestor_has_effect
+            or bool(
+                group_properties is not None
+                and group_properties.xpath("boolean(a:effectLst | a:effectDag)", namespaces=NS)
+            ),
+        ):
+            return True
+    return False
+
+
+def extract_group_picture_camera_slide_indices(source_pptx: Path) -> set[int]:
+    """Return slides containing the bounded perspective-left two-picture group tuple."""
+    indices: set[int] = set()
+    with ZipFile(source_pptx) as archive:
+        slide_paths = sorted(
+            (
+                name
+                for name in archive.namelist()
+                if re.fullmatch(r"ppt/slides/slide\d+\.xml", name)
+            ),
+            key=_slide_number,
+        )
+        for slide_index, slide_path in enumerate(slide_paths):
+            slide = etree.fromstring(archive.read(slide_path))
+            shape_tree = slide.find("p:cSld/p:spTree", NS)
+            if shape_tree is not None and _find_group_picture_camera_slides(
+                shape_tree,
+                ancestor_transformed=False,
+                ancestor_has_scene=False,
+                ancestor_has_effect=False,
+            ):
+                indices.add(slide_index)
+    return indices
+
+
 def _foreground_mask(image: np.ndarray) -> np.ndarray:
     if image.ndim != 3 or image.shape[2] < 3:
         raise ValueError("camera metric requires an RGB image")
@@ -817,6 +1014,49 @@ def _ordered_normalized_corners(image: np.ndarray) -> tuple[np.ndarray, np.ndarr
     )
     if len({tuple(point) for point in ordered}) != 4:
         raise ValueError("camera plane corners are ambiguous")
+    return ordered, mask
+
+
+def _ordered_group_surface_corners(image: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Recover a group plane from all substantial picture fragments, not one contour.
+
+    A legal source crop can enlarge a white feature until it separates the two colored halves of
+    the target surface. Selecting only the largest contour then validates half a group. The group
+    modality instead joins every substantial foreground contour before building the outer hull.
+    """
+    mask = _foreground_mask(image)
+    contours, _ = cv2.findContours(
+        mask.astype(np.uint8) * 255,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
+    substantial = [contour for contour in contours if cv2.contourArea(contour) >= 64]
+    if not substantial:
+        raise ValueError("group camera plane foreground is below the resolution floor")
+    hull = cv2.convexHull(np.vstack(substantial))
+    perimeter = cv2.arcLength(hull, True)
+    polygon = None
+    for epsilon in (0.003, 0.005, 0.008, 0.012, 0.02):
+        candidate = cv2.approxPolyDP(hull, epsilon * perimeter, True).reshape(-1, 2)
+        if len(candidate) == 4:
+            polygon = candidate.astype(np.float64)
+            break
+    if polygon is None:
+        raise ValueError("group camera plane foreground is not a four-corner convex polygon")
+    polygon[:, 0] /= image.shape[1]
+    polygon[:, 1] /= image.shape[0]
+    sums = polygon.sum(axis=1)
+    differences = polygon[:, 0] - polygon[:, 1]
+    ordered = np.asarray(
+        [
+            polygon[np.argmin(sums)],
+            polygon[np.argmax(differences)],
+            polygon[np.argmax(sums)],
+            polygon[np.argmin(differences)],
+        ]
+    )
+    if len({tuple(point) for point in ordered}) != 4:
+        raise ValueError("group camera plane corners are ambiguous")
     return ordered, mask
 
 
@@ -1232,16 +1472,17 @@ def _picture_crop_sensitivity(
     }
 
 
-def compute_picture_camera_metrics(
+def _compute_picture_camera_metrics(
     reference: np.ndarray,
     candidate: np.ndarray,
     *,
     corner_score_threshold: float = PICTURE_CORNER_SCORE_THRESHOLD,
     rectified_color_score_threshold: float = PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
     rectified_edge_f1_threshold: float = PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
+    corner_extractor=_ordered_normalized_corners,
 ) -> dict[str, Any]:
-    reference_corners, _ = _ordered_normalized_corners(reference)
-    candidate_corners, _ = _ordered_normalized_corners(candidate)
+    reference_corners, _ = corner_extractor(reference)
+    candidate_corners, _ = corner_extractor(candidate)
     left, top = reference_corners.min(axis=0)
     right, bottom = reference_corners.max(axis=0)
     diagonal = math.hypot(right - left, bottom - top)
@@ -1301,6 +1542,41 @@ def compute_picture_camera_metrics(
         },
         "passed": passed,
     }
+
+
+def compute_picture_camera_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    corner_score_threshold: float = PICTURE_CORNER_SCORE_THRESHOLD,
+    rectified_color_score_threshold: float = PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
+    rectified_edge_f1_threshold: float = PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
+) -> dict[str, Any]:
+    return _compute_picture_camera_metrics(
+        reference,
+        candidate,
+        corner_score_threshold=corner_score_threshold,
+        rectified_color_score_threshold=rectified_color_score_threshold,
+        rectified_edge_f1_threshold=rectified_edge_f1_threshold,
+    )
+
+
+def compute_group_picture_camera_metrics(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    corner_score_threshold: float = PICTURE_CORNER_SCORE_THRESHOLD,
+    rectified_color_score_threshold: float = PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
+    rectified_edge_f1_threshold: float = PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
+) -> dict[str, Any]:
+    return _compute_picture_camera_metrics(
+        reference,
+        candidate,
+        corner_score_threshold=corner_score_threshold,
+        rectified_color_score_threshold=rectified_color_score_threshold,
+        rectified_edge_f1_threshold=rectified_edge_f1_threshold,
+        corner_extractor=_ordered_group_surface_corners,
+    )
 
 
 def compute_text_camera_metrics(
@@ -1719,12 +1995,14 @@ def build_camera_report(
         shadow_slides = extract_camera_shadow_slide_indices(source_path)
         text_slides = extract_text_camera_slide_indices(source_path)
         picture_slides = extract_picture_camera_slide_indices(source_path)
+        group_picture_slides = extract_group_picture_camera_slide_indices(source_path)
         custom_slides = extract_custom_geometry_camera_slide_indices(source_path)
         applicable_slides = (
             plane_slides
             | bottom_front_slides
             | text_slides
             | picture_slides
+            | group_picture_slides
             | custom_slides
         )
         slide_results: list[dict[str, Any]] = []
@@ -1780,6 +2058,9 @@ def build_camera_report(
             elif slide_index in text_slides:
                 modality = "text"
                 metrics = compute_text_camera_metrics(reference, candidate)
+            elif slide_index in group_picture_slides:
+                modality = "picture-group"
+                metrics = compute_group_picture_camera_metrics(reference, candidate)
             else:
                 modality = "picture"
                 metrics = compute_picture_camera_metrics(reference, candidate)
@@ -1811,7 +2092,7 @@ def build_camera_report(
         )
     applicable_count = sum(1 for case in cases if case["applicable"])
     return {
-        "schemaVersion": 6,
+        "schemaVersion": 7,
         "renderer": dict(renderer or {}),
         "thresholds": {
             "plane": {
@@ -1834,6 +2115,14 @@ def build_camera_report(
                 "inkCoverageRatio": TEXT_INK_COVERAGE_RATIO_THRESHOLD,
             },
             "picture": {
+                "cornerScore": PICTURE_CORNER_SCORE_THRESHOLD,
+                "rectifiedColorScore": PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
+                "rectifiedEdgeF1": PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,
+                "rectifiedSize": PICTURE_RECTIFIED_SIZE,
+                "edgeToleranceRatio": PICTURE_EDGE_TOLERANCE_RATIO,
+                "cropMutationRatio": PICTURE_CROP_MUTATION_RATIO,
+            },
+            "picture-group": {
                 "cornerScore": PICTURE_CORNER_SCORE_THRESHOLD,
                 "rectifiedColorScore": PICTURE_RECTIFIED_COLOR_SCORE_THRESHOLD,
                 "rectifiedEdgeF1": PICTURE_RECTIFIED_EDGE_F1_THRESHOLD,

@@ -16,6 +16,7 @@ import { createMockRenderContext } from '../helpers/mockContext';
 import type { GroupNodeData } from '../../../src/model/nodes/GroupNode';
 import type { TableNodeData } from '../../../src/model/nodes/TableNode';
 import type { RenderContext } from '../../../src/renderer/RenderContext';
+import { parseShape3DProperties, type Shape3DProperties } from '../../../src/model/nodes/Shape3D';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -44,6 +45,7 @@ function makeGroup(
     flipH?: boolean;
     flipV?: boolean;
     source?: SafeXmlNode;
+    shape3d?: Shape3DProperties;
   } = {},
 ): GroupNodeData {
   const w = opts.w ?? 200;
@@ -58,6 +60,7 @@ function makeGroup(
     flipH: opts.flipH ?? false,
     flipV: opts.flipV ?? false,
     source: opts.source ?? emptyXml,
+    shape3d: opts.shape3d,
     childOffset: { x: opts.childOffsetX ?? 0, y: opts.childOffsetY ?? 0 },
     childExtent: { w: opts.childExtentW ?? w, h: opts.childExtentH ?? h },
     children,
@@ -270,7 +273,7 @@ function makeCxnSpXml(id = '2'): SafeXmlNode {
 /**
  * A minimal picture (p:pic) XML child.
  */
-function makePicXml(id = '3'): SafeXmlNode {
+function makePicXml(id = '3', opts: { blipEffect?: boolean } = {}): SafeXmlNode {
   return xml(`
     <p:pic xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
            xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
@@ -281,7 +284,7 @@ function makePicXml(id = '3'): SafeXmlNode {
         <p:nvPr/>
       </p:nvPicPr>
       <p:blipFill>
-        <a:blip r:embed="rId1"/>
+        <a:blip r:embed="rId1">${opts.blipEffect ? '<a:alphaModFix amt="50000"/>' : ''}</a:blip>
         <a:stretch><a:fillRect/></a:stretch>
       </p:blipFill>
       <p:spPr>
@@ -569,6 +572,135 @@ function makeCtxWithDiagram(): RenderContext {
 // ---------------------------------------------------------------------------
 
 describe('renderGroup — wrapper element', () => {
+  it('projects a bounded two-picture group through one group-local camera layer', () => {
+    const groupSource = xml(`
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="1" name="G"/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/>
+            <a:chOff x="0" y="0"/><a:chExt cx="1905000" cy="952500"/>
+          </a:xfrm>
+          <a:scene3d>
+            <a:camera prst="perspectiveLeft" fov="5700000">
+              <a:rot lat="0" lon="1500000" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:grpSpPr>
+      </p:grpSp>
+    `);
+    const shape3d = parseShape3DProperties(groupSource.child('grpSpPr'));
+    const group = makeGroup([makePicXml('30'), makePicXml('31')], {
+      source: groupSource,
+      shape3d,
+      x: 40,
+      y: 50,
+      w: 200,
+      h: 100,
+    });
+
+    const el = renderGroup(
+      group,
+      createMockRenderContext({ groupDepth: 3, groupTransformHasRotationOrFlip: false }),
+      stubRenderNode,
+    );
+    const layer = el.querySelector<HTMLElement>('[data-pptx-shape3d-projected-group-plane]');
+
+    expect(el.style.left).toBe('40px');
+    expect(el.style.top).toBe('50px');
+    expect(el.style.transform).toBe('');
+    expect(el.children).toHaveLength(1);
+    const content = layer?.querySelector<HTMLElement>('[data-pptx-shape3d-group-content]');
+    const lighting = layer?.querySelector<HTMLElement>('[data-pptx-shape3d-group-lighting]');
+    expect(content?.children).toHaveLength(2);
+    expect(content?.style.filter).toMatch(/^brightness\(/);
+    expect(lighting?.style.backgroundColor).toBe('rgba(255, 255, 255, 0.02)');
+    expect(layer?.lastElementChild).toBe(lighting);
+    expect(layer?.style.transform).toMatch(/^matrix3d\(/);
+  });
+
+  it('leaves an unsupported group flat and exposes the fallback reason', () => {
+    const groupSource = xml(`
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="1" name="G"/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm/>
+          <a:scene3d>
+            <a:camera prst="perspectiveLeft" fov="5700000">
+              <a:rot lat="0" lon="1500000" rev="0"/>
+            </a:camera>
+            <a:lightRig rig="threePt" dir="t"/>
+          </a:scene3d>
+        </p:grpSpPr>
+      </p:grpSp>
+    `);
+    const group = makeGroup([makePicXml('30')], {
+      source: groupSource,
+      shape3d: parseShape3DProperties(groupSource.child('grpSpPr')),
+    });
+
+    const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
+
+    expect(el.dataset.pptxShape3dFallback).toBe('group-child-profile');
+    expect(el.querySelector('[data-pptx-shape3d-projected-group-plane]')).toBeNull();
+    expect(el.children).toHaveLength(1);
+  });
+
+  it('keeps a two-picture group flat when a child has an unverified blip effect', () => {
+    const groupSource = xml(`
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="1" name="G"/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/>
+            <a:chOff x="0" y="0"/><a:chExt cx="1905000" cy="952500"/>
+          </a:xfrm>
+          <a:scene3d><a:camera prst="perspectiveLeft" fov="5700000">
+            <a:rot lat="0" lon="1500000" rev="0"/>
+          </a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+        </p:grpSpPr>
+      </p:grpSp>
+    `);
+    const group = makeGroup([makePicXml('30', { blipEffect: true }), makePicXml('31')], {
+      source: groupSource,
+      shape3d: parseShape3DProperties(groupSource.child('grpSpPr')),
+    });
+
+    const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
+
+    expect(el.dataset.pptxShape3dFallback).toBe('group-child-profile');
+    expect(el.querySelector('[data-pptx-shape3d-projected-group-plane]')).toBeNull();
+  });
+
+  it('marks descendants when the current group declares a 3D scene', () => {
+    const groupSource = xml(`
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="1" name="G"/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr><a:xfrm/><a:scene3d>
+          <a:camera prst="perspectiveLeft" fov="5700000">
+            <a:rot lat="0" lon="1500000" rev="0"/>
+          </a:camera><a:lightRig rig="threePt" dir="t"/>
+        </a:scene3d></p:grpSpPr>
+      </p:grpSp>
+    `);
+    const group = makeGroup([makePicXml('30'), makePicXml('31')], {
+      source: groupSource,
+      shape3d: parseShape3DProperties(groupSource.child('grpSpPr')),
+    });
+    const observed: boolean[] = [];
+
+    renderGroup(group, createMockRenderContext(), (_node, childCtx) => {
+      observed.push(Boolean(childCtx.groupAncestorHas3dScene));
+      return document.createElement('div');
+    });
+
+    expect(observed).toEqual([true, true]);
+  });
+
   it('marks child render contexts as grouped for bounded renderer lanes', () => {
     const group = makeGroup([makeSpXml()]);
     let observedDepth: number | undefined;
@@ -793,6 +925,29 @@ describe('renderGroup — wrapper element', () => {
 // ---------------------------------------------------------------------------
 
 describe('renderGroup — group-level effects', () => {
+  it('builds a group reflection from the completed child subtree', () => {
+    const groupSource = xml(`
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <p:nvGrpSpPr><p:cNvPr id="1" name="G"/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm>
+            <a:off x="0" y="0"/><a:ext cx="914400" cy="914400"/>
+            <a:chOff x="0" y="0"/><a:chExt cx="914400" cy="914400"/>
+          </a:xfrm>
+          <a:effectLst><a:reflection/></a:effectLst>
+        </p:grpSpPr>
+      </p:grpSp>
+    `);
+    const group = makeGroup([makeSpXml('42')], { source: groupSource });
+
+    const el = renderGroup(group, createMockRenderContext(), stubRenderNode);
+    const reflectedSource = el.querySelector<HTMLElement>('[data-pptx-reflection-source="true"]');
+
+    expect(reflectedSource?.querySelector('[data-node-id="42"]')).toBeTruthy();
+    expect(el.querySelector(':scope > [data-node-id="42"]')).toBeTruthy();
+  });
+
   it('applies grpSpPr outerShdw to the group wrapper', () => {
     const groupSource = xml(`
       <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

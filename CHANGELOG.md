@@ -27,7 +27,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   reflection energy, spatial field, centroid, and an erasure mutation. A separate live-text row is
   retained as discovery evidence rather than broadening the promoted shape-surface scope.
 - Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes and pictures, with stable renderer fallback reasons, plus a nineteen-case, fifty-eight-slide
+  shapes, pictures, and groups, with stable renderer fallback reasons, plus a twenty-case, sixty-six-slide
   native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
   ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
   vertical and combined source crops, plus explicit- and implicit-depth camera planes, editable-text
@@ -36,7 +36,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   omitted/explicit default top-bevel dimensions. A six-slide custom-geometry matrix crosses one
   bounded multi-contour cubic silhouette over square/wide/tall bounds and blue/white paint for the
   exact `perspectiveRelaxedModerately` tuple. A nine-slide donut matrix independently crosses
-  intermediate `0.75|1.25|2.0` aspects with `10000|default25000|40000` adjustments.
+  intermediate `0.75|1.25|2.0` aspects with `10000|default25000|40000` adjustments. The twentieth
+  case adds a native-verified eight-slide `perspectiveLeft` two-picture group matrix with scene-absent
+  inverses, square/wide/tall bounds, and a nested real-corpus source-crop composition.
 - Added a schema-v8 bevel-ring fidelity metric and derived capability gate with independent dynamic
   range and shadow-amplitude floors, a `1.05` general directional shadow-overshoot ceiling, a
   native-backed `1.01` peak ceiling and `1.05` aggregate shadow-energy ceiling for solid donut
@@ -51,7 +53,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 - Grouped donuts now rasterize their circular bevel lighting in the child OOXML coordinate space
   before the non-identity group stretch. This removes the concentrated dark lobe seen on the tall
   adjustment row while leaving the independently verified grouped rect and ellipse paths unchanged.
-- Added a schema-v6 camera-plane metric and derived capability gate that bind native raster hashes
+- Added a schema-v7 camera-plane metric and derived capability gate that bind native raster hashes
   and verify normalized four-corner projection, material color, gradient range/direction, and
   source-required external shadow evidence for solid planes; resolution-tolerant foreground,
   projected bounds, and ink retention for live text; and rectified picture color/edge fidelity so
@@ -59,7 +61,9 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   bottom-bevel front-material tuple through three interior color bands and a restored-flat-fill
   mutation, plus bounded custom-path foreground, bounds, area, centroid, and color fidelity. The
   report erases each measurable shadow, injects a 12% picture crop, and vertically squashes custom
-  silhouettes to 20% height; promotion fails unless each corresponding local metric detects its fault.
+  silhouettes to 20% height; promotion fails unless each corresponding local metric detects its
+  fault. Schema v7 adds an independently source-derived `picture-group` modality while preserving
+  schema-v6 compatibility for existing evidence.
 - Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
   reasons so one private corpus file cannot prevent evidence collection for the remaining files.
 - Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
@@ -78,6 +82,13 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   hashes, renderer Git state, and the actual browser version.
 
 ### Changed
+
+- Added a bounded native-verified whole-group camera projection for the exact
+  `perspectiveLeft`/95-degree/two-picture tuple. It applies one homography to the completed live child
+  layer, rejects transformed or 3D-scene ancestors and unsupported child formats, and preserves
+  finite source crops. Group reflections now clone after child rendering so diagnostic reflected
+  groups contain their completed subtree. Native PowerPoint, manual, full-page regression, and
+  crop-sensitive local gates promote the exact tuple; reflection composition remains diagnostic.
 
 - Promote the bounded direct `a:outerShdw` lane for solid/simple-gradient `rect`, `roundRect`, and
   `ellipse` shapes. Verified 92% and 102% uniformly scaled shadows now use a separate SVG silhouette

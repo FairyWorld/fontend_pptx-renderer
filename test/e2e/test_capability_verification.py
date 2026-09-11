@@ -202,6 +202,7 @@ def camera_report(
     *,
     passed: bool = True,
     modality: str = "plane",
+    schema_version: int = 7,
 ) -> dict:
     case_id = case["testFile"]
     reports_dir = repo / "test/e2e/reports"
@@ -273,6 +274,8 @@ def camera_report(
         "bottom-material": bottom_material_thresholds,
         "custom-geometry": custom_geometry_thresholds,
     }
+    if schema_version >= 7:
+        thresholds["picture-group"] = picture_thresholds
     if modality == "plane":
         metrics = {
             "evaluable": True,
@@ -440,7 +443,7 @@ def camera_report(
             "passed": passed,
         }
     return {
-        "schemaVersion": 6,
+        "schemaVersion": schema_version,
         "renderer": dict(case["provenance"]["renderer"]),
         "thresholds": thresholds,
         "applicableCaseCount": 1,
@@ -1188,6 +1191,50 @@ def test_derives_camera_local_gate_from_live_picture_projection_evidence(tmp_pat
         baseline_reports=[baseline],
         passed_gates=("source", "structural", "unit", "browser", "docs"),
         camera_report=camera_report(current, repo, modality="picture"),
+    )
+
+    assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_derives_camera_local_gate_from_live_picture_group_projection_evidence(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-picture-group")
+    baseline = native_report("camera-picture-group", revision="b" * 40)
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        camera_report=camera_report(current, repo, modality="picture-group"),
+    )
+
+    assert verified["gates"]["camera-local"] == "passed"
+
+
+def test_camera_local_keeps_schema_v6_reports_backward_compatible(tmp_path: Path):
+    repo, base_capability = capability_fixture(tmp_path)
+    capability = replace(
+        base_capability,
+        required_gates=(*base_capability.required_gates, "camera-local"),
+    )
+    current = native_report("camera-plane-v6")
+    baseline = native_report("camera-plane-v6", revision="b" * 40)
+
+    verified = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+        camera_report=camera_report(current, repo, schema_version=6),
     )
 
     assert verified["gates"]["camera-local"] == "passed"

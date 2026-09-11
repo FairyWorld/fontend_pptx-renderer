@@ -1343,6 +1343,116 @@ test('perspective-right picture projection preserves live image crop and bounded
   expect(result.fillRectProjected).toBe(false);
 });
 
+test('perspective-left group projection keeps live picture children and completed reflections', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseGroupNode } = await import('/src/model/nodes/GroupNode.ts');
+    const { renderGroup } = await import('/src/renderer/GroupRenderer.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const picture = (id: number, top: number) => `
+      <p:pic>
+        <p:nvPicPr><p:cNvPr id="${id}" name="Picture ${id}"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr>
+        <p:blipFill><a:blip r:embed="rId${id}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>
+        <p:spPr><a:xfrm><a:off x="0" y="${top}"/><a:ext cx="1905000" cy="476250"/></a:xfrm></p:spPr>
+      </p:pic>`;
+    const groupXml = (fieldOfView: number) => `
+      <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+               xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+               xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+        <p:nvGrpSpPr><p:cNvPr id="10" name="Picture camera group"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+        <p:grpSpPr>
+          <a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/>
+            <a:chOff x="0" y="0"/><a:chExt cx="1905000" cy="952500"/>
+          </a:xfrm>
+          <a:scene3d><a:camera prst="perspectiveLeft" fov="${fieldOfView}">
+            <a:rot lat="0" lon="1500000" rev="0"/>
+          </a:camera><a:lightRig rig="threePt" dir="t"/></a:scene3d>
+        </p:grpSpPr>
+        ${picture(11, 0)}${picture(12, 476250)}
+      </p:grpSp>`;
+    const renderNode = (node: {
+      id: string;
+      position: { x: number; y: number };
+      size: { w: number; h: number };
+    }) => {
+      const element = document.createElement('div');
+      element.dataset.nodeId = node.id;
+      element.style.position = 'absolute';
+      element.style.left = `${node.position.x}px`;
+      element.style.top = `${node.position.y}px`;
+      element.style.width = `${node.size.w}px`;
+      element.style.height = `${node.size.h}px`;
+      element.style.background = node.id === '11' ? '#4472c4' : '#70ad47';
+      return element;
+    };
+    const basePresentation = createMockRenderContext().presentation;
+    const context = createMockRenderContext({
+      groupDepth: 3,
+      groupTransformHasRotationOrFlip: false,
+      presentation: { ...basePresentation, width: 1280, height: 720 },
+    });
+    const supported = renderGroup(parseGroupNode(parseXml(groupXml(5700000))), context, renderNode);
+    const inverse = renderGroup(parseGroupNode(parseXml(groupXml(5760000))), context, renderNode);
+    supported.id = 'group-camera-supported';
+    inverse.style.left = '500px';
+    document.body.append(supported, inverse);
+
+    const reflected = renderGroup(
+      parseGroupNode(
+        parseXml(`
+          <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+                   xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+            <p:nvGrpSpPr><p:cNvPr id="20" name="Reflective parent"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
+            <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/>
+              <a:chOff x="0" y="0"/><a:chExt cx="1905000" cy="952500"/>
+            </a:xfrm><a:effectLst><a:reflection/></a:effectLst></p:grpSpPr>
+            <p:sp><p:nvSpPr><p:cNvPr id="21" name="Child"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>
+              <p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="1905000" cy="952500"/></a:xfrm>
+                <a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+            </p:sp>
+          </p:grpSp>`),
+      ),
+      createMockRenderContext(),
+      renderNode,
+    );
+    document.body.append(reflected);
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+    const layer = supported.querySelector<HTMLElement>(
+      '[data-pptx-shape3d-projected-group-plane="perspective"]',
+    );
+    const content = layer?.querySelector<HTMLElement>('[data-pptx-shape3d-group-content]');
+    const bounds = layer?.getBoundingClientRect();
+    return {
+      transform: layer ? getComputedStyle(layer).transform : '',
+      liveChildCount: content?.children.length,
+      lighting: !!layer?.querySelector('[data-pptx-shape3d-group-lighting]'),
+      contentFilter: content ? getComputedStyle(content).filter : '',
+      bounds: bounds
+        ? { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+        : null,
+      inverseProjected: !!inverse.querySelector('[data-pptx-shape3d-projected-group-plane]'),
+      inverseFallback: inverse.dataset.pptxShape3dFallback,
+      reflectedChild: !!reflected.querySelector(
+        '[data-pptx-reflection-source="true"] [data-node-id="21"]',
+      ),
+    };
+  });
+
+  expect(result.transform).toMatch(/^matrix3d\(/);
+  expect(result.liveChildCount).toBe(2);
+  expect(result.lighting).toBe(true);
+  expect(result.contentFilter).toMatch(/^brightness\(/);
+  expect(result.bounds?.width).toBeGreaterThan(150);
+  expect(result.bounds?.height).toBeGreaterThan(90);
+  expect(result.inverseProjected).toBe(false);
+  expect(result.inverseFallback).toBe('camera-field-of-view');
+  expect(result.reflectedChild).toBe(true);
+});
+
 test('static 3D donut composes with its upper adjustment bound and a solid theme fill', async ({
   page,
 }) => {

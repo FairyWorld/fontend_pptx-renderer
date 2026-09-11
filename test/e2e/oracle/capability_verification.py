@@ -918,8 +918,9 @@ def _validate_camera_local(
     current_revision: str,
     repo: Path,
 ) -> None:
-    if report.get("schemaVersion") != 6:
-        raise CapabilityVerificationError("camera-local report requires schemaVersion=6")
+    schema_version = report.get("schemaVersion")
+    if schema_version not in {6, 7}:
+        raise CapabilityVerificationError("camera-local report requires schemaVersion=6 or 7")
     renderer = _mapping(report.get("renderer"), "camera-local renderer")
     if renderer.get("revision") != current_revision or renderer.get("dirty") is not False:
         raise CapabilityVerificationError(
@@ -968,6 +969,8 @@ def _validate_camera_local(
             "verticalSquashRatio": CAMERA_CUSTOM_VERTICAL_SQUASH_RATIO,
         },
     }
+    if schema_version >= 7:
+        expected_thresholds["picture-group"] = dict(expected_thresholds["picture"])
     thresholds = _mapping(report.get("thresholds"), "camera-local thresholds")
     if thresholds != expected_thresholds:
         raise CapabilityVerificationError("camera-local report uses unexpected thresholds")

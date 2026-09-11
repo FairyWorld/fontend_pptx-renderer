@@ -44,6 +44,8 @@ export interface RenderContext {
   groupChildScale?: { x: number; y: number };
   /** True when any ancestor group rotates or flips this node's rendered coordinate space. */
   groupTransformHasRotationOrFlip?: boolean;
+  /** True when an ancestor group declares a 3D scene, whether supported or kept flat. */
+  groupAncestorHas3dScene?: boolean;
   /** Connected root used for hidden text measurement while slide nodes are still detached. */
   measurementRoot?: HTMLElement;
   /** Template rendering skips placeholder descendants inside groups as well as top-level shapes. */
@@ -109,6 +111,7 @@ export function createRenderContext(
     colorCache: new Map(),
     nodeOrigin: 'slide',
     groupDepth: 0,
+    groupAncestorHas3dScene: false,
     usedEmbeddedFontFamilies: new Set(),
     pdfjs,
     signal,

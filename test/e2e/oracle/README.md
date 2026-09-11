@@ -197,7 +197,7 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 181 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 182 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
 - **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
@@ -214,7 +214,7 @@ ground-truth export. It defines 181 cases under `oracle/cases-pypptx/` with the
   across shape geometry, aspect, solid/gradient paint, blur, fade, distance, and the same group scale
 - **Text effects** (1 discovery case): live no-fill text reflection retained for comparison and
   future local-metric work; it is outside the verified ordinary-shape reflection capability
-- **Static DrawingML 3D** (19 cases, 58 slides): flat picture opt-out plus a bounded
+- **Static DrawingML 3D** (20 cases, 66 slides): flat picture opt-out plus a bounded
   `orthographicFront`/`twoPt:t|threePt:t`/circle-top-bevel matrix across picture, rect,
   roundRect, ellipse, contour, wide/tall, and grouped-shape contexts; the seventh case mirrors the
   `model-platform` picture tuple including light rotation, implicit defaults, outline, and outer
@@ -232,7 +232,10 @@ ground-truth export. It defines 181 cases under `oracle/cases-pypptx/` with the
   crosses donut aspect ratios `0.75`, `1.25`, and `2.0` with adjustments `10000`, default `25000`,
   and `40000` while holding paint, container, camera, light, and bevel constant; case 19 crosses
   one bounded multi-contour numeric line/cubic custom path over square/wide/tall physical bounds
-  with explicit blue/white paint and the exact `perspectiveRelaxedModerately` scene tuple
+  with explicit blue/white paint and the exact `perspectiveRelaxedModerately` scene tuple; case 20
+  adds an eight-slide native-verified `perspectiveLeft` two-picture group matrix across square/wide/tall,
+  a nested real-corpus asymmetric source crop under a coordinate-only ancestor, and
+  scene-absent inverses
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -279,7 +282,7 @@ matrix. The bottom-bevel rows isolate default encoding, material, light rotation
 transparent overlay composition plus an exact transparent flat control, a neighboring `circle`
 preset, and aspect ratio. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
-ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 177-case matrix.
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 182-case matrix.
 The current macOS PowerPoint oracle produces byte-identical native rasters for the implicit/explicit
 dimension pair, the explicit/omitted light-rotation pair, and the `relaxedInset`/`circle` pair. The
 opaque material opt-out is deliberately distinct. The exact standalone rectangle rows now back
@@ -335,8 +338,10 @@ or crop behind a correct outer plane. Bottom-front rows require normalized corne
 mean RGB band error no greater than `1.0`, and rejection of a restored source-flat-fill mutation.
 Custom-path rows require tolerant foreground F1 `0.95`, tolerant bounds score `0.98`,
 candidate/reference foreground area ratio `0.90`, centroid score `0.99`, and color score `0.98`.
-Pass the schema-v6 report to `run_capability_loop.py verify --camera-report ...`; callers cannot
-self-attest `camera-local`.
+Include case 0020 in the same command. The schema-v7 report adds a `picture-group` modality using the same
+corner, rectified-color, tolerant-edge, and crop-mutation checks as picture planes. Schema-v6 reports
+remain accepted for the previously verified modalities. Pass the report to
+`run_capability_loop.py verify --camera-report ...`; callers cannot self-attest `camera-local`.
 The same report erases every measurable candidate shadow and applies a 12% left crop plus rescale to
 each rectified picture. It also vertically squashes every custom-path candidate to 20% height. All
 matching mutations must be rejected by their target metric, so the gate also

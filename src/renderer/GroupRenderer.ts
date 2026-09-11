@@ -13,9 +13,103 @@ import { SafeXmlNode } from '../parser/XmlParser';
 import { hexToRgb } from '../utils/color';
 import { resolveColor } from './StyleResolver';
 import { applyReflectionEffect } from './ReflectionRenderer';
+import { applyStaticGroup3DPlane, buildStaticGroup3DPlan } from './Shape3DRenderer';
 
 function shouldPropagateGroupFlip(node: BaseNodeData): boolean {
   return node.nodeType !== 'table' && node.nodeType !== 'chart';
+}
+
+function numericAttributeIsZeroOrAbsent(node: SafeXmlNode, name: string): boolean {
+  const raw = node.attr(name);
+  if (raw === undefined) return true;
+  const value = Number(raw);
+  return Number.isFinite(value) && value === 0;
+}
+
+function hasSupportedSourceCrop(srcRect: SafeXmlNode): boolean {
+  if (!srcRect.exists()) return true;
+  const values = ['t', 'r', 'b', 'l'].map((name) => {
+    const raw = srcRect.attr(name);
+    return raw === undefined ? 0 : Number(raw) / 100000;
+  });
+  if (!values.every((value) => Number.isFinite(value) && value >= 0 && value <= 1)) return false;
+  const [top, right, bottom, left] = values;
+  return left + right < 0.999 && top + bottom < 0.999;
+}
+
+function isSupportedGroupPictureChild(child: SafeXmlNode): boolean {
+  if (child.localName !== 'pic' || child.child('style').exists()) return false;
+  const nvPr = child.child('nvPicPr').child('nvPr');
+  if (nvPr.child('videoFile').exists() || nvPr.child('audioFile').exists()) return false;
+
+  const blipFill = child.child('blipFill');
+  const blip = blipFill.child('blip');
+  const stretch = blipFill.child('stretch');
+  if (
+    !blipFill.exists() ||
+    !blip.exists() ||
+    !(blip.attr('embed') ?? blip.attr('r:embed')) ||
+    blip.allChildren().length > 0 ||
+    !stretch.exists() ||
+    blipFill.child('tile').exists() ||
+    !hasSupportedSourceCrop(blipFill.child('srcRect'))
+  ) {
+    return false;
+  }
+  const stretchChildren = stretch.allChildren();
+  if (
+    stretchChildren.length > 1 ||
+    (stretchChildren.length === 1 &&
+      (stretchChildren[0].localName !== 'fillRect' ||
+        (stretchChildren[0].element?.attributes.length ?? 0) > 0))
+  ) {
+    return false;
+  }
+
+  const shapeProperties = child.child('spPr');
+  const transform = shapeProperties.child('xfrm');
+  const extent = transform.child('ext');
+  const width = extent.numAttr('cx');
+  const height = extent.numAttr('cy');
+  const geometry = shapeProperties.child('prstGeom');
+  if (
+    !shapeProperties.exists() ||
+    !transform.exists() ||
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    !(width! > 0) ||
+    !(height! > 0) ||
+    !numericAttributeIsZeroOrAbsent(transform, 'rot') ||
+    !numericAttributeIsZeroOrAbsent(transform, 'flipH') ||
+    !numericAttributeIsZeroOrAbsent(transform, 'flipV') ||
+    (geometry.exists() &&
+      (geometry.attr('prst') !== 'rect' || geometry.child('avLst').allChildren().length > 0)) ||
+    shapeProperties.child('custGeom').exists() ||
+    shapeProperties.child('scene3d').exists() ||
+    shapeProperties.child('sp3d').exists() ||
+    shapeProperties.child('effectLst').exists() ||
+    shapeProperties.child('effectDag').exists() ||
+    shapeProperties.child('ln').exists() ||
+    ['solidFill', 'gradFill', 'pattFill', 'blipFill', 'grpFill'].some((name) =>
+      shapeProperties.child(name).exists(),
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function hasValidGroupChildCoordinateSpace(groupProperties: SafeXmlNode): boolean {
+  const transform = groupProperties.child('xfrm');
+  const extent = transform.child('ext');
+  const childExtent = transform.child('chExt');
+  const values = [
+    extent.numAttr('cx'),
+    extent.numAttr('cy'),
+    childExtent.numAttr('cx'),
+    childExtent.numAttr('cy'),
+  ];
+  return values.every((value) => value !== undefined && Number.isFinite(value) && value > 0);
 }
 
 function rotationSwapsAxes(rotation: number): boolean {
@@ -155,8 +249,6 @@ export function renderGroup(
     ),
   };
   if (grpSpPr.exists()) {
-    applyGroupEffects(wrapper, node, ctx, grpSpPr);
-
     // Check if the group itself has a fill (solidFill, gradFill, etc.)
     // that children can inherit via grpFill
     const FILL_TAGS = ['solidFill', 'gradFill', 'blipFill', 'pattFill'];
@@ -171,6 +263,50 @@ export function renderGroup(
       childCtx.groupFillNode = ctx.groupFillNode;
     }
   }
+
+  const group3dPlan = buildStaticGroup3DPlan(
+    node.shape3d,
+    {
+      width: groupW,
+      height: groupH,
+      container: (ctx.groupDepth ?? 0) === 0 ? 'standalone-slide' : 'group',
+      hasTransformedAncestor: ctx.groupTransformHasRotationOrFlip,
+      hasSceneAncestor: ctx.groupAncestorHas3dScene,
+      rotation: node.rotation,
+      flipH: node.flipH,
+      flipV: node.flipV,
+      childKinds: node.children.map((child) => child.localName),
+      hasSupportedPictureChildren: node.children.every(isSupportedGroupPictureChild),
+      hasValidChildCoordinateSpace: hasValidGroupChildCoordinateSpace(grpSpPr),
+    },
+    ctx,
+  );
+  let childHost = wrapper;
+  let projectedGroupLayer: HTMLElement | undefined;
+  if (group3dPlan.mode === 'camera-projected-group-plane') {
+    const childLayer = document.createElement('div');
+    childLayer.style.position = 'absolute';
+    childLayer.style.left = '0px';
+    childLayer.style.top = '0px';
+    childLayer.style.width = `${groupW}px`;
+    childLayer.style.height = `${groupH}px`;
+    if (applyStaticGroup3DPlane(childLayer, group3dPlan)) {
+      const contentLayer = document.createElement('div');
+      contentLayer.dataset.pptxShape3dGroupContent = 'true';
+      contentLayer.style.position = 'absolute';
+      contentLayer.style.inset = '0';
+      contentLayer.style.filter = `brightness(${group3dPlan.lighting.brightness})`;
+      childLayer.appendChild(contentLayer);
+      wrapper.appendChild(childLayer);
+      childHost = contentLayer;
+      projectedGroupLayer = childLayer;
+    } else {
+      wrapper.dataset.pptxShape3dFallback = 'projection-out-of-range';
+    }
+  } else if (node.shape3d) {
+    wrapper.dataset.pptxShape3dFallback = group3dPlan.reason;
+  }
+  childCtx.groupAncestorHas3dScene = Boolean(ctx.groupAncestorHas3dScene || node.shape3d?.scene);
 
   // Cycle diagram: 3 pie sectors + 3 circular arrows → one circle (3 equal 120° sectors) centered in the diagram.
   const parsedChildren = new Map<number, BaseNodeData | undefined>();
@@ -316,7 +452,7 @@ export function renderGroup(
         y: originalSize.h > 0 ? childNode.size.h / originalSize.h : 1,
       };
       const el = renderNode(childNode, { ...childCtx, groupChildScale });
-      wrapper.appendChild(el);
+      childHost.appendChild(el);
     } catch {
       // Per-child error handling — create error placeholder
       const errDiv = document.createElement('div');
@@ -330,9 +466,23 @@ export function renderGroup(
       errDiv.style.justifyContent = 'center';
       errDiv.style.padding = '2px';
       errDiv.textContent = 'Group child error';
-      wrapper.appendChild(errDiv);
+      childHost.appendChild(errDiv);
     }
   }
+
+  if (projectedGroupLayer && group3dPlan.mode === 'camera-projected-group-plane') {
+    const lighting = document.createElement('div');
+    lighting.dataset.pptxShape3dGroupLighting = 'threePt:t';
+    lighting.style.position = 'absolute';
+    lighting.style.inset = '0';
+    lighting.style.pointerEvents = 'none';
+    lighting.style.backgroundColor = `rgba(255, 255, 255, ${group3dPlan.lighting.opacity})`;
+    projectedGroupLayer.appendChild(lighting);
+  }
+
+  // Reflection must clone the completed child subtree. Applying group effects before rendering
+  // children creates an empty reflected source even though the effect node itself is present.
+  if (grpSpPr.exists()) applyGroupEffects(wrapper, node, ctx, grpSpPr);
 
   return wrapper;
 }

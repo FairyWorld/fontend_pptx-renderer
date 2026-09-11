@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { serializePresentation } from '../../../src/export/serializePresentation';
+import { parseGroupNode } from '../../../src/model/nodes/GroupNode';
 import { SafeXmlNode, parseXml } from '../../../src/parser/XmlParser';
 import type { PresentationData } from '../../../src/model/Presentation';
 import type { SlideData } from '../../../src/model/Slide';
@@ -380,6 +381,41 @@ describe('serializePresentation', () => {
     expect(node.children).toHaveLength(1);
     expect(node.children![0].nodeType).toBe('shape');
     expect(node.children![0].name).toBe('child-shape');
+  });
+
+  it('serializes retained group-level scene3d semantics without XML wrappers', () => {
+    const groupXml = parseXml(`
+      <grpSp xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <nvGrpSpPr><cNvPr id="10" name="camera group"/><nvPr/></nvGrpSpPr>
+        <grpSpPr>
+          <xfrm><off x="0" y="0"/><ext cx="914400" cy="457200"/></xfrm>
+          <scene3d>
+            <camera prst="perspectiveLeft" fov="5700000">
+              <rot lat="0" lon="1500000" rev="0"/>
+            </camera>
+            <lightRig rig="threePt" dir="t"/>
+          </scene3d>
+        </grpSpPr>
+      </grpSp>
+    `);
+    const group = parseGroupNode(groupXml);
+
+    const serialized = serializePresentation(makePres([group])).slides[0].nodes[0];
+
+    expect(serialized.shape3d).toEqual({
+      scene: {
+        cameraPreset: 'perspectiveLeft',
+        fieldOfView: 95,
+        cameraZoom: undefined,
+        cameraRotation: { latitude: 0, longitude: 25, revolution: 0 },
+        lightRig: 'threePt',
+        lightDirection: 't',
+        lightRotation: undefined,
+      },
+      shape: undefined,
+      effectKinds: [],
+      parseIssues: [],
+    });
   });
 
   it('serializes group chart children', () => {

@@ -6,12 +6,12 @@ export interface ProjectedPoint {
   y: number;
 }
 
-export interface FlatPlaneProjection {
+interface FlatPlaneProjection {
   corners: readonly [ProjectedPoint, ProjectedPoint, ProjectedPoint, ProjectedPoint];
   cameraDistance?: number;
 }
 
-export interface FlatPlaneProjectionOptions {
+interface FlatPlaneProjectionOptions {
   kind: 'orthographic' | 'perspective';
   width: number;
   height: number;
