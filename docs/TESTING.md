@@ -508,6 +508,9 @@ Every `/api/evaluate/{case}` response includes `provenance` with:
 `scripts/run_all_shapes_eval.py` preserves this object in every `results[]` row. Compare or update
 a baseline only when the input hashes and relevant runtime profile match; otherwise treat the
 difference as an environment/corpus change and rerun before changing renderer code.
+Regression comparison uses the resolved font-profile ID, ordered faces, descriptors, and font-file
+fingerprints. It retains the raw manifest fingerprint for audit but ignores formatting-only changes
+to that JSON file.
 
 ### Manual Review
 

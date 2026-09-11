@@ -378,8 +378,17 @@ def _reports_by_case(
 
 
 def _environment_key(report: Mapping[str, Any], case_id: str) -> str:
+    runtime = dict(_runtime_environment(report, case_id))
+    font_profile = runtime.get("fontProfile")
+    if isinstance(font_profile, Mapping):
+        # The resolved face list is the browser input. Keep the raw manifest
+        # fingerprint in provenance, but do not make whitespace-only JSON
+        # changes invalidate an otherwise identical regression environment.
+        comparable_profile = dict(font_profile)
+        comparable_profile.pop("manifest", None)
+        runtime["fontProfile"] = comparable_profile
     return json.dumps(
-        _runtime_environment(report, case_id),
+        runtime,
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,

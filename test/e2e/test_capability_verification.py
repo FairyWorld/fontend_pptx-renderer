@@ -808,6 +808,66 @@ def test_rejects_incomparable_regression_baselines(tmp_path: Path):
         )
 
 
+def test_regression_environment_compares_resolved_fonts_not_manifest_formatting(
+    tmp_path: Path,
+):
+    repo, capability = capability_fixture(tmp_path)
+    current = native_report("donut-thin")
+    baseline = native_report("donut-thin", revision="b" * 40)
+    resolved_profile = {
+        "id": "office-core",
+        "manifest": {
+            "path": "font-profiles/office-core.json",
+            "sizeBytes": 120,
+            "sha256": "1" * 64,
+        },
+        "faces": [
+            {
+                "family": "Calibri",
+                "descriptors": {"weight": "400", "style": "normal"},
+                "file": {
+                    "path": "font-profiles/fonts/calibri.ttf",
+                    "sizeBytes": 1000,
+                    "sha256": "2" * 64,
+                },
+            }
+        ],
+    }
+    current["provenance"]["runtime"]["fontProfile"] = resolved_profile
+    baseline["provenance"]["runtime"]["fontProfile"] = {
+        **resolved_profile,
+        "manifest": {
+            "path": "font-profiles/office-core.json",
+            "sizeBytes": 180,
+            "sha256": "3" * 64,
+        },
+    }
+
+    verification = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+    )
+
+    assert verification["gates"]["regression"] == "passed"
+
+    changed_font = json.loads(json.dumps(baseline))
+    changed_font["provenance"]["runtime"]["fontProfile"]["faces"][0]["file"][
+        "sha256"
+    ] = "4" * 64
+    with pytest.raises(CapabilityVerificationError, match="runtime environment"):
+        normalize_native_evaluation_reports(
+            capability,
+            [current],
+            repo,
+            oracle="powerpoint-macos",
+            baseline_reports=[changed_font],
+            passed_gates=("source", "structural", "unit", "browser", "docs"),
+        )
+
 def test_requires_explicit_verdict_for_a_review_row(tmp_path: Path):
     repo, capability = capability_fixture(tmp_path)
     current = [native_report("donut-thin", needs_review=True)]

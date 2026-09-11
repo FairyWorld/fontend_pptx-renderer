@@ -417,7 +417,9 @@ PPTX_E2E_BROWSER_CHANNEL=chrome \
 
 The single-slide page registers the profile before layout. Evaluation provenance records the
 profile manifest, every face hash, the browser version, renderer revision, and source/ground-truth
-hashes. Only compare metric runs whose relevant provenance matches.
+hashes. Only compare metric runs whose relevant provenance matches. Regression comparability uses
+the resolved profile ID, ordered faces, descriptors, and font-file hashes; the manifest hash remains
+auditable but formatting-only JSON changes do not create a different browser environment.
 
 ## Local Development Loop (Incremental by default)
 
