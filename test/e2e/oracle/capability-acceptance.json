@@ -2283,6 +2283,79 @@
       "implementationFingerprint": "a23392cbb3ff6a57863cb3adac2a51c36d9a879e42d221b631f20486ce571a99"
     },
     {
+      "acceptedAt": "2026-09-11T05:35:14.273566Z",
+      "acceptedRevision": "afd9cea8db9b6d0a861381e2190854ea13a54849",
+      "capabilityId": "drawingml.shape.effect.outer-shadow",
+      "caseIds": [
+        "oracle-pypptx-shape-effect-0001-outer-shadow-matrix"
+      ],
+      "caseInputFingerprints": [
+        "9947c52fb223adb426ed6f1df539ce10eece84fe423aabb8211db648aa2c72de"
+      ],
+      "definitionFingerprint": "b800e1ae5ff4948eb454c1cd41543282fb4d2771c84b3f20676da50be186d775",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "fontProfile": {
+          "faces": [
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "400"
+              },
+              "family": "微软雅黑",
+              "file": {
+                "sha256": "3084f1f88369af6bf9989c909024164d953d1e38d08734f05f28ef24b2f9d577",
+                "sizeBytes": 19701556
+              }
+            },
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "700"
+              },
+              "family": "微软雅黑",
+              "file": {
+                "sha256": "519309b7ab0479c4dc3ace5e291de5a8702175be5586e165bc810267bd4619a5",
+                "sizeBytes": 16880832
+              }
+            }
+          ],
+          "id": "local-powerpoint-microsoft-yahei",
+          "manifest": {
+            "sha256": "ef3fd4c88b7407b0dda1e0efcf32beb2da7cce748a434b8605800fb5d29c0564",
+            "sizeBytes": 388
+          }
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "shadow-local",
+        "performance",
+        "package",
+        "package-size",
+        "typecheck",
+        "lint",
+        "build",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "f78169460d82509b9b8c6d0cff5dd39cb6ca7bd16ad335b9a433163759b7a157"
+      ],
+      "implementationFingerprint": "b61bb613a28a6fe4b448c59eafedaaec86f8dc2dff40727ee0cde227f0af7058"
+    },
+    {
       "acceptedAt": "2026-09-08T18:56:55.317403Z",
       "acceptedRevision": "0d144fcce9716200c9af0a9dbdb90cffacfae3ff",
       "capabilityId": "drawingml.shape.geometry.adjustment.donut",
