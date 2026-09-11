@@ -382,6 +382,137 @@ def test_cjk_case_json_records_coverage_and_font_requirements(tmp_path: Path):
     assert "normAutofit.fontScale=85000" in payload["coverage"]["features"]
 
 
+def test_table_native_matrix_is_registered():
+    generator = _load_generator_module()
+    table_cases = [
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-table-")
+    ]
+
+    assert [case["name"] for case in table_cases] == [
+        "oracle-pypptx-table-0001-default-grid",
+        "oracle-pypptx-table-0002-header-banded-rows",
+        "oracle-pypptx-table-0003-first-last-columns",
+        "oracle-pypptx-table-0004-horizontal-vertical-merges",
+        "oracle-pypptx-table-0005-variable-grid-sizes",
+        "oracle-pypptx-table-0006-cell-margins-vertical-anchors",
+        "oracle-pypptx-table-0007-cjk-mixed-text",
+        "oracle-pypptx-table-0008-cell-border-matrix",
+    ]
+    assert all(case["coverage"]["oracle"] == "native-powerpoint" for case in table_cases)
+
+
+def test_table_native_matrix_serializes_layout_merge_and_border_ooxml(tmp_path: Path):
+    generator = _load_generator_module()
+    cases = {
+        case["name"]: case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-table-")
+    }
+    ns = {
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+
+    def generate(slug: str):
+        path = tmp_path / slug / "source.pptx"
+        generator._generate_pptx(cases[slug], path)
+        with ZipFile(path) as zf:
+            return etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+
+    flags = generate("oracle-pypptx-table-0002-header-banded-rows")
+    assert flags.xpath("boolean(.//a:tblPr[@firstRow='1'][@bandRow='1'])", namespaces=ns)
+
+    merges = generate("oracle-pypptx-table-0004-horizontal-vertical-merges")
+    assert merges.xpath("boolean(.//a:tc[@gridSpan='3'])", namespaces=ns)
+    assert merges.xpath("boolean(.//a:tc[@rowSpan='3'])", namespaces=ns)
+    assert merges.xpath("boolean(.//a:tc[@hMerge='1'])", namespaces=ns)
+    assert merges.xpath("boolean(.//a:tc[@vMerge='1'])", namespaces=ns)
+
+    sizes = generate("oracle-pypptx-table-0005-variable-grid-sizes")
+    assert sizes.xpath(".//a:tblGrid/a:gridCol/@w", namespaces=ns) == [
+        str(value) for value in (1371600, 2743200, 1828800, 3657600)
+    ]
+    assert sizes.xpath(".//a:tr/@h", namespaces=ns) == ["548640", "1097280", "1645920"]
+
+    anchors = generate("oracle-pypptx-table-0006-cell-margins-vertical-anchors")
+    assert anchors.xpath(".//a:tcPr/@anchor", namespaces=ns) == ["t", "ctr", "b"]
+    assert anchors.xpath(".//a:tcPr/@marL", namespaces=ns) == ["91440", "182880", "274320"]
+
+    borders = generate("oracle-pypptx-table-0008-cell-border-matrix")
+    assert borders.xpath(
+        "boolean(.//a:tcPr/a:lnL[@w='25400']/a:solidFill/a:srgbClr[@val='C00000'])",
+        namespaces=ns,
+    )
+    assert borders.xpath(
+        "boolean(.//a:tcPr/a:lnT[@w='38100']/a:prstDash[@val='dash'])",
+        namespaces=ns,
+    )
+    assert borders.xpath("boolean(.//a:tcPr/a:lnR/a:noFill)", namespaces=ns)
+
+
+def test_formula_native_matrix_is_registered():
+    generator = _load_generator_module()
+    formula_cases = [
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-formula-")
+    ]
+
+    assert [case["name"] for case in formula_cases] == [
+        "oracle-pypptx-formula-0001-inline-expression",
+        "oracle-pypptx-formula-0002-fraction",
+        "oracle-pypptx-formula-0003-radical",
+        "oracle-pypptx-formula-0004-subscript-superscript",
+        "oracle-pypptx-formula-0005-delimiters",
+        "oracle-pypptx-formula-0006-nary-summation",
+        "oracle-pypptx-formula-0007-matrix-2x2",
+        "oracle-pypptx-formula-0008-function",
+    ]
+    assert all(case["coverage"]["oracle"] == "native-powerpoint" for case in formula_cases)
+
+
+def test_formula_native_matrix_serializes_a14_choice_omml_and_shape_fallback(tmp_path: Path):
+    generator = _load_generator_module()
+    cases = [
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-formula-")
+    ]
+    ns = {
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+        "a14": "http://schemas.microsoft.com/office/drawing/2010/main",
+        "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
+        "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+    }
+    omml_constructs: set[str] = set()
+
+    for case in cases:
+        path = tmp_path / case["name"] / "source.pptx"
+        generator._generate_pptx(case, path)
+        with ZipFile(path) as zf:
+            root = etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+
+        assert root.xpath(
+            "boolean(.//mc:AlternateContent/mc:Choice[@Requires='a14']/p:sp"
+            "//a:p/a14:m/m:oMathPara/m:oMath)",
+            namespaces=ns,
+        )
+        assert root.xpath(
+            "boolean(.//mc:AlternateContent/mc:Fallback/p:sp"
+            "//p:cNvPr[@name='Equation fallback'])",
+            namespaces=ns,
+        )
+        omml_constructs.update(
+            etree.QName(element).localname
+            for element in root.xpath(".//a14:m/m:oMathPara/m:oMath//*", namespaces=ns)
+            if etree.QName(element).namespace == ns["m"]
+        )
+
+    assert {"f", "rad", "sSubSup", "d", "nary", "m", "func"} <= omml_constructs
+
+
 def test_complex_composite_cases_are_registered():
     generator = _load_generator_module()
     case_defs = generator._build_all_case_defs()

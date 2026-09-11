@@ -280,7 +280,7 @@ describe('ChartRenderer', () => {
       ).option.grid;
 
       expect(negative).toMatchObject({ left: 18, right: 10, top: 20, bottom: 20 });
-      expect(horizontal).toMatchObject({ left: 15, right: 28, top: 60, bottom: 20 });
+      expect(horizontal).toMatchObject({ left: 15, right: 10, top: 60, bottom: 20 });
     });
 
     it('scales numeric-axis margins with the chart frame', () => {
@@ -3651,7 +3651,7 @@ describe('ChartRenderer', () => {
       const grid = option.grid as any;
 
       expect(grid.left).toBe(15);
-      expect(grid.right).toBe(28);
+      expect(grid.right).toBe(10);
       expect(grid.top).toBe(60);
     });
 

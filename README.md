@@ -4,7 +4,7 @@
 
 A high-fidelity, browser-native PPTX renderer that parses Office Open XML (`.pptx`) files and renders slides as HTML/SVG DOM.
 
-Supports shapes, text, images, tables, charts, SmartArt fallback data, groups, backgrounds, gradients, pattern fills, bounded ordinary-shape outer shadows and reflections, bounded static DrawingML 3D, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
+Supports shapes, text, images, tables, charts, SmartArt, bounded OMML equations, groups, backgrounds, gradients, pattern fills, bounded ordinary-shape outer shadows and reflections, bounded static DrawingML 3D, and OOXML color inheritance. Rendering fidelity depends on the source features and available preview data; see the support boundaries below.
 
 ## Rendering Example
 
@@ -29,7 +29,7 @@ Visual regression suites compare selected shape, SmartArt, fill/stroke, text, ta
 
 <sup>E2E evaluation dashboard: side-by-side ground truth vs rendered output with SSIM, color histogram, and IoU metrics per slide.</sup>
 
-> Ground truth binaries (PPTX/PDF/PNG) stay in the ignored `test/e2e/testdata/` tree. Tracked case definitions and coverage metadata keep that local corpus reproducible. Generate shape/SmartArt corpora with `scripts/one_shot_full_ground_truth.py` or focused text/chart/composite cases with `scripts/generate_pypptx_cases.py`; both macOS and Windows PowerPoint are supported. See [`docs/TESTING.md`](docs/TESTING.md).
+> Ground truth binaries (PPTX/PDF/PNG) stay in the ignored `test/e2e/testdata/` tree. Tracked case definitions and coverage metadata keep that local corpus reproducible. Generate shape/SmartArt corpora with `scripts/one_shot_full_ground_truth.py` or focused text/table/chart/composite cases with `scripts/generate_pypptx_cases.py`; both macOS and Windows PowerPoint are supported. See [`docs/TESTING.md`](docs/TESTING.md).
 
 On macOS, native exports use one fixed ignored `oracle-runtime` directory and target the requested
 presentation by its exact full path. Keep the interactive PowerPoint session available and inspect
@@ -842,6 +842,10 @@ inverse fallback, and square, wide, and tall text boxes.
 
 Powered by [ECharts](https://echarts.apache.org/). Supports Bar/Column (clustered, stacked, 100% stacked), Line/Area (standard, stacked, 100% stacked), Pie, multi-ring Doughnut, Radar, Scatter, Bubble, and Stock/Candlestick charts, with axis labels, legends, data labels, grid lines, chart color-style palettes, marker symbols, and custom number formats.
 
+A 21-case native PowerPoint matrix exercises these two-dimensional families and their common data
+variants. The runtime coverage is broad, while the capability remains explicitly `approximate`
+until the chart-family gates close the remaining plot-area, axis, label, and legend differences.
+
 The renderer registers only the ECharts charts, components, features, and Canvas renderer
 that it uses. Bundler consumers keep ECharts external; the standalone browser entry
 contains this same tree-shakeable runtime.
@@ -859,7 +863,7 @@ Supported chart combinations include combo charts and secondary axes. Sparse sca
 ### SmartArt, Tables, Images & More
 
 - **SmartArt**: renders available PowerPoint diagram fallback data; individual layout fidelity varies. EMF-embedded PDF previews can be rendered with optional [pdfjs-dist](https://mozilla.github.io/pdf.js/) configuration.
-- **Tables**: OOXML table styles, merged-cell inside/outer borders, conditional corner styles, explicit no-fill border clearing, and direct-cell overrides
+- **Tables**: OOXML table styles, first/last/banded options, variable rows and columns, horizontal/vertical merges, cell margins and vertical anchors, CJK/mixed text, merged-cell inside/outer borders, conditional corner styles, explicit no-fill border clearing, and direct-cell overrides. A dedicated eight-case native PowerPoint matrix bounds this claim.
 - **Images**: raster/SVG previews with crop and geometry clipping; grayscale, duotone, luminance, and biLevel effects on clipped pictures. Embedded audio/video playback uses browser-supported codecs, with posters/placeholders when playback data is unavailable.
 - **Groups**: coordinate remapping with recursive child rendering; diagram-specific compensation requires matching diagram layout provenance
 - **Backgrounds**: slide → layout → master inheritance chain
@@ -867,6 +871,16 @@ Supported chart combinations include combo charts and secondary axes. Sparse sca
 ### Compatible Content and Text Inheritance
 
 `mc:AlternateContent` selects one compatible `Choice` (including the supported SVG picture extension), otherwise its `Fallback`, across ordinary slide/template/group content and OLE picture previews. Unknown extension namespaces do not become supported merely because they occur in a `Choice`. Eager and lazy rendering retain selected branch order.
+
+PowerPoint equations use an `a14:m` extension inside a text paragraph and normally carry an MCE
+fallback shape or graphic frame. The renderer now parses a bounded OMML subset and emits browser-native
+Presentation MathML for runs, bar/no-bar/skewed/linear fractions, radicals, subscript/superscript,
+delimiters, n-ary operators, matrices, and functions. It selects the `a14` choice only when the whole
+math subtree is recognized; unknown constructs retain the package-authored fallback, without marking
+the rest of the `a14` namespace as supported. The first implementation uses one inherited formula
+run style; per-token rich styling remains outside this scope. An eight-case native PowerPoint matrix
+covers the direct path, and low foreground overlap forces manual review even when sparse full-slide
+SSIM is high. No formula-specific runtime library is required.
 
 Placeholder inheritance follows the matched layout placeholder into its master category, preserves explicit zero transforms/insets, and resolves omitted body properties and mutually exclusive autofit choices. Explicit no-autofit clipping and whitespace behavior are checked in real browser containers. These combinations do not establish native equivalence for every text/autofit variant.
 
@@ -1016,11 +1030,11 @@ perspective or rotated cameras, nonzero extrusion, other bottom or non-circular 
 materials, unsupported lighting, tiled pictures,
 custom geometry outside the exact camera-path profile, and unsupported paint, text, stroke,
 transform, or effect combinations. Group scenes outside the exact native-verified two-picture tuple
-above remain flat. True 3D chart
-perspective/depth/surface meshes, Office 2017 embedded 3D
-models, animation playback/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing
-embedded OLE objects, and slide notes rendering are outside the verified native scope. Available OLE
-picture previews can render; they are not an OLE object engine. EMF bitmap and embedded-PDF previews
+above remain flat. True 3D chart perspective/depth/surface meshes, Office 2017 embedded 3D
+models, animation playback/transitions, OMML constructs and per-token formula styles outside the
+bounded direct subset, full EMF/WMF vector rendering, executing/editing embedded OLE objects, and
+slide notes rendering are outside the verified native scope. Available OLE picture previews and
+unsupported-equation fallback shapes can render; they are not OLE engines. EMF bitmap and embedded-PDF previews
 remain supported (PDF previews require PDF.js); arbitrary EMF/WMF vector records remain excluded.
 Exact current boundaries live in the capability registry described above.
 

@@ -130,7 +130,8 @@ Three-step: `schemeClr` → master `colorMap` remap (e.g. "tx1"→"dk1") → the
 
 General DrawingML 3D outside the verified static top-bevel, bounded preset/custom zero-depth
 camera-plane, and edge-on bottom-front-material tuples, true 3D chart perspective/depth/surface meshes,
-animations/transitions, equations, full EMF/WMF vector rendering, effect combinations outside the
+animations/transitions, OMML constructs and per-token formula styles outside the bounded direct
+MathML subset, full EMF/WMF vector rendering, effect combinations outside the
 bounded ordinary-shape outer-shadow and reflection lanes, unverified text/picture/group reflection
 or glow fidelity,
 executing/editing embedded OLE objects, and slide notes rendering.
@@ -140,6 +141,7 @@ Notes:
 - Pattern fills, supported combo-chart combinations, and secondary axes are implemented; do not treat them as blanket exclusions.
 - OLE picture previews and EMF bitmap/embedded-PDF previews are supported paths, not full OLE or EMF/WMF engines. PDF previews require PDF.js.
 - Compatible content selects one supported Choice or Fallback, including supported SVG preview Choices; eager/lazy slide and group paths must preserve branch order.
+- Recognized `a14:m` runs, fractions, radicals, scripts, delimiters, n-ary operators, matrices, and functions render as Presentation MathML; any unknown semantic OMML node keeps the package-authored fallback.
 - Color inheritance is slide → layout → master, with explicit identity/reset semantics. Chart-local maps take precedence only inside the derived chart context.
 - Placeholder parent inheritance follows actual layout type/category, even when slide-local type differs. Preserve explicit zero values and exclusive autofit choices.
 - Sparse chart caches, literal sources, conditional/merged table borders, and clipped image effects have scoped regression coverage; this is not a full-corpus native parity claim.

@@ -208,6 +208,60 @@ describe('TextRenderer — branch coverage (uncovered paths)', () => {
   });
 
   // ============================================================================
+  // East Asian line breaking (eaLnBrk)
+  // ============================================================================
+  describe('East Asian line breaking (eaLnBrk)', () => {
+    it('allows a break at any typographic boundary when eaLnBrk is false', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode('<pPr eaLnBrk="0"/>'),
+            runs: [{ text: '“两个维护”' }],
+            level: 0,
+          },
+        ],
+      });
+
+      const paragraph = renderToContainer(body).children[0] as HTMLElement;
+      expect(paragraph.style.lineBreak).toBe('anywhere');
+    });
+
+    it.each([
+      ['true', '<pPr eaLnBrk="1"/>'],
+      ['omitted', '<pPr/>'],
+    ])('keeps East Asian line-breaking rules when eaLnBrk is %s', (_name, properties) => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(properties),
+            runs: [{ text: '“两个维护”' }],
+            level: 0,
+          },
+        ],
+      });
+
+      const paragraph = renderToContainer(body).children[0] as HTMLElement;
+      expect(paragraph.style.lineBreak).toBe('auto');
+    });
+
+    it('lets paragraph properties override inherited list-style line breaking', () => {
+      const body = makeTextBody({
+        listStyle: '<lstStyle><lvl1pPr eaLnBrk="1"/></lstStyle>',
+        paragraphs: [
+          {
+            properties: xmlNode('<pPr eaLnBrk="0"/>'),
+            runs: [{ text: '“两个维护”' }],
+            level: 0,
+          },
+        ],
+      });
+
+      const paragraph = renderToContainer(body).children[0] as HTMLElement;
+      expect(paragraph.style.lineBreak).toBe('anywhere');
+    });
+  });
+
+  // ============================================================================
   // Vertical text (vert="vert270", "eaVert")
   // Note: TextRenderer doesn't directly render vert, but test listStyle inheritance with levels
   // ============================================================================

@@ -125,6 +125,33 @@ The normal ESM/CJS builds externalize `echarts/*` and JSZip for application bund
 `./browser` entry bundles JSZip and the registered ECharts subset while keeping PDF.js
 optional and external.
 
+### Tables, two-dimensional charts, and formulas
+
+Tables remain native DOM rather than canvas content. `TableNode` preserves row and column sizes,
+merge continuations, cell text, and direct properties; `TableRenderer` combines those values with
+the table-style hierarchy. The bounded native matrix contains eight isolated cases for common
+styles, banding, first/last columns, horizontal and vertical merges, variable grid dimensions,
+cell margins and anchors, CJK/mixed text, and direct border variants. Combinations outside that
+matrix still render, but do not inherit its native-fidelity claim.
+
+Two-dimensional charts use the modular ECharts canvas runtime. A 21-case native matrix spans the
+implemented chart families, while the capability remains `approximate` until the family-specific
+plot-area, axis, label, and legend gates pass. Chart data semantics and visual layout are tested as
+separate concerns so layout tuning cannot conceal a dropped series or malformed cache.
+
+PowerPoint math is an Office Drawing extension: an `mc:AlternateContent` choice contains a shape
+whose paragraph includes `a14:m` and OMML, while the fallback contains a `p:sp` or
+`p:graphicFrame`. The current MCE path deliberately does not advertise the whole `a14` namespace;
+it opts into a Choice only when every `a14:m` wrapper contains a fully recognized math subtree.
+`MathNode` parses that OMML into a JSON-safe renderer-owned model, and `MathRenderer` emits native
+Presentation MathML. The first direct subset handles runs, fractions, radicals, scripts, delimiters,
+n-ary operators, functions, and matrices with one inherited formula run style. Unknown subtrees retain the source
+fallback rather than disappear or cause unrelated `a14` choices to be selected. An eight-case
+native matrix fixes those target constructs and their fallbacks. The capability remains approximate
+while font outlines, operator sizing, and detailed OMML run styling differ. Because a sparse equation can
+produce a high full-slide SSIM even with the wrong topology, low foreground overlap is always a
+manual-review condition.
+
 ## OOXML Geometry Compilation Boundary
 
 The handwritten `src/shapes/presets.ts` registry remains the compatibility geometry engine. The
@@ -175,7 +202,9 @@ native PowerPoint oracle evidence for the selected shape family.
 before it chooses CSS wrapping, overflow, and autofit behavior. `wrap="square"` uses browser line
 wrapping and `wrap="none"` uses a single-line container; both are written as inline styles so a
 host page's `white-space` rule cannot replace the presentation semantics. Explicit
-`horzOverflow` and `vertOverflow` values are resolved independently.
+`horzOverflow` and `vertOverflow` values are resolved independently. Paragraph `eaLnBrk="0"`
+uses the browser's unrestricted break opportunity, while the omitted/true default retains East
+Asian typographic rules; both values are explicit so inherited host CSS cannot change the result.
 
 The three autofit choices remain mutually exclusive:
 

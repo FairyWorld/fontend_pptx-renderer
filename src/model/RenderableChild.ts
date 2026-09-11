@@ -6,6 +6,7 @@ import { PicNodeData, parsePicNode } from './nodes/PicNode';
 import { TableNodeData, parseTableNode } from './nodes/TableNode';
 import { GroupNodeData, parseGroupNode } from './nodes/GroupNode';
 import { ChartNodeData, parseChartNode } from './nodes/ChartNode';
+import { DRAWINGML_MATH_NAMESPACE, isSupportedDrawingmlMathChoice } from './nodes/MathNode';
 
 export type RenderableNode =
   | ShapeNodeData
@@ -42,9 +43,11 @@ function isCompatibleChoice(choice: SafeXmlNode): boolean {
   const element = choice.element;
   if (!element) return false;
 
-  return requires
-    .split(/\s+/)
-    .every((prefix) => SUPPORTED_MCE_NAMESPACES.has(element.lookupNamespaceURI(prefix) ?? ''));
+  return requires.split(/\s+/).every((prefix) => {
+    const namespace = element.lookupNamespaceURI(prefix) ?? '';
+    if (SUPPORTED_MCE_NAMESPACES.has(namespace)) return true;
+    return namespace === DRAWINGML_MATH_NAMESPACE && isSupportedDrawingmlMathChoice(choice);
+  });
 }
 
 function selectAlternateContentBranch(alternateContent: SafeXmlNode): SafeXmlNode | undefined {

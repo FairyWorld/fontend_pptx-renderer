@@ -12,6 +12,8 @@ const r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const c = 'http://schemas.openxmlformats.org/drawingml/2006/chart';
 const ns = `xmlns:a="${a}" xmlns:p="${p}" xmlns:r="${r}" xmlns:c="${c}"
   xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+  xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main"
+  xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
   xmlns:svg="http://schemas.microsoft.com/office/drawing/2016/SVG/main"
   xmlns:unknown="urn:unsupported:test"`;
 const map =
@@ -100,9 +102,10 @@ async function packageBytes(chartMap: 'accent2' | 'accent1' | 'absent') {
   const ole = (svg: boolean) =>
     `<p:oleObj name="Linked preview" r:id="rOle" progId="Excel.Sheet.12"><p:link updateAutomatic="0"/>${picture(9, svg)}</p:oleObj>`;
   const nested = `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="6" name="nested"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3810000" cy="2095500"/><a:chOff x="0" y="0"/><a:chExt cx="3810000" cy="2095500"/></a:xfrm></p:grpSpPr>${alternate('unknown', shape(60, 'discard-nested', 0, 0), shape(7, 'nested-first', 10, 160) + shape(8, 'nested-second', 90, 160))}</p:grpSp>`;
+  const nativeEquation = `<p:sp><p:nvSpPr><p:cNvPr id="12" name="native-equation"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(300, 10)}<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a14:m><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></a14:m></a:p></p:txBody></p:sp>`;
   zip.file(
     'ppt/slides/slide1.xml',
-    `<p:sld ${ns}><p:cSld><p:spTree>${groupProps}${shape(2, 'ordinary-before', 10, 10)}${alternate('p', shape(3, 'chosen', 90, 10), shape(30, 'discard-fallback', 0, 0))}${alternate('unknown', shape(40, 'discard-choice', 0, 0), shape(4, 'fallback', 170, 10))}${alternate('svg', picture(5, true), picture(50, false))}${nested}${frame(9, 'ole-preview', 90, alternate('svg', ole(true), ole(false)), 'http://schemas.openxmlformats.org/presentationml/2006/ole')}${frame(10, 'mapped-chart', 210, '<c:chart r:id="rChart"/>', c, 180, 120)}${shape(11, 'ordinary-after', 290, 160)}</p:spTree></p:cSld><p:clrMapOvr><a:overrideClrMapping ${map.replace('accent1="accent1"', 'accent1="accent3"')}/></p:clrMapOvr></p:sld>`,
+    `<p:sld ${ns}><p:cSld><p:spTree>${groupProps}${shape(2, 'ordinary-before', 10, 10)}${alternate('p', shape(3, 'chosen', 90, 10), shape(30, 'discard-fallback', 0, 0))}${alternate('unknown', shape(40, 'discard-choice', 0, 0), shape(4, 'fallback', 170, 10))}${alternate('svg', picture(5, true), picture(50, false))}${nested}${frame(9, 'ole-preview', 90, alternate('svg', ole(true), ole(false)), 'http://schemas.openxmlformats.org/presentationml/2006/ole')}${frame(10, 'mapped-chart', 210, '<c:chart r:id="rChart"/>', c, 180, 120)}${shape(11, 'ordinary-after', 290, 160)}${alternate('a14', nativeEquation, shape(13, 'equation-fallback', 300, 10))}</p:spTree></p:cSld><p:clrMapOvr><a:overrideClrMapping ${map.replace('accent1="accent1"', 'accent1="accent3"')}/></p:clrMapOvr></p:sld>`,
   );
   zip.file(
     'ppt/slides/_rels/slide1.xml.rels',
@@ -187,6 +190,8 @@ for (const lazy of [false, true]) {
               .find((node) => node.nodeType === 'group')
               ?.children.map((node) => node.id),
             text: handle.element.textContent,
+            mathCount: handle.element.querySelectorAll('math').length,
+            mathTags: [...handle.element.querySelectorAll('math *')].map((node) => node.localName),
             fills: [...handle.element.querySelectorAll('svg path')].map((path) =>
               path.getAttribute('fill'),
             ),
@@ -198,14 +203,19 @@ for (const lazy of [false, true]) {
         { bytes: await packageBytes(chartMap), lazy },
       );
       expect(errors).toEqual([]);
-      expect(result.deferred).toBe(lazy ? 0 : 8);
-      expect(result.ids).toEqual(['2', '3', '4', '5', '6', '9', '10', '11']);
+      expect(result.deferred).toBe(lazy ? 0 : 9);
+      expect(result.ids).toEqual(['2', '3', '4', '5', '6', '9', '10', '11', '12']);
       expect(result.groupIds).toEqual(['7', '8']);
       expect(result.text).toContain('chosen');
       expect(result.text).toContain('fallback');
       expect(result.text).toContain('nested-first');
       expect(result.text).toContain('nested-second');
+      expect(result.text).toContain('x');
+      expect(result.text).not.toContain('equation-fallback');
       expect(result.text).not.toContain('discard');
+      expect(result.text).not.toContain('native-equation');
+      expect(result.mathCount).toBe(1);
+      expect(result.mathTags).toEqual(['mrow', 'mi']);
       expect(result.decoded).toEqual([
         { width: 60, pixel: [255, 0, 255, 255] },
         { width: 60, pixel: [255, 0, 255, 255] },

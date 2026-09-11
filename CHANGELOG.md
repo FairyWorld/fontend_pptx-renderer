@@ -18,8 +18,9 @@ remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
   guide-formula contract, emits deterministic SVG paths, and ships a generated runtime subset.
 - Added an evidence-driven capability loop with a tracked OOXML registry, bounded corpus inventory,
   transparent ranking, generated work packets, and hash-bound native PowerPoint acceptance receipts.
-- Added native PowerPoint matrices and local visual gates for CJK text, text-color precedence,
-  flowchart geometry, bounded static 3D, ordinary-shape shadows, and reflections.
+- Added native PowerPoint matrices and local visual gates for CJK text, common tables, 2D charts,
+  bounded OMML formula rendering and fallbacks, text-color precedence, flowchart geometry, bounded static 3D,
+  ordinary-shape shadows, and reflections.
 - Added bounded embedded EOT/MTX font loading, host-provided font faces, and reproducible font/browser
   provenance for visual evaluation.
 

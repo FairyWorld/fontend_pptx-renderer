@@ -740,7 +740,12 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
         slide.get("needsReview") is True and not slide.get("oracleMismatch")
         for slide in per_slide
     )
-    needs_review = bool(evaluation_errors) or ssim_needs_review or oracle_mismatch_count > 0
+    needs_review = (
+        bool(evaluation_errors)
+        or bool(warning_reasons)
+        or ssim_needs_review
+        or oracle_mismatch_count > 0
+    )
     if not evaluation_errors and ssim_needs_review:
         warning_reasons.append("warn:ssim_below_review_threshold")
     if oracle_mismatch_count:

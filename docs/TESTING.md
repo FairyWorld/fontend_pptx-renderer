@@ -217,9 +217,14 @@ cd test/e2e
 This generates/reuses ground truth for all SmartArt layouts available on the local PowerPoint build plus the specified shape ID range.
 
 For text, shape-adjustment, zero-adjustment flowchart, ordinary-shape and text effects, bounded
-static DrawingML 3D, composite, and chart interaction cases, use the python-pptx generator. It
-currently defines 182 cases: 59 text, 31 shape-adjustment, 28 flowchart, 2 shape-effect, 1
-text-effect, 20 static 3D, 20 composite, and 21 chart cases.
+static DrawingML 3D, table, composite, and chart interaction cases, use the python-pptx generator.
+It currently defines 198 cases: 60 text, 31 shape-adjustment, 28 flowchart, 2 shape-effect, 1
+text-effect, 20 static 3D, 8 table, 8 formula, 20 composite, and 21 chart cases.
+
+The eight isolated table cases cover a default grid, header and row banding, first/last-column
+styles, horizontal and vertical merges, variable grid sizes, cell margins and vertical anchors,
+CJK/mixed-script text, and direct solid/dashed/no-fill borders. They complement composite cases by
+making one table interaction family diagnosable per native comparison.
 
 The ordinary-shape effect cohort contains the eight-slide outer-shadow matrix and a seven-slide
 reflection matrix with one inverse plus six positive shape-surface rows. The separate one-slide
@@ -316,6 +321,14 @@ cd test/e2e
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-flowchart-*'
 
+# Generate the isolated eight-case table matrix.
+.venv/bin/python scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-table-*'
+
+# Generate the eight-case DrawingML/OMML formula matrix.
+.venv/bin/python scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-formula-*'
+
 # Generate the ignored local 3D discovery matrix. Add --pptx-only without PowerPoint.
 .venv/bin/python scripts/generate_pypptx_cases.py \
   --include-local-shape3d-matrix \
@@ -332,7 +345,7 @@ per-slide PNG. The generator refreshes tracked case metadata even when cached lo
 reused and writes artifact fingerprints to
 `reports/oracle-failures/pypptx-ground-truth.json`, including every available slide PNG.
 The local discovery definitions default to `oracle-runtime/local-shape3d-cases/`; they never write
-into tracked `oracle/cases-pypptx/` and do not change the 182-case default matrix.
+into tracked `oracle/cases-pypptx/` and do not change the 198-case default matrix.
 
 The top-bevel capability also has a region-level lighting gate. After clean native API reports for
 cases 0001-0012 and 0017-0018 have refreshed `reports/<case>_slide0_{pdf,html}.png`, run:
@@ -838,6 +851,21 @@ Chart rendering is validated at two levels:
 2. Run targeted oracle comparisons through the E2E API or pytest. Use
    `--testdata-source=windows` for Windows-generated chart oracle cases, which
    include many Office chart defaults not present in lightweight generated decks.
+
+The 21-case python-pptx matrix covers column/bar, line/area, pie/doughnut, scatter, radar, bubble,
+and stock families. Treat the broad runtime as approximate until each family passes its native
+gate. Diagnose Cartesian plot area, axes, labels, and legends separately before changing series
+geometry or data parsing.
+
+Formula verification has two distinct gates. MCE fallback tests prove that an unsupported
+`a14:m` equation retains its package-authored `p:sp` or `p:graphicFrame` fallback. Direct support
+uses an eight-case native PowerPoint matrix spanning inline runs, fractions, radicals,
+subscript/superscript, delimiters, n-ary summation, a 2x2 matrix, and a function. It also requires
+structural and browser checks for the corresponding Presentation MathML tree; a fallback-only pass
+does not satisfy that gate. Global SSIM can remain high when sparse formula ink is topologically
+wrong, so any low-foreground-overlap warning sets `needsReview=true` and blocks unattended
+promotion. The current direct subset is `approximate`: supported topology is usable, while native
+font outlines, operator sizing, and per-token rich OMML styling remain outside its fidelity claim.
 
 Current chart 3D support is intentionally a 2D fallback for render continuity.
 Do not treat `surface3DChart` or 3D perspective/depth mismatches as fixed unless

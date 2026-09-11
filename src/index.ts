@@ -71,6 +71,7 @@ export type {
   LineEndInfo,
   TextBoxBounds,
 } from './model/nodes/ShapeNode';
+export type { MathFormula, MathNode, MathRowNode } from './model/nodes/MathNode';
 export type { PicNodeData, CropRect } from './model/nodes/PicNode';
 export type {
   Shape3DProperties,

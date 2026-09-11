@@ -209,10 +209,10 @@ Report (default):
 ## Python-pptx Ground Truth Pipeline
 
 A second pipeline uses `python-pptx` for PPTX creation and native PowerPoint automation for
-ground-truth export. It defines 182 cases under `oracle/cases-pypptx/` with the
+ground-truth export. It defines 198 cases under `oracle/cases-pypptx/` with the
 `oracle-pypptx-*` prefix:
 
-- **Text** (59 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
+- **Text** (60 cases): fonts, sizes, styles, alignment, colors, bullets, vertical text,
   placeholder inheritance, plus a 16-case CJK wrap/autofit/line-spacing interaction matrix whose
   final four cases cover square/wide/tall `spAutoFit` growth and explicit-overflow opt-out, and a
   four-case `defRPr`/`fontRef` color-precedence matrix with explicit-run and inverse controls
@@ -248,6 +248,13 @@ ground-truth export. It defines 182 cases under `oracle/cases-pypptx/` with the
   adds an eight-slide native-verified `perspectiveLeft` two-picture group matrix across square/wide/tall,
   a nested real-corpus asymmetric source crop under a coordinate-only ancestor, and
   scene-absent inverses
+- **Tables** (8 cases): default and conditional styles, banding, first/last columns,
+  horizontal/vertical merges, variable grid sizes, cell margins and vertical anchors,
+  CJK/mixed-script text, and direct solid/dashed/no-fill borders
+- **Formulas** (8 cases): valid DrawingML `a14:m` choices and visible MCE shape fallbacks for
+  inline runs, fractions, radicals, subscript/superscript, delimiters, n-ary summation, a 2x2
+  matrix, and a function; recognized choices render as Presentation MathML while unknown OMML
+  constructs must keep the authored fallback
 - **Composites** (20 cases): multi-element layouts combining shapes, text, tables, charts, connectors, merged cells, vertical text, transparent overlaps, and scaled groups
 - **Charts** (21 cases): column, bar, line, pie, doughnut, area, scatter, radar, bubble variants
 
@@ -273,6 +280,14 @@ cd test/e2e
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --case 'oracle-pypptx-shape3d-*'
 
+# Generate only the isolated native table matrix.
+.venv/bin/python3 scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-table-*'
+
+# Generate only the native DrawingML/OMML formula matrix.
+.venv/bin/python3 scripts/generate_pypptx_cases.py \
+  --case 'oracle-pypptx-formula-*'
+
 # Generate eight ignored discovery probes without widening the supported cohort.
 .venv/bin/python3 scripts/generate_pypptx_cases.py \
   --include-local-shape3d-matrix \
@@ -294,7 +309,7 @@ matrix. The bottom-bevel rows isolate default encoding, material, light rotation
 transparent overlay composition plus an exact transparent flat control, a neighboring `circle`
 preset, and aspect ratio. Its definition files
 default to ignored `oracle-runtime/local-shape3d-cases/`, and its PPTX/PDF output remains under
-ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 182-case matrix.
+ignored `testdata/`. These cases are discovery inputs; they do not alter the tracked 198-case matrix.
 The current macOS PowerPoint oracle produces byte-identical native rasters for the implicit/explicit
 dimension pair, the explicit/omitted light-rotation pair, and the `relaxedInset`/`circle` pair. The
 opaque material opt-out is deliberately distinct. The exact standalone rectangle rows now back

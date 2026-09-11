@@ -230,6 +230,95 @@ describe('RenderableChild parsing', () => {
     ]);
   });
 
+  it('selects a supported a14 OMML formula choice without enabling unrelated a14 content', () => {
+    const alternate = parseXml(`
+      <mc:AlternateContent
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main"
+        xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+        xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <mc:Choice Requires="a14">
+          <p:sp>
+            <p:nvSpPr><p:cNvPr id="41" name="Native equation"/><p:nvPr/></p:nvSpPr>
+            <p:spPr/>
+            <p:txBody>
+              <a:bodyPr/><a:lstStyle/>
+              <a:p>
+                <a14:m><m:oMath><m:r><m:t>x</m:t></m:r></m:oMath></a14:m>
+              </a:p>
+            </p:txBody>
+          </p:sp>
+        </mc:Choice>
+        <mc:Fallback>
+          <p:sp>
+            <p:nvSpPr><p:cNvPr id="42" name="Equation fallback"/><p:nvPr/></p:nvSpPr>
+            <p:spPr/>
+            <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>x</a:t></a:r></a:p></p:txBody>
+          </p:sp>
+        </mc:Fallback>
+      </mc:AlternateContent>
+    `);
+
+    const nodes = parseRenderableChildren(alternate, { rels: new Map() });
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({
+      nodeType: 'shape',
+      id: '41',
+      name: 'Native equation',
+      textBody: {
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'x',
+                math: {
+                  display: 'inline',
+                  body: { kind: 'row', children: [{ kind: 'text', text: 'x' }] },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+
+  it('uses the PowerPoint fallback when an a14 formula contains an unsupported OMML construct', () => {
+    const alternate = parseXml(`
+      <mc:AlternateContent
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main"
+        xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"
+        xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <mc:Choice Requires="a14">
+          <p:sp>
+            <p:nvSpPr><p:cNvPr id="41" name="Unsupported equation"/><p:nvPr/></p:nvSpPr>
+            <p:spPr/>
+            <p:txBody>
+              <a:bodyPr/><a:lstStyle/>
+              <a:p><a14:m><m:oMath><m:eqArr/></m:oMath></a14:m></a:p>
+            </p:txBody>
+          </p:sp>
+        </mc:Choice>
+        <mc:Fallback>
+          <p:sp>
+            <p:nvSpPr><p:cNvPr id="42" name="Equation fallback"/><p:nvPr/></p:nvSpPr>
+            <p:spPr/>
+            <p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>fallback</a:t></a:r></a:p></p:txBody>
+          </p:sp>
+        </mc:Fallback>
+      </mc:AlternateContent>
+    `);
+
+    const nodes = parseRenderableChildren(alternate, { rels: new Map() });
+
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0]).toMatchObject({ nodeType: 'shape', id: '42', name: 'Equation fallback' });
+  });
+
   it('selects compatible content nested inside a group', () => {
     const groupXml = parseXml(`
       <p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"

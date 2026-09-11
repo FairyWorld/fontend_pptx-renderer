@@ -363,7 +363,15 @@ def test_tracked_capability_contract_is_valid():
     history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
 
     validate_acceptance_history(registry, history)
-    assert len(registry.capabilities) == 18
+    assert len(registry.capabilities) == 21
+    chart_2d = registry.by_id()["drawingml.chart.2d.common"]
+    common_table = registry.by_id()["drawingml.table.common"]
+    formula = registry.by_id()["drawingml.text.math.omml"]
+    assert chart_2d.render_mode == "approximate"
+    assert common_table.render_mode == "native"
+    assert formula.render_mode == "approximate"
+    assert formula.scope["output"] == ("Presentation MathML",)
+    assert "m:f" in formula.scope["directOmmlRendering"]
     camera_plane = registry.by_id()["drawingml.shape.3d.camera-projected-plane"]
     scene_residual = registry.by_id()["drawingml.shape.3d.scene"]
     text_scene_residual = registry.by_id()["drawingml.text.3d.scene"]

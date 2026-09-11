@@ -2,6 +2,68 @@
   "schemaVersion": 1,
   "capabilities": [
     {
+      "id": "drawingml.chart.2d.common",
+      "component": "chart",
+      "renderMode": "approximate",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "areaChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "barChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "bubbleChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "doughnutChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "lineChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "pieChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "radarChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "scatterChart"
+        },
+        {
+          "partGlob": "ppt/charts/chart*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+          "localName": "stockChart"
+        }
+      ],
+      "scope": {
+        "families": ["area", "bar-column", "bubble", "doughnut", "line", "pie", "radar", "scatter", "stock"],
+        "matrix": ["oracle-pypptx-chart-0001-through-0021"],
+        "runtime": ["echarts-canvas"]
+      },
+      "fallback": "Render supported chart families through ECharts while retaining an explicit approximation status for Office plot-area, axis, label, and legend layout differences.",
+      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/ChartNode.ts", "src/renderer/ChartRenderer.ts", "src/renderer/chart/echartsRuntime.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-chart-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/unit/renderer/ChartRenderer.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": []
+    },
+    {
       "id": "drawingml.chart.3d.bar",
       "component": "chart",
       "renderMode": "fallback",
@@ -592,6 +654,31 @@
       "issueUrls": []
     },
     {
+      "id": "drawingml.table.common",
+      "component": "table",
+      "renderMode": "native",
+      "impact": "semantics",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "tbl"
+        }
+      ],
+      "scope": {
+        "borders": ["direct-solid", "direct-dashed", "direct-no-fill", "theme-and-conditional"],
+        "cellLayout": ["margins", "top-middle-bottom-anchor", "wrapped-text"],
+        "grid": ["equal", "variable-column-width", "variable-row-height"],
+        "merges": ["horizontal", "vertical"],
+        "styleOptions": ["first-row", "first-column", "last-column", "banded-rows"],
+        "text": ["latin", "cjk", "mixed-script"]
+      },
+      "fallback": "Render combinations outside the native matrix through the same HTML table path without extending the verified fidelity claim.",
+      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/TableNode.ts", "src/renderer/TableRenderer.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-table-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/ChartTableCoverage.test.ts", "test/unit/renderer/TableRenderer.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": []
+    },
+    {
       "id": "drawingml.text.3d.scene",
       "component": "text",
       "renderMode": "fallback",
@@ -630,7 +717,7 @@
         }
       ],
       "scope": {
-        "properties": ["wrap", "horzOverflow", "vertOverflow", "spAutoFit", "normAutofit", "noAutofit"],
+        "properties": ["wrap", "horzOverflow", "vertOverflow", "spAutoFit", "normAutofit", "noAutofit", "eaLnBrk"],
         "spAutoFitGrowthAspectRatios": ["square", "wide", "tall"],
         "spAutoFitGrowthAnchors": ["absent", "top"],
         "spAutoFitGrowthContainers": ["standalone-horizontal-textbox"],
@@ -639,9 +726,35 @@
         "spAutoFitGrowthExclusions": ["non-square-wrap", "center-or-bottom-anchor", "explicit-overflow-axis", "vertical-text", "diagram-text-bounds", "non-textbox-shape", "inherited-compact-label"]
       },
       "fallback": "Use explicit inline text-container styles so host white-space rules cannot replace PowerPoint wrapping semantics; unsupported spAutoFit growth contexts retain the bounded measurement path.",
-      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts", "test/browser/browser-package.spec.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-text-00*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/fixtures/text-coverage.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
+      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts", "test/browser/browser-package.spec.ts", "test/browser/rendering-coverage.spec.ts", "test/browser/text-line-break.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-text-00*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/fixtures/text-coverage.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/TextRenderer.branches.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/17", "https://github.com/aiden0z/pptx-renderer/issues/23"]
+    },
+    {
+      "id": "drawingml.text.math.omml",
+      "component": "text",
+      "renderMode": "approximate",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.microsoft.com/office/drawing/2010/main",
+          "localName": "m"
+        }
+      ],
+      "scope": {
+        "directOmmlRendering": ["m:r", "m:f", "m:rad", "m:sSub", "m:sSup", "m:sSubSup", "m:d", "m:nary", "m:m", "m:func"],
+        "fallbackContainers": ["mc:Fallback/p:sp", "mc:Fallback/p:graphicFrame"],
+        "fractionTypes": ["bar", "noBar", "skw", "lin"],
+        "formulaRoots": ["m:oMath", "m:oMathPara"],
+        "nativeMatrixConstructs": ["m:r", "m:f", "m:rad", "m:sSubSup", "m:d", "m:nary", "m:m", "m:func"],
+        "output": ["Presentation MathML"],
+        "styleBoundary": ["single-inherited-formula-run-style"]
+      },
+      "fallback": "Render a fully recognized math subtree as Presentation MathML; if any semantic OMML construct is unknown, select the package-authored MCE fallback shape or graphic frame. Formulas without a usable fallback remain unrendered.",
+      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/RenderableChild.ts", "src/model/nodes/MathNode.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/MathRenderer.ts", "src/renderer/TextRenderer.ts", "test/browser/compatible-content-package.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-formula-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/server.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/unit/model/RenderableChild.test.ts", "test/unit/model/nodes/MathNode.test.ts", "test/unit/renderer/MathRenderer.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": []
     },
     {
       "id": "drawingml.text.run.defrpr-color-precedence",

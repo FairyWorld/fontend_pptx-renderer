@@ -6,6 +6,8 @@ Produces oracle-pypptx-* cases covering:
   - Shape adjustment variants: same shape with different adj values
   - Zero-adjustment flowchart geometry: 28 presets across square, wide, and grouped tall views
   - Static DrawingML 3D: bounded orthographic top-bevel and opt-out matrix
+  - Tables: isolated style, merge, sizing, alignment, text, and border interactions
+  - Formulas: DrawingML a14:m / OMML constructs with explicit MCE shape fallbacks
   - Chart data variants: 2D chart types with custom data/series
   - Composite: multiple components on a single slide
 
@@ -38,7 +40,7 @@ from pptx.chart.data import BubbleChartData, CategoryChartData, XyChartData
 from pptx.dml.color import RGBColor
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.enum.dml import MSO_LINE_DASH_STYLE
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import MSO_VERTICAL_ANCHOR, PP_ALIGN
 from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
 from pptx.oxml.ns import qn
 from pptx.util import Inches, Pt
@@ -67,6 +69,10 @@ PML_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
 PML_REL_PREFIX = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 NS = {"p": PML_NS, "pr": REL_NS}
+A14_NS = "http://schemas.microsoft.com/office/drawing/2010/main"
+DRAWINGML_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006"
+OMML_NS = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 
 
 def _emu(inches: float) -> int:
@@ -3394,7 +3400,435 @@ def _build_local_shape3d_cases() -> list[CaseDef]:
 
 
 # ---------------------------------------------------------------------------
-# P2: Composite (multi-component) cases
+# P2: Native table interaction matrix
+# ---------------------------------------------------------------------------
+
+def _build_table_cases() -> list[CaseDef]:
+    """Build isolated native-oracle cases for common DrawingML table semantics."""
+    cases: list[CaseDef] = []
+    seq = 0
+
+    def _add(
+        slug: str,
+        build_fn,
+        *,
+        features: list[str],
+        required_fonts: list[str] | None = None,
+    ) -> None:
+        nonlocal seq
+        seq += 1
+        coverage = {
+            "oracle": "native-powerpoint",
+            "features": features,
+        }
+        if required_fonts:
+            coverage["requiredFonts"] = required_fonts
+        cases.append(
+            {
+                "name": f"oracle-pypptx-table-{seq:04d}-{slug}",
+                "build_fn": build_fn,
+                "coverage": coverage,
+            }
+        )
+
+    def _populate(table, values: list[list[str]], *, font_name: str = "Calibri") -> None:
+        for row_idx, row in enumerate(values):
+            for col_idx, value in enumerate(row):
+                cell = table.cell(row_idx, col_idx)
+                cell.text = value
+                for paragraph in cell.text_frame.paragraphs:
+                    paragraph.font.name = font_name
+                    paragraph.font.size = Pt(15 if row_idx == 0 else 13)
+                    if row_idx == 0:
+                        paragraph.font.bold = True
+
+    def _build_default_grid(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(4, 4, _emu(1.2), _emu(1.0), _emu(10.8), _emu(4.8)).table
+        _populate(
+            table,
+            [
+                ["Quarter", "Revenue", "Cost", "Profit"],
+                ["Q1", "$120K", "$85K", "$35K"],
+                ["Q2", "$145K", "$92K", "$53K"],
+                ["Q3", "$132K", "$88K", "$44K"],
+            ],
+        )
+
+    _add(
+        "default-grid",
+        _build_default_grid,
+        features=["a:tbl.defaultStyle", "a:tblGrid.equalColumns", "a:tr.equalRows"],
+    )
+
+    def _build_header_banded_rows(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(6, 4, _emu(0.9), _emu(0.7), _emu(11.4), _emu(5.6)).table
+        table.first_row = True
+        table.horz_banding = True
+        _populate(
+            table,
+            [
+                ["Region", "Target", "Actual", "Status"],
+                ["North", "80", "83", "On track"],
+                ["South", "75", "69", "Review"],
+                ["East", "90", "94", "On track"],
+                ["West", "70", "72", "On track"],
+                ["Central", "65", "61", "Review"],
+            ],
+        )
+
+    _add(
+        "header-banded-rows",
+        _build_header_banded_rows,
+        features=["a:tblPr.firstRow=1", "a:tblPr.bandRow=1", "a:tableStyleId"],
+    )
+
+    def _build_first_last_columns(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(5, 5, _emu(0.7), _emu(1.0), _emu(11.9), _emu(4.8)).table
+        table.first_row = True
+        table.first_col = True
+        table.last_col = True
+        _populate(
+            table,
+            [
+                ["Team", "Jan", "Feb", "Mar", "Total"],
+                ["Alpha", "12", "14", "13", "39"],
+                ["Beta", "9", "11", "15", "35"],
+                ["Gamma", "16", "15", "17", "48"],
+                ["Delta", "10", "12", "11", "33"],
+            ],
+        )
+
+    _add(
+        "first-last-columns",
+        _build_first_last_columns,
+        features=["a:tblPr.firstRow=1", "a:tblPr.firstCol=1", "a:tblPr.lastCol=1"],
+    )
+
+    def _build_horizontal_vertical_merges(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(5, 5, _emu(0.8), _emu(0.8), _emu(11.7), _emu(5.6)).table
+        _populate(table, [[f"R{r + 1}C{c + 1}" for c in range(5)] for r in range(5)])
+        table.cell(0, 0).merge(table.cell(0, 2))
+        table.cell(0, 0).text = "Horizontal span ×3"
+        table.cell(1, 3).merge(table.cell(3, 3))
+        table.cell(1, 3).text = "Vertical\nspan ×3"
+        table.cell(4, 0).merge(table.cell(4, 1))
+        table.cell(4, 0).text = "Footer span"
+
+    _add(
+        "horizontal-vertical-merges",
+        _build_horizontal_vertical_merges,
+        features=["a:tc.gridSpan", "a:tc.rowSpan", "a:tc.hMerge", "a:tc.vMerge"],
+    )
+
+    def _build_variable_grid_sizes(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(3, 4, _emu(1.4), _emu(1.2), _emu(10.5), _emu(3.6)).table
+        for column, width in zip(table.columns, (1.5, 3.0, 2.0, 4.0), strict=True):
+            column.width = _emu(width)
+        for row, height in zip(table.rows, (0.6, 1.2, 1.8), strict=True):
+            row.height = _emu(height)
+        _populate(
+            table,
+            [
+                ["ID", "Variable width label", "State", "Long notes column"],
+                ["A-01", "Standard row", "Ready", "The middle row is twice the header height."],
+                ["A-02", "Tall row wraps across lines", "Review", "The final row is three times the header height."],
+            ],
+        )
+
+    _add(
+        "variable-grid-sizes",
+        _build_variable_grid_sizes,
+        features=["a:gridCol.variableWidth", "a:tr.variableHeight", "a:tc.textWrap"],
+    )
+
+    def _build_cell_margins_vertical_anchors(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(3, 3, _emu(1.3), _emu(0.8), _emu(10.7), _emu(5.8)).table
+        _populate(
+            table,
+            [
+                ["Top / 0.10 in", "Default peer", "Short"],
+                ["Middle / 0.20 in", "Default peer", "Two\nlines"],
+                ["Bottom / 0.30 in", "Default peer", "Three\ntext\nlines"],
+            ],
+        )
+        for row_idx, (anchor, margin) in enumerate(
+            (
+                (MSO_VERTICAL_ANCHOR.TOP, 0.1),
+                (MSO_VERTICAL_ANCHOR.MIDDLE, 0.2),
+                (MSO_VERTICAL_ANCHOR.BOTTOM, 0.3),
+            )
+        ):
+            cell = table.cell(row_idx, 0)
+            cell.vertical_anchor = anchor
+            cell.margin_left = Inches(margin)
+
+    _add(
+        "cell-margins-vertical-anchors",
+        _build_cell_margins_vertical_anchors,
+        features=["a:tcPr.anchor=t|ctr|b", "a:tcPr.marL=91440|182880|274320"],
+    )
+
+    def _build_cjk_mixed_text(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(4, 3, _emu(1.0), _emu(0.9), _emu(11.3), _emu(5.2)).table
+        _populate(
+            table,
+            [
+                ["项目", "状态 Status", "说明"],
+                ["渲染精度", "进行中", "中文标点：括号（）、引号“”、顿号、。"],
+                ["Chart 2D", "95.6%", "Latin + 中文 + 12345"],
+                ["公式", "计划支持", "分数、根式、上下标与矩阵"],
+            ],
+            font_name="Microsoft YaHei",
+        )
+
+    _add(
+        "cjk-mixed-text",
+        _build_cjk_mixed_text,
+        features=["a:tbl.cjkText", "a:tbl.mixedScript", "a:tbl.punctuationWrap"],
+        required_fonts=["Microsoft YaHei"],
+    )
+
+    def _set_cell_border(
+        cell,
+        side: str,
+        *,
+        width: int,
+        color: str | None = None,
+        dash: str | None = None,
+        no_fill: bool = False,
+    ) -> None:
+        tc_pr = cell._tc.get_or_add_tcPr()
+        tag = qn(f"a:ln{side}")
+        existing = tc_pr.find(tag)
+        if existing is not None:
+            tc_pr.remove(existing)
+        line = etree.SubElement(tc_pr, tag, w=str(width))
+        if no_fill:
+            etree.SubElement(line, qn("a:noFill"))
+        else:
+            fill = etree.SubElement(line, qn("a:solidFill"))
+            etree.SubElement(fill, qn("a:srgbClr"), val=color or "000000")
+        if dash:
+            etree.SubElement(line, qn("a:prstDash"), val=dash)
+
+    def _build_cell_border_matrix(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        table = slide.shapes.add_table(3, 3, _emu(1.4), _emu(1.0), _emu(10.4), _emu(4.8)).table
+        _populate(
+            table,
+            [
+                ["Red left 2 pt", "Blue dashed top 3 pt", "No right border"],
+                ["Green bottom 1 pt", "Four explicit edges", "Theme peers"],
+                ["Default", "Default", "Default"],
+            ],
+        )
+        _set_cell_border(table.cell(0, 0), "L", width=25400, color="C00000")
+        _set_cell_border(table.cell(0, 1), "T", width=38100, color="4472C4", dash="dash")
+        _set_cell_border(table.cell(0, 2), "R", width=12700, no_fill=True)
+        _set_cell_border(table.cell(1, 0), "B", width=12700, color="70AD47")
+        for side in ("L", "R", "T", "B"):
+            _set_cell_border(table.cell(1, 1), side, width=19050, color="7030A0")
+
+    _add(
+        "cell-border-matrix",
+        _build_cell_border_matrix,
+        features=["a:tcPr.lnL|lnR|lnT|lnB", "a:ln.solidFill", "a:ln.noFill", "a:ln.prstDash"],
+    )
+
+    return cases
+
+
+# ---------------------------------------------------------------------------
+# P2a: Native formula / OMML matrix
+# ---------------------------------------------------------------------------
+
+def _math_run(text: str, *, normal: bool = False) -> str:
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    math_properties = '<m:rPr><m:nor m:val="1"/></m:rPr>' if normal else ""
+    return (
+        f"<m:r>{math_properties}"
+        '<a:rPr lang="en-US" sz="3200"><a:latin typeface="Cambria Math"/></a:rPr>'
+        f"<m:t>{escaped}</m:t></m:r>"
+    )
+
+
+def _math_arg(name: str, content: str) -> str:
+    return f"<m:{name}>{content}</m:{name}>"
+
+
+def _patch_formula_case(pptx_path: Path, omml_content: str) -> None:
+    """Wrap one fallback text box in the PowerPoint DrawingML math MCE shape."""
+    slide_part = "ppt/slides/slide1.xml"
+    entries, data_by_name = _read_pptx_entries(pptx_path)
+    root = etree.fromstring(data_by_name[slide_part])
+    fallback_shapes = root.xpath(
+        ".//p:sp[p:nvSpPr/p:cNvPr[@name='Equation fallback']]",
+        namespaces={"p": PML_NS},
+    )
+    if len(fallback_shapes) != 1:
+        raise RuntimeError("formula case requires exactly one Equation fallback shape")
+
+    fallback_shape = fallback_shapes[0]
+    choice_shape = etree.fromstring(etree.tostring(fallback_shape))
+    choice_name = choice_shape.xpath("./p:nvSpPr/p:cNvPr", namespaces={"p": PML_NS})[0]
+    choice_name.set("name", "Native equation")
+    paragraphs = choice_shape.xpath("./p:txBody/a:p", namespaces={"p": PML_NS, "a": DRAWINGML_NS})
+    if len(paragraphs) != 1:
+        raise RuntimeError("formula choice requires exactly one text paragraph")
+    paragraph = paragraphs[0]
+    for child in list(paragraph):
+        if etree.QName(child).localname != "pPr":
+            paragraph.remove(child)
+
+    math_wrapper = etree.fromstring(
+        (
+            f'<a14:m xmlns:a14="{A14_NS}" xmlns:a="{DRAWINGML_NS}" '
+            f'xmlns:m="{OMML_NS}"><m:oMathPara><m:oMath>{omml_content}'
+            "</m:oMath></m:oMathPara></a14:m>"
+        ).encode("utf-8")
+    )
+    paragraph.append(math_wrapper)
+    etree.SubElement(paragraph, f"{{{DRAWINGML_NS}}}endParaRPr", lang="en-US")
+
+    alternate = etree.Element(
+        f"{{{MC_NS}}}AlternateContent",
+        nsmap={"mc": MC_NS, "a14": A14_NS, "m": OMML_NS},
+    )
+    choice = etree.SubElement(alternate, f"{{{MC_NS}}}Choice", Requires="a14")
+    choice.append(choice_shape)
+    fallback = etree.SubElement(alternate, f"{{{MC_NS}}}Fallback")
+    parent = fallback_shape.getparent()
+    if parent is None:
+        raise RuntimeError("formula fallback shape has no parent")
+    parent.replace(fallback_shape, alternate)
+    fallback.append(fallback_shape)
+
+    _replace_pptx_entries(
+        pptx_path,
+        entries,
+        {slide_part: etree.tostring(root, encoding="UTF-8", xml_declaration=True)},
+    )
+
+
+def _build_formula_cases() -> list[CaseDef]:
+    """Build a bounded OMML construct matrix with visible fallback controls."""
+    cases: list[CaseDef] = []
+
+    def _add(slug: str, fallback_text: str, omml_content: str, feature: str) -> None:
+        def _build(prs, _fallback_text=fallback_text):
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            box = slide.shapes.add_textbox(_emu(1.4), _emu(1.6), _emu(10.5), _emu(3.2))
+            box.name = "Equation fallback"
+            text_frame = box.text_frame
+            text_frame.clear()
+            text_frame.vertical_anchor = MSO_VERTICAL_ANCHOR.MIDDLE
+            paragraph = text_frame.paragraphs[0]
+            paragraph.alignment = PP_ALIGN.CENTER
+            run = paragraph.add_run()
+            run.text = _fallback_text
+            run.font.name = "Cambria Math"
+            run.font.size = Pt(32)
+
+        cases.append(
+            {
+                "name": f"oracle-pypptx-formula-{len(cases) + 1:04d}-{slug}",
+                "build_fn": _build,
+                "postprocess_fn": lambda path, _omml=omml_content: _patch_formula_case(
+                    path, _omml
+                ),
+                "coverage": {
+                    "oracle": "native-powerpoint",
+                    "features": ["mc:AlternateContent", "a14:m", "m:oMathPara", feature],
+                    "requiredFonts": ["Cambria Math"],
+                },
+            }
+        )
+
+    _add(
+        "inline-expression",
+        "x + 1",
+        _math_run("x") + _math_run("+") + _math_run("1"),
+        "m:r",
+    )
+    _add(
+        "fraction",
+        "(a + b) / (c + d)",
+        "<m:f><m:fPr><m:type m:val=\"bar\"/></m:fPr>"
+        + _math_arg("num", _math_run("a+b"))
+        + _math_arg("den", _math_run("c+d"))
+        + "</m:f>",
+        "m:f",
+    )
+    _add(
+        "radical",
+        "sqrt(x^2 + y^2)",
+        '<m:rad><m:radPr><m:degHide m:val="1"/></m:radPr><m:deg/>'
+        + _math_arg("e", _math_run("x²+y²"))
+        + "</m:rad>",
+        "m:rad",
+    )
+    _add(
+        "subscript-superscript",
+        "x_i^2",
+        "<m:sSubSup><m:sSubSupPr/>"
+        + _math_arg("e", _math_run("x"))
+        + _math_arg("sub", _math_run("i"))
+        + _math_arg("sup", _math_run("2"))
+        + "</m:sSubSup>",
+        "m:sSubSup",
+    )
+    _add(
+        "delimiters",
+        "(x + y)",
+        '<m:d><m:dPr><m:begChr m:val="("/><m:endChr m:val=")"/></m:dPr>'
+        + _math_arg("e", _math_run("x+y"))
+        + "</m:d>",
+        "m:d",
+    )
+    _add(
+        "nary-summation",
+        "sum(i=1..n) i",
+        '<m:nary><m:naryPr><m:chr m:val="∑"/><m:limLoc m:val="undOvr"/>'
+        "</m:naryPr>"
+        + _math_arg("sub", _math_run("i=1"))
+        + _math_arg("sup", _math_run("n"))
+        + _math_arg("e", _math_run("i"))
+        + "</m:nary>",
+        "m:nary",
+    )
+    _add(
+        "matrix-2x2",
+        "[1 2; 3 4]",
+        "<m:m><m:mr>"
+        + _math_arg("e", _math_run("1"))
+        + _math_arg("e", _math_run("2"))
+        + "</m:mr><m:mr>"
+        + _math_arg("e", _math_run("3"))
+        + _math_arg("e", _math_run("4"))
+        + "</m:mr></m:m>",
+        "m:m",
+    )
+    _add(
+        "function",
+        "sin(theta)",
+        "<m:func><m:funcPr/>"
+        + _math_arg("fName", _math_run("sin", normal=True))
+        + _math_arg("e", _math_run("θ"))
+        + "</m:func>",
+        "m:func",
+    )
+    return cases
+
+
+# ---------------------------------------------------------------------------
+# P3: Composite (multi-component) cases
 # ---------------------------------------------------------------------------
 
 def _build_composite_cases() -> list[CaseDef]:
@@ -3912,7 +4346,7 @@ def _build_composite_cases() -> list[CaseDef]:
 
 
 # ---------------------------------------------------------------------------
-# P3: Chart data variants (2D types only — ECharts renderable)
+# P4: Chart data variants (2D types only — ECharts renderable)
 # ---------------------------------------------------------------------------
 
 def _build_chart_cases() -> list[CaseDef]:
@@ -4150,6 +4584,8 @@ def _build_all_case_defs(*, include_local_shape3d: bool = False) -> list[CaseDef
     all_cases.extend(_build_shape3d_cases())
     if include_local_shape3d:
         all_cases.extend(_build_local_shape3d_cases())
+    all_cases.extend(_build_table_cases())
+    all_cases.extend(_build_formula_cases())
     all_cases.extend(_build_composite_cases())
     all_cases.extend(_build_chart_cases())
     return all_cases

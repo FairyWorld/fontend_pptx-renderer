@@ -6,9 +6,18 @@ import { SafeXmlNode } from '../../parser/XmlParser';
 import { emuToPx, angleToDeg } from '../../parser/units';
 import { BaseNodeData, parseBaseProps } from './BaseNode';
 import { parseShape3DProperties, Shape3DProperties } from './Shape3D';
+import {
+  DRAWINGML_MATH_NAMESPACE,
+  firstMathRunProperties,
+  mathFormulaText,
+  parseDrawingmlMath,
+  type MathFormula,
+} from './MathNode';
 
 export interface TextRun {
   text: string;
+  /** Parsed Presentation MathML source when this run originated from `a14:m`. */
+  math?: MathFormula;
   /** OOXML dynamic field type, for example `slidenum`. */
   fieldType?: string;
   /** @internal Raw XML node — opaque to consumers. Use serializePresentation() for JSON-safe data. */
@@ -125,6 +134,15 @@ function parseParagraph(pNode: SafeXmlNode): TextParagraph {
         fieldType: child.attr('type'),
         properties: rPr.exists() ? rPr : undefined,
       });
+    } else if (ln === 'm' && child.element?.namespaceURI === DRAWINGML_MATH_NAMESPACE) {
+      const math = parseDrawingmlMath(child);
+      if (math) {
+        orderedRuns.push({
+          text: mathFormulaText(math),
+          math,
+          properties: firstMathRunProperties(child),
+        });
+      }
     }
   }
 

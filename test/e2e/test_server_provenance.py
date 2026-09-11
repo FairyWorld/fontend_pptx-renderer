@@ -180,6 +180,62 @@ def test_case_requires_review_when_one_slide_is_below_the_review_threshold(
     assert "warn:ssim_below_review_threshold" in result["quality"]["warnings"]
 
 
+def test_low_foreground_overlap_warning_requires_manual_review(tmp_path: Path, monkeypatch):
+    pptx_path = tmp_path / "source.pptx"
+    pdf_path = tmp_path / "ground-truth.pdf"
+    pptx_path.write_bytes(b"pptx")
+    pdf_path.write_bytes(b"pdf")
+    image = np.full((8, 8, 3), 255, dtype=np.uint8)
+
+    class Browser:
+        version = "test"
+
+    async def get_browser():
+        return Browser()
+
+    async def screenshot_slide(*_args, **_kwargs):
+        return image
+
+    def save_image(_image, path):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"png")
+
+    monkeypatch.setattr(server.tdp, "source_pptx", lambda *_args: pptx_path)
+    monkeypatch.setattr(server.tdp, "ground_truth_pdf", lambda *_args: pdf_path)
+    monkeypatch.setattr(server.tdp, "has_png_ground_truth", lambda *_args: False)
+    monkeypatch.setattr(server.tdp, "slide_png", lambda *_args: tmp_path / "missing.png")
+    monkeypatch.setattr(server, "get_browser", get_browser)
+    monkeypatch.setattr(server, "build_slide_to_pdf_mapping", lambda *_args: [0])
+    monkeypatch.setattr(server, "get_pdf_page_count", lambda *_args: 1)
+    monkeypatch.setattr(server, "collect_evaluation_provenance", lambda **_kwargs: {})
+    monkeypatch.setattr(server, "pdf_page_to_image", lambda *_args: image)
+    monkeypatch.setattr(server, "screenshot_slide", screenshot_slide)
+    monkeypatch.setattr(
+        server,
+        "compute_visual_metrics",
+        lambda *_args: {"ssim": 0.995, "mae": 0.1, "color_hist_corr": 1.0},
+    )
+    monkeypatch.setattr(
+        server,
+        "compute_foreground_shape_metrics",
+        lambda *_args: {
+            "fg_iou": 0.05,
+            "fg_iou_tolerant": 0.08,
+            "chamfer_score": 0.98,
+        },
+    )
+    monkeypatch.setattr(server, "make_diff_heatmap", lambda *_args: image)
+    monkeypatch.setattr(server, "_save_image", save_image)
+    monkeypatch.setattr(server, "REPORTS_DIR", tmp_path / "reports")
+    server._eval_cache.clear()
+
+    result = asyncio.run(server.evaluate_file("formula-like-sparse-content"))
+
+    assert result["supported"] is True
+    assert result["quality"]["needsReview"] is True
+    assert "warn:low_foreground_overlap_check_manually" in result["quality"]["warnings"]
+
+
 def test_batch_retry_recovers_a_transient_per_slide_runtime_error():
     run_all = _load_run_all_module()
 

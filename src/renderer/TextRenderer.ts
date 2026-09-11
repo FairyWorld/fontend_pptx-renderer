@@ -16,6 +16,7 @@ import { isAllowedExternalUrl } from '../utils/urlSafety';
 import { getEffectiveBodyPrChild, parseTextPercentage } from './TextBodyProperties';
 import { cssFontFamilyStack, resolveThemeFontStack } from './fontResolver';
 import { resolveSlideNavigationIndex, slideJumpTitle } from './navigation';
+import { renderMathFormula } from './MathRenderer';
 
 // ---------------------------------------------------------------------------
 // Style Inheritance Helpers
@@ -52,7 +53,7 @@ function findCompactNumericRunGroups(runs: TextRun[]): Map<number, number> {
     let bestEnd = -1;
     for (let j = i; j < runs.length && j < i + 4; j++) {
       const part = runs[j].text;
-      if (part === undefined || part === '\n' || part.includes('\t')) break;
+      if (runs[j].math || part === undefined || part === '\n' || part.includes('\t')) break;
       text += part;
       if (text.trim().length > 32) break;
       if (j > i && isCompactNumericToken(text)) bestEnd = j;
@@ -157,6 +158,8 @@ function getPlaceholderLstStyle(phNode: SafeXmlNode): SafeXmlNode | undefined {
 interface MergedParagraphStyle {
   align?: string;
   rtl?: boolean;
+  /** Whether Office East Asian typography and line-breaking rules are enabled. */
+  eastAsianLineBreak?: boolean;
   marginLeft?: number;
   textIndent?: number;
   defaultTabSize?: number;
@@ -199,6 +202,9 @@ function mergeParagraphProps(target: MergedParagraphStyle, pPr: SafeXmlNode): vo
 
   const rtl = pPr.attr('rtl');
   if (rtl !== undefined) target.rtl = parseOoxmlBool(rtl);
+
+  const eaLnBrk = pPr.attr('eaLnBrk');
+  if (eaLnBrk !== undefined) target.eastAsianLineBreak = parseOoxmlBool(eaLnBrk);
 
   const marL = pPr.numAttr('marL');
   if (marL !== undefined) target.marginLeft = emuToPx(marL);
@@ -989,6 +995,10 @@ export function renderTextBody(
     if (merged.rtl !== undefined) {
       paraDiv.style.direction = merged.rtl ? 'rtl' : 'ltr';
     }
+    // DrawingML defaults eaLnBrk to true. CSS line-break is inherited, so set an
+    // explicit paragraph boundary: `auto` keeps East Asian typographic rules,
+    // while `anywhere` models Office's behavior when those rules are disabled.
+    paraDiv.style.lineBreak = merged.eastAsianLineBreak === false ? 'anywhere' : 'auto';
     if (merged.marginLeft !== undefined) {
       paraDiv.style.paddingLeft = `${merged.marginLeft}px`;
     }
@@ -1225,7 +1235,9 @@ export function renderTextBody(
 
       // Determine if this should be a link
       let element: HTMLElement;
-      if (runStyle.hlinkSlideIndex !== undefined) {
+      if (run.math) {
+        element = renderMathFormula(run.math);
+      } else if (runStyle.hlinkSlideIndex !== undefined) {
         const span = document.createElement('span');
         const slideIndex = runStyle.hlinkSlideIndex;
         span.setAttribute('role', 'link');
@@ -1256,7 +1268,7 @@ export function renderTextBody(
       // Preserve consecutive spaces by alternating with &nbsp; so they survive
       // HTML whitespace collapse without being stretched by text-align:justify.
       // Tabs still need white-space:pre for tab-stop rendering.
-      const compactNumericToken = compactNumericTokenText(run.text);
+      const compactNumericToken = run.math ? undefined : compactNumericTokenText(run.text);
       const usesElementLevelTextPaint =
         !!runStyle.textGradientCss ||
         !!runStyle.textPatternCss ||
@@ -1269,7 +1281,9 @@ export function renderTextBody(
         !!compactNumericToken &&
         run.text !== compactNumericToken &&
         !usesElementLevelTextPaint;
-      if (run.text && run.text.includes('\t')) {
+      if (run.math) {
+        // The MathML subtree already carries the formula text and topology.
+      } else if (run.text && run.text.includes('\t')) {
         element.textContent = run.text;
         element.style.whiteSpace = 'pre';
       } else if (shouldSplitCompactNumericToken) {

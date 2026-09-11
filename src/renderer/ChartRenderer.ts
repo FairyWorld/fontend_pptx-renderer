@@ -879,7 +879,10 @@ function buildBarChartOption(
   const legendTopPx = getLegendTopPx(hasTitle, legendInfo);
   // When value axis is hidden, reduce left/right padding so bars use full width
   const gridLeft = isHorizontal ? 15 : valueAxis.deleted ? 4 : useCompactDefaults ? 12 : 18;
-  const gridRight = isHorizontal ? 28 : useCompactDefaults ? 15 : 10;
+  // ECharts containLabel already reserves the final value label. Keeping an
+  // additional 28 px inset shortens horizontal bars compared with Office's
+  // automatic plot area, so use the regular Cartesian edge inset here.
+  const gridRight = isHorizontal ? 10 : useCompactDefaults ? 15 : 10;
   const tooltipFmt = pctFormat || sharedSeriesFormat;
   const gridBottom = getGridBottomPx(legendInfo) + (useCompactDefaults ? 3 : 0);
   const containLabel = !hasManualGrid(manualGrid);
