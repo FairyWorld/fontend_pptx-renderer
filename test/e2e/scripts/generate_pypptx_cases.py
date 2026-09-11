@@ -1524,7 +1524,6 @@ def _build_shape_effect_cases() -> list[CaseDef]:
                 "blurRad": 50800,
                 "dist": 38100,
                 "dir": 5400000,
-                "algn": "tl",
                 "rotWithShape": 0,
             },
         )
@@ -1550,9 +1549,8 @@ def _build_shape_effect_cases() -> list[CaseDef]:
             height=3.2,
             name="Rectangle 102 percent centered shadow scale",
             shadow_attributes={
-                "blurRad": 50800,
-                "dist": 0,
-                "dir": 0,
+                "blurRad": 115455,
+                "dist": 46182,
                 "sx": 102000,
                 "sy": 102000,
                 "algn": "ctr",
@@ -1566,8 +1564,8 @@ def _build_shape_effect_cases() -> list[CaseDef]:
             height=3.2,
             name="Rectangle 92 percent top right scaled shadow",
             shadow_attributes={
-                "blurRad": 76200,
-                "dist": 63500,
+                "blurRad": 317500,
+                "dist": 127000,
                 "dir": 8100000,
                 "sx": 92000,
                 "sy": 92000,
