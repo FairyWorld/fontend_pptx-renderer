@@ -153,6 +153,44 @@
       "implementationFingerprint": "f76e4031d7ae52daa8cde5b1a3fa45c8e234c3a728eb4f03677bf26c8e93ef18"
     },
     {
+      "acceptedAt": "2026-09-11T02:22:01.352560Z",
+      "acceptedRevision": "819036412eac4913ff67254987cbb948380cf353",
+      "capabilityId": "drawingml.shape.3d.bottom-bevel-front-material",
+      "caseIds": [
+        "oracle-local-shape3d-0008-bottom-relaxed-inset-matrix"
+      ],
+      "caseInputFingerprints": [
+        "9df342d638c23b3940e36e134d7c8a9985fb4dd505e88871dc2f04ba08b5a354"
+      ],
+      "definitionFingerprint": "1f9bbbe400753ff0ec4261790326e6344059dbbd4eb7b726d0c9eccd7781065d",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "camera-local",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "performance",
+        "package-size",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "e93da7f47b75cb24bef82e1c025f5db9db53a37eb1c3bfdb03bb0fe4c427012e"
+      ],
+      "implementationFingerprint": "ef7ae3937f42052b18aedf6476773c228683d55624a0682a38e0c4170eefaaaf"
+    },
+    {
       "acceptedAt": "2026-09-09T23:14:22.003351Z",
       "acceptedRevision": "972382885758ac355cf21d9cbe40932d78a008bd",
       "capabilityId": "drawingml.shape.3d.camera-projected-plane",
