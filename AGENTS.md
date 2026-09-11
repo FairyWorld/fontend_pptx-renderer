@@ -192,6 +192,11 @@ default-case aliases as representative documents. Preserve that distinction when
 ground-truth matrices so generated case volume cannot raise its own capability rank.
 Broad residual capability selectors must use `planningMode: observation-only`. Keep their counts in
 the ledger for discovery, and define a bounded `ranked` capability before generating a work packet.
+For animation, keep the broad `presentation.animation.timing` row observation-only. The first
+ranked lane is the exact whole-shape 500 ms entrance-fade tuple declared by
+`presentation.animation.entrance.fade`; do not treat its candidate selector as runtime support.
+Animation promotion requires native temporal frames for initial, midpoint, completed, and replay
+reset states. A static PowerPoint PDF is not sufficient evidence.
 
 ## E2E Test Suite (`test/e2e/`)
 

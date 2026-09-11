@@ -338,6 +338,40 @@ def test_work_packet_contains_bounded_reflection_matrix_without_text_or_pictures
     assert packet["caseMatrix"]["paint"] == ["solid", "simple-gradient"]
 
 
+def test_work_packet_contains_bounded_entrance_fade_matrix():
+    registry = load_capability_registry(Path("oracle/capabilities.json"))
+    selected = rank_capabilities(
+        [
+            row(
+                "presentation.animation.entrance.fade",
+                impact="enhancement",
+                observed=1,
+                oracle_ready=False,
+                blockers=("oracle-report:missing-or-unmapped",),
+            )
+        ]
+    )[0]
+
+    packet = build_work_packet(selected, registry)
+
+    assert packet["caseMatrix"]["caseId"] == [
+        "shape-click-fade-500ms",
+        "shape-with-effect-fade-500ms",
+        "shape-after-effect-excluded",
+        "picture-target-excluded",
+        "group-target-excluded",
+        "paragraph-range-excluded",
+        "non-fade-inverse",
+    ]
+    assert packet["caseMatrix"]["trigger"] == ["clickEffect", "withEffect"]
+    assert packet["caseMatrix"]["timelineSample"] == [
+        "initial-hidden",
+        "midpoint-opacity",
+        "completed-visible",
+        "replay-reset",
+    ]
+
+
 def test_oracle_row_with_uninventoried_source_hash_is_stale():
     registry = load_capability_registry(Path("oracle/capabilities.json"))
     capability_id = "drawingml.shape.geometry.adjustment.donut"

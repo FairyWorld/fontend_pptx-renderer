@@ -795,6 +795,21 @@ overlapping umbrella itself the next work packet.
 text body, so raw `a:bodyPr/a:scene3d` presence cannot be treated as visible renderer demand. A
 future text-3D implementation starts by registering a bounded visible-text cohort.
 
+PresentationML animation uses the same residual/candidate split. The broad
+`presentation.animation.timing` row records every slide with a timing tree but is
+`observation-only`. The ranked `presentation.animation.entrance.fade` candidate is intentionally
+limited to whole ordinary shapes, PowerPoint's entrance-fade preset tuple
+`presetClass=entr`/`presetID=10`/`presetSubtype=0`, a 500 ms duration, `fill=hold`, a visibility set
+to visible, and `clickEffect` or `withEffect`. Group, picture, paragraph-range, after-effect,
+non-fade and unsupported timing-tree rows are inverse cases, not supported variants.
+
+Animation acceptance needs temporal evidence; a final-state PDF is insufficient. Capture the
+native PowerPoint state before playback, at the 250 ms midpoint, after 500 ms completion, and after
+replay reset for each positive row. Bind those frames and the exact PPTX hash to the verification
+report, and use the excluded rows to prove that unsupported targets retain the static fallback.
+Until that matrix exists and the runtime is promoted, the registered candidate remains planned
+rather than a public support claim.
+
 Case 0020 supplies the native group evidence: square/wide/tall and nested source-crop positives are
 paired with scene-absent inverses. Group reflection composition remains browser/real-corpus
 diagnostic evidence and is intentionally outside the promoted native matrix.

@@ -111,4 +111,11 @@ discovery umbrella, and the current representative occurrence belongs to an empt
 does not prove visible text-3D demand. It remains `observation-only` until a separate bounded row
 defines visible text content plus an exact camera, light, text-surface, and fallback contract.
 
+Animation timing is also an umbrella marker. `presentation.animation.timing` selects `p:timing`
+only for residual discovery and is `observation-only`. The ranked
+`presentation.animation.entrance.fade` selector narrows candidate `p:cTn` elements to the entrance
+fade preset tuple under `p:par`. The streaming selector cannot prove the descendant
+`p:animEffect`, target kind or paragraph range, duration, visibility set, or trigger relationship;
+the declared scope and native temporal matrix must reject candidates outside those bounds.
+
 See `CORPUS_CLASSIFICATION.md` for the separate representative-versus-validation ranking signal.

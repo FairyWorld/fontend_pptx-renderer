@@ -40,6 +40,13 @@ selectors visible in the ledger while excluding them from executable ranking and
 relevant implementation or scope change invalidates the receipt, while an unrelated
 documentation-only commit does not.
 
+Umbrella feature markers must be split before implementation. For animation, a slide-level
+`p:timing` match remains the observation-only residual, while the ranked
+`presentation.animation.entrance.fade` row identifies the narrower `presetClass=entr`,
+`presetID=10`, `presetSubtype=0` candidate. Descendant effect, target, trigger, duration and reset
+semantics are still enforced by the registry scope and oracle matrix rather than inferred from the
+element selector alone.
+
 ## 1) Parse Layer
 
 Core modules:

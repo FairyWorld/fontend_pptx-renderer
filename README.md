@@ -63,6 +63,10 @@ exclusive. If byte-identical content has both roles, its representative alias ta
 Capabilities marked `planningMode: observation-only` stay visible in inventory and the ledger but
 cannot enter the executable ranking or produce a work packet. This is used for broad residual
 selectors whose matches overlap narrower, machine-verifiable capability scopes.
+PresentationML animation follows the same split: the broad `presentation.animation.timing` row is
+observation-only, while `presentation.animation.entrance.fade` is the ranked candidate for a
+bounded whole-shape, 500 ms entrance-fade matrix. Registering that candidate does not claim runtime
+playback support; native temporal evidence and a fresh promotion receipt remain required.
 The `verify` command converts raw `/api/evaluate` results into the promotion schema and derives
 native-PowerPoint, manual-review, regression, and capability-specific local gates from those
 results. A capability that requires `shadow-local` or `reflection-local` must also receive the
@@ -1014,7 +1018,7 @@ custom geometry outside the exact camera-path profile, and unsupported paint, te
 transform, or effect combinations. Group scenes outside the exact native-verified two-picture tuple
 above remain flat. True 3D chart
 perspective/depth/surface meshes, Office 2017 embedded 3D
-models, animations/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing
+models, animation playback/transitions, equations (OMML), full EMF/WMF vector rendering, executing/editing
 embedded OLE objects, and slide notes rendering are outside the verified native scope. Available OLE
 picture previews can render; they are not an OLE object engine. EMF bitmap and embedded-PDF previews
 remain supported (PDF previews require PDF.js); arbitrary EMF/WMF vector records remain excluded.

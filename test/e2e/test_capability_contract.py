@@ -363,12 +363,21 @@ def test_tracked_capability_contract_is_valid():
     history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
 
     validate_acceptance_history(registry, history)
-    assert len(registry.capabilities) == 17
+    assert len(registry.capabilities) == 18
     camera_plane = registry.by_id()["drawingml.shape.3d.camera-projected-plane"]
     scene_residual = registry.by_id()["drawingml.shape.3d.scene"]
     text_scene_residual = registry.by_id()["drawingml.text.3d.scene"]
+    entrance_fade = registry.by_id()["presentation.animation.entrance.fade"]
+    timing_residual = registry.by_id()["presentation.animation.timing"]
     assert scene_residual.planning_mode == "observation-only"
     assert text_scene_residual.planning_mode == "observation-only"
+    assert entrance_fade.planning_mode == "ranked"
+    assert entrance_fade.selectors[0].attributes == {
+        "presetClass": ("entr",),
+        "presetID": ("10",),
+        "presetSubtype": ("0",),
+    }
+    assert timing_residual.planning_mode == "observation-only"
     scene_selector = next(
         selector for selector in camera_plane.selectors if selector.local_name == "scene3d"
     )

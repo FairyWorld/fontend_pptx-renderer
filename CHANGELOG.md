@@ -88,6 +88,10 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
   representative-document counts remain visible in the ledger, while the ranking and work-packet commands now select only bounded `ranked`
   capabilities. This prevents an overlapping umbrella selector from repeatedly steering the loop
   toward generic 3D work already covered in part by narrower native capabilities.
+- Split PresentationML timing discovery into an observation-only residual and a bounded ranked
+  entrance-fade candidate. The generated work matrix covers whole-shape 500 ms fade-in playback,
+  `clickEffect`/`withEffect`, timeline sampling and explicit inverse targets without claiming that
+  animation playback is already implemented.
 - Classify default `oracle-*` case aliases as validation fixtures during capability inventory while
   keeping other local case aliases representative. Custom corpora can select either representative
   or validation globs, and a representative alias wins when byte-identical content also has a

@@ -243,6 +243,33 @@ def test_text_body_scene3d_does_not_count_as_shape_scene3d(tmp_path: Path, regis
     assert "drawingml.shape.3d.camera-projected-plane" not in observation.capability_ids
 
 
+def test_scan_pptx_detects_bounded_entrance_fade_and_residual_timing(
+    tmp_path: Path,
+    registry,
+):
+    slide = f"""
+    <p:sld xmlns:p="{P_NS}" xmlns:a="{A_NS}">
+      <p:cSld><p:spTree/></p:cSld>
+      <p:timing><p:tnLst><p:par>
+        <p:cTn presetID="10" presetClass="entr" presetSubtype="0"
+               fill="hold" nodeType="clickEffect">
+          <p:childTnLst>
+            <p:animEffect transition="in" filter="fade"/>
+          </p:childTnLst>
+        </p:cTn>
+      </p:par></p:tnLst></p:timing>
+    </p:sld>
+    """
+
+    observation = scan_pptx(
+        write_test_pptx(tmp_path / "entrance-fade.pptx", slide_xml=slide, chart_xml=None),
+        registry,
+    )
+
+    assert "presentation.animation.entrance.fade" in observation.capability_ids
+    assert "presentation.animation.timing" in observation.capability_ids
+
+
 def test_scan_pptx_matches_exact_ancestor_path_without_counting_other_outer_shadows(
     tmp_path: Path,
 ):

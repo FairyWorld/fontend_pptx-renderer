@@ -444,6 +444,23 @@ def _case_matrix(capability: CapabilityDefinition) -> dict[str, list[Any]]:
         matrix["container"] = ["standalone", "grouped"]
         matrix["geometry"] = ["rect", "roundRect", "ellipse", "upArrow"]
         matrix["paint"] = ["solid", "simple-gradient"]
+    if capability.id == "presentation.animation.entrance.fade":
+        matrix["caseId"] = [
+            "shape-click-fade-500ms",
+            "shape-with-effect-fade-500ms",
+            "shape-after-effect-excluded",
+            "picture-target-excluded",
+            "group-target-excluded",
+            "paragraph-range-excluded",
+            "non-fade-inverse",
+        ]
+        matrix["trigger"] = ["clickEffect", "withEffect"]
+        matrix["timelineSample"] = [
+            "initial-hidden",
+            "midpoint-opacity",
+            "completed-visible",
+            "replay-reset",
+        ]
     if ".3d." in capability.id:
         matrix["operations"] = ["malformed-input", "resource-bounds", "deterministic-disposal"]
     return {key: matrix[key] for key in sorted(matrix)}

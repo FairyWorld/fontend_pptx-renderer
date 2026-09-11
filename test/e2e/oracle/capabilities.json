@@ -670,9 +670,46 @@
       "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/21", "https://github.com/aiden0z/pptx-renderer/issues/23"]
     },
     {
+      "id": "presentation.animation.entrance.fade",
+      "component": "presentation",
+      "renderMode": "fallback",
+      "impact": "enhancement",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+          "localName": "cTn",
+          "parent": {
+            "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "localNames": ["par"]
+          },
+          "attributes": {
+            "presetClass": ["entr"],
+            "presetID": ["10"],
+            "presetSubtype": ["0"]
+          }
+        }
+      ],
+      "scope": {
+        "behavior": ["opacity-fade-in"],
+        "durationMs": [500],
+        "fill": ["hold"],
+        "triggerNodeTypes": ["clickEffect", "withEffect"],
+        "targetKinds": ["shape"],
+        "targetScope": ["whole-shape"],
+        "visibilitySet": ["style.visibility=visible"],
+        "exclusions": ["afterEffect", "group-target", "picture-target", "paragraph-range", "non-fade-effect", "unsupported-timing-tree"]
+      },
+      "fallback": "Render the shape in its static final visible state when the timing tree, target, trigger, effect, or duration falls outside the verified fade-in matrix.",
+      "implementationPaths": ["CHANGELOG.md", "README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/core/Viewer.ts", "src/model/Slide.ts", "src/renderer/SlideRenderer.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_ranking.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_ranking.py"],
+      "requiredGates": ["source", "structural", "unit", "browser", "performance", "native-powerpoint", "manual-visual", "regression", "docs"],
+      "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/18", "https://github.com/aiden0z/pptx-renderer/issues/23"]
+    },
+    {
       "id": "presentation.animation.timing",
       "component": "presentation",
       "renderMode": "fallback",
+      "planningMode": "observation-only",
       "impact": "enhancement",
       "selectors": [
         {
@@ -683,6 +720,7 @@
       ],
       "scope": {
         "behavior": ["static-final-state"],
+        "role": ["residual-unsupported-animation-observation"],
         "unsupported": ["timeline", "triggers", "seek", "pause", "media-sync"]
       },
       "fallback": "Render the slide's static object state without animation playback.",
