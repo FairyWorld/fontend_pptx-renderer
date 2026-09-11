@@ -611,8 +611,10 @@ python3 test/e2e/scripts/run_capability_loop.py inventory \
 The scanner reads ZIP members in memory without extracting them. It rejects path traversal, more
 than 4,000 entries, a decoded entry over 32 MiB, or more than 256 MiB decoded in total. Identical
 PPTX bytes count once for ranking while all corpus aliases remain available in the ignored report.
-Selectors match XML namespace, local name, and optional attribute predicates; similarly named
-elements from unrelated namespaces do not count. A rejected package is isolated and recorded with
+Selectors match XML namespace, local name, optional attribute predicates, and either an optional
+direct parent or exact root-to-parent suffix. The path-scoped outer-shadow selector therefore does
+not count picture, text-run, group-level, or theme effect lists. Similarly named elements from
+unrelated namespaces do not count. A rejected package is isolated and recorded with
 a stable reason so the rest of a private corpus still produces evidence; add `--fail-on-rejected`
 when any rejected package must also make the command exit nonzero.
 

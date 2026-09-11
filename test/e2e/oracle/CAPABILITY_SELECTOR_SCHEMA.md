@@ -1,8 +1,9 @@
 # Capability Selector Schema
 
 Each selector in `capabilities.json` identifies an OOXML element by package-part glob, namespace,
-local name, and optional attribute constraints. The optional `parent` object narrows a match to an
-element whose **direct XML parent** has the declared namespace and one of the declared local names:
+local name, and optional attribute constraints. It may also use either `parent` or `ancestorPath`
+to constrain the element's XML context. The optional `parent` object narrows a match to an element
+whose **direct XML parent** has the declared namespace and one of the declared local names:
 
 ```json
 {
@@ -20,12 +21,43 @@ element whose **direct XML parent** has the declared namespace and one of the de
 duplicate-free `localNames` list are both required. Omitting `parent` preserves the original
 unscoped selector behavior and fingerprint representation.
 
+`ancestorPath` matches an exact root-to-direct-parent suffix. Each nonempty step declares a
+namespace and one or more accepted local names. This example matches `a:outerShdw` only when it is
+the direct effect-list child of a normal PresentationML shape, including that shape inside a group:
+
+```json
+{
+  "partGlob": "ppt/slides/slide*.xml",
+  "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+  "localName": "outerShdw",
+  "ancestorPath": [
+    {
+      "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+      "localNames": ["sp"]
+    },
+    {
+      "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+      "localNames": ["spPr"]
+    },
+    {
+      "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+      "localNames": ["effectLst"]
+    }
+  ]
+}
+```
+
+The path must be nonempty. Every step requires its namespace and a nonempty, duplicate-free
+`localNames` list. A selector cannot combine `parent` and `ancestorPath`. The suffix rule permits
+additional package structure above the selected shape while still excluding picture, group-level,
+text-run, and theme effect lists. Omitting both constraints preserves unscoped matching.
+
 This distinction matters for DrawingML 3D. An `a:scene3d` directly under `p:spPr` or `p:grpSpPr`
 is shape/group scene data. The same element directly under `a:bodyPr` is text-body 3D and is
 tracked separately. Inventory observation does not imply renderer support; the capability's
 `renderMode`, bounded scope, gates, and fresh promotion receipt determine the support claim.
 
-The inventory scanner enforces direct-parent matching while streaming XML with a bounded ancestor
+The inventory scanner enforces both constraint forms while streaming XML with a bounded ancestor
 stack. Contract and scanner behavior are covered by `test_capability_contract.py` and
 `test_capability_inventory.py`.
 

@@ -289,6 +289,53 @@
       "issueUrls": []
     },
     {
+      "id": "drawingml.shape.effect.outer-shadow",
+      "component": "shape",
+      "renderMode": "approximate",
+      "impact": "fidelity",
+      "selectors": [
+        {
+          "partGlob": "ppt/slides/slide*.xml",
+          "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+          "localName": "outerShdw",
+          "ancestorPath": [
+            {
+              "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+              "localNames": ["sp"]
+            },
+            {
+              "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
+              "localNames": ["spPr"]
+            },
+            {
+              "namespace": "http://schemas.openxmlformats.org/drawingml/2006/main",
+              "localNames": ["effectLst"]
+            }
+          ]
+        }
+      ],
+      "scope": {
+        "alignment": ["all-standard-values"],
+        "blurRadius": ["absent-default-zero", "nonnegative"],
+        "coexistingEffects": ["outer-shadow-only"],
+        "direction": ["absent-default-zero", "all-normalized-angles"],
+        "distance": ["absent-default-zero", "nonnegative"],
+        "geometry": ["ellipse", "rect", "roundRect"],
+        "groupTransform": ["rotation-0", "flipH-false", "flipV-false"],
+        "nodeContainer": ["standalone-slide-shape", "group-child-shape"],
+        "rotWithShape": ["0", "absent-default-true-with-unrotated-shape"],
+        "scale": ["absent-default-100pct", "uniform-positive-sx-equals-sy"],
+        "shapeFill": ["resolved-opaque-solid", "simple-gradient"],
+        "shapeTransform": ["rotation-0", "flipH-false", "flipV-false"],
+        "skew": ["absent-or-zero"],
+        "source": ["direct-shape-effect-list"]
+      },
+      "fallback": "Render the existing bounded SVG shadow approximation; retain unsupported text-only, picture-fill, custom-geometry, transform, skew, nonuniform-scale, effect-DAG, and compound-effect behavior as separate follow-on lanes.",
+      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/ShapeRenderer.ts", "src/renderer/StyleResolver.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_inventory.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/ShapeRenderer.test.ts"],
+      "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "performance", "package", "package-size", "typecheck", "lint", "build", "docs"],
+      "issueUrls": []
+    },
+    {
       "id": "drawingml.shape.geometry.adjustment.donut",
       "component": "shape",
       "renderMode": "native",

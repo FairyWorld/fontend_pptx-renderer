@@ -253,6 +253,36 @@ def test_work_packet_contains_one_bounded_donut_matrix():
     )
 
 
+def test_work_packet_contains_bounded_outer_shadow_matrix_without_placeholders():
+    registry = load_capability_registry(Path("oracle/capabilities.json"))
+    selected = rank_capabilities(
+        [
+            row(
+                "drawingml.shape.effect.outer-shadow",
+                observed=6,
+                oracle_ready=False,
+                blockers=("oracle-report:missing-or-unmapped",),
+            )
+        ]
+    )[0]
+
+    packet = build_work_packet(selected, registry)
+
+    assert packet["caseMatrix"]["caseId"] == [
+        "no-shadow-inverse",
+        "rect-blur-defaults",
+        "wide-roundrect-common-offset",
+        "tall-ellipse-directional-offset",
+        "rect-uniform-scale-102",
+        "rect-uniform-scale-92-top-right",
+        "grouped-roundrect",
+        "scheme-color-modifiers",
+    ]
+    assert packet["caseMatrix"]["container"] == ["standalone", "grouped"]
+    assert packet["caseMatrix"]["geometry"] == ["rect", "roundRect", "ellipse"]
+    assert "placeholder-parent" not in packet["caseMatrix"]["container"]
+
+
 def test_oracle_row_with_uninventoried_source_hash_is_stale():
     registry = load_capability_registry(Path("oracle/capabilities.json"))
     capability_id = "drawingml.shape.geometry.adjustment.donut"

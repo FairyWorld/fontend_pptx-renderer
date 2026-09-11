@@ -408,6 +408,20 @@ def _case_matrix(capability: CapabilityDefinition) -> dict[str, list[Any]]:
         matrix["paint"] = ["solid", "theme-style-reference"]
     if capability.id == "drawingml.shape.geometry.adjustment.donut":
         matrix["container"] = ["standalone", "grouped", "picture-clip-sentinel"]
+    if capability.id == "drawingml.shape.effect.outer-shadow":
+        matrix["caseId"] = [
+            "no-shadow-inverse",
+            "rect-blur-defaults",
+            "wide-roundrect-common-offset",
+            "tall-ellipse-directional-offset",
+            "rect-uniform-scale-102",
+            "rect-uniform-scale-92-top-right",
+            "grouped-roundrect",
+            "scheme-color-modifiers",
+        ]
+        matrix["container"] = ["standalone", "grouped"]
+        matrix["geometry"] = ["rect", "roundRect", "ellipse"]
+        matrix["paint"] = ["solid", "simple-gradient", "scheme-color-modifiers"]
     if ".3d." in capability.id:
         matrix["operations"] = ["malformed-input", "resource-bounds", "deterministic-disposal"]
     return {key: matrix[key] for key in sorted(matrix)}

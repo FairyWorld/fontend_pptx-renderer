@@ -25,6 +25,11 @@ python3 test/e2e/scripts/run_capability_loop.py --help
 they may refer to private case aliases. Tracked receipts keep stable case IDs and SHA-256 values,
 but remove absolute paths, usernames, free-form issue bodies, and private labels.
 
+Selectors can constrain a direct parent or an exact root-to-direct-parent suffix. The latter keeps
+features such as ordinary-shape `a:outerShdw` separate from identically named picture, text, group,
+and theme effects while still matching shapes nested in groups. The two constraint forms are
+mutually exclusive; see `CAPABILITY_SELECTOR_SCHEMA.md` for the tracked contract.
+
 The default inventory limits match the renderer safety contract: 4,000 ZIP entries, 32 MiB per
 decoded entry, and 256 MiB decoded in total. Ranking counts byte-identical PPTX files once. A dirty
 report, missing or changed inputs, stale relevant implementation files, skipped required cases,

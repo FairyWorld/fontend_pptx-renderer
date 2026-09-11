@@ -330,7 +330,27 @@ def test_tracked_capability_contract_is_valid():
     history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
 
     validate_acceptance_history(registry, history)
-    assert len(registry.capabilities) == 15
+    assert len(registry.capabilities) == 16
+    outer_shadow = registry.by_id()["drawingml.shape.effect.outer-shadow"]
+    assert outer_shadow.render_mode == "approximate"
+    assert tuple(
+        (step.namespace, step.local_names)
+        for step in outer_shadow.selectors[0].ancestor_path
+    ) == (
+        (
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            ("sp",),
+        ),
+        (
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            ("spPr",),
+        ),
+        (
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            ("effectLst",),
+        ),
+    )
+    assert outer_shadow.scope["source"] == ("direct-shape-effect-list",)
     top_bevel = registry.by_id()["drawingml.shape.3d.top-bevel-contour"]
     assert top_bevel.scope["bevelPresetEncoding"] == (
         "explicit-circle",
