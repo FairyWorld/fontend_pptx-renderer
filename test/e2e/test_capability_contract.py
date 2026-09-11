@@ -366,7 +366,9 @@ def test_tracked_capability_contract_is_valid():
     assert len(registry.capabilities) == 17
     camera_plane = registry.by_id()["drawingml.shape.3d.camera-projected-plane"]
     scene_residual = registry.by_id()["drawingml.shape.3d.scene"]
+    text_scene_residual = registry.by_id()["drawingml.text.3d.scene"]
     assert scene_residual.planning_mode == "observation-only"
+    assert text_scene_residual.planning_mode == "observation-only"
     scene_selector = next(
         selector for selector in camera_plane.selectors if selector.local_name == "scene3d"
     )

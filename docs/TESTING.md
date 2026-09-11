@@ -791,6 +791,10 @@ and the same caller-run gate classes. The broad
 residual, so observing a verified narrow tuple cannot hide unimplemented scene values or make the
 overlapping umbrella itself the next work packet.
 
+`drawingml.text.3d.scene` is also `observation-only`. Its current representative hit has an empty
+text body, so raw `a:bodyPr/a:scene3d` presence cannot be treated as visible renderer demand. A
+future text-3D implementation starts by registering a bounded visible-text cohort.
+
 Case 0020 supplies the native group evidence: square/wide/tall and nested source-crop positives are
 paired with scene-absent inverses. Group reflection composition remains browser/real-corpus
 diagnostic evidence and is intentionally outside the promoted native matrix.

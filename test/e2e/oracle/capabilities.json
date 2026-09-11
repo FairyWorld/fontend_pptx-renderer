@@ -595,6 +595,7 @@
       "id": "drawingml.text.3d.scene",
       "component": "text",
       "renderMode": "fallback",
+      "planningMode": "observation-only",
       "impact": "fidelity",
       "selectors": [
         {

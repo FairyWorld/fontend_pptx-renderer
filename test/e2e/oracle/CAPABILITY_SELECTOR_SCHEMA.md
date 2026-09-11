@@ -106,4 +106,9 @@ top-bevel or camera-plane candidate, while ranking cannot select the overlapping
 Only a newly registered bounded capability can produce a work packet, and only a fresh receipt for
 its exact registry scope supports a public native claim.
 
+The `drawingml.text.3d.scene` row follows the same rule. Its `a:bodyPr/a:scene3d` selector is a
+discovery umbrella, and the current representative occurrence belongs to an empty text body, so it
+does not prove visible text-3D demand. It remains `observation-only` until a separate bounded row
+defines visible text content plus an exact camera, light, text-surface, and fallback contract.
+
 See `CORPUS_CLASSIFICATION.md` for the separate representative-versus-validation ranking signal.
