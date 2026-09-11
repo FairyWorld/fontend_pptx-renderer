@@ -7,238 +7,51 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+This release improves rendering fidelity through standards-based geometry, bounded native
+PowerPoint validation, and stricter evidence tracking. Detailed supported tuples and oracle gates
+remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and
+[`docs/TESTING.md`](docs/TESTING.md).
+
 ### Added
 
-- Added an evidence-driven capability loop with a tracked OOXML feature registry, namespace-aware
-  bounded PPTX corpus inventory, transparent cohort ranking, generated work packets, and atomic
-  promotion receipts bound to capability, implementation, source, and PowerPoint ground-truth
-  hashes.
-- Added `pnpm capability:check` as a CI-safe contract gate and `pnpm capability:inventory` for local
-  ignored corpora; generated evidence stays outside the published package and tracked source tree.
-- Added capability verification normalization for raw native API reports, with clean-revision,
-  input-hash, per-slide raster-hash, manual-review, and before/after SSIM regression checks.
-- Added an eight-slide native PowerPoint matrix and a hash-bound `shadow-local` metric for direct
-  ordinary-shape outer shadows. The local gate measures exterior shadow energy, spatial field,
-  overlap, centroid, and an erasure mutation so a high full-slide SSIM cannot hide a missing or
-  misplaced shadow.
-- Added a seven-slide native PowerPoint matrix and hash-bound `reflection-local` metric for direct
-  ordinary-shape reflections. The matrix contains an inverse and six bounded positive rows across
-  geometry, aspect, paint, blur, fade, distance, and one uniform group scale. The local gate checks
-  reflection energy, spatial field, centroid, and an erasure mutation. A separate live-text row is
-  retained as discovery evidence rather than broadening the promoted shape-surface scope.
-- Added typed, serializable `a:scene3d`/`a:sp3d` observations and malformed-value diagnostics for
-  shapes, pictures, and groups, with stable renderer fallback reasons, plus a twenty-case, sixty-six-slide
-  native PowerPoint matrix covering the bounded static 3D cohort, a real-corpus picture sentinel,
-  ellipse and donut aspect/container/paint interactions, donut adjustment bounds, and horizontal,
-  vertical and combined source crops, plus explicit- and implicit-depth camera planes, editable-text
-  projection matrices including an implicit-rotation `perspectiveLeft` CJK row, and an
-  implicit-rotation `perspectiveRight` picture matrix with source-crop interactions, and paired
-  omitted/explicit default top-bevel dimensions. A six-slide custom-geometry matrix crosses one
-  bounded multi-contour cubic silhouette over square/wide/tall bounds and blue/white paint for the
-  exact `perspectiveRelaxedModerately` tuple. A nine-slide donut matrix independently crosses
-  intermediate `0.75|1.25|2.0` aspects with `10000|default25000|40000` adjustments. The twentieth
-  case adds a native-verified eight-slide `perspectiveLeft` two-picture group matrix with scene-absent
-  inverses, square/wide/tall bounds, and a nested real-corpus source-crop composition.
-- Added a schema-v8 bevel-ring fidelity metric and derived capability gate with independent dynamic
-  range and shadow-amplitude floors, a `1.05` general directional shadow-overshoot ceiling, a
-  native-backed `1.01` peak ceiling and `1.05` aggregate shadow-energy ceiling for solid donut
-  faces, a `0.30` non-cancelling local-shadow-excess ceiling, and a `1.60` ceiling for every
-  salient 30° donut contour sector, plus material-specific solid/picture
-  highlight floors, alongside
-  exact native/renderer slide-equivalence assertions for alternate OOXML encodings and an opt-in
-  ignored eight-case 3D discovery matrix for curved, holed, concave, transformed, effect-bearing,
-  and bottom-bevel inputs. The eleven-slide bottom-bevel case isolates implicit/explicit `relaxedInset`
-  dimensions, material and light rotation, live CJK text, transparency, neighboring presets, and
-  square/wide/tall geometry, including an exact transparent 3D/flat inverse control.
-- Grouped donuts now rasterize their circular bevel lighting in the child OOXML coordinate space
-  before the non-identity group stretch. This removes the concentrated dark lobe seen on the tall
-  adjustment row while leaving the independently verified grouped rect and ellipse paths unchanged.
-- Added a schema-v7 camera-plane metric and derived capability gate that bind native raster hashes
-  and verify normalized four-corner projection, material color, gradient range/direction, and
-  source-required external shadow evidence for solid planes; resolution-tolerant foreground,
-  projected bounds, and ink retention for live text; and rectified picture color/edge fidelity so
-  source-crop errors cannot pass on correct outer geometry alone. It also verifies the exact
-  bottom-bevel front-material tuple through three interior color bands and a restored-flat-fill
-  mutation, plus bounded custom-path foreground, bounds, area, centroid, and color fidelity. The
-  report erases each measurable shadow, injects a 12% picture crop, and vertically squashes custom
-  silhouettes to 20% height; promotion fails unless each corresponding local metric detects its
-  fault. Schema v7 adds an independently source-derived `picture-group` modality while preserving
-  schema-v6 compatibility for existing evidence.
-- Capability inventory isolates oversized, malformed, or unsafe packages with stable rejection
-  reasons so one private corpus file cannot prevent evidence collection for the remaining files.
-- Added a pinned ECMA-376 preset-geometry source contract, complete guide-formula/IR compiler,
-  deterministic SVG emitter, and a generated runtime subset with source-hash verification.
-- Added browser rendering for licensed EOT/MTX fonts embedded in PowerPoint files, with
-  bounded face, byte, and processing budgets plus host-font fallback for rejected faces.
-- Added `fontFaces` options to `PptxViewer` and headless `renderSlide()` so host applications can
-  register missing regular/bold font data before PowerPoint text layout is measured.
-- Added a 16-case CJK native-oracle matrix for wrap, autofit, line/paragraph spacing, adjacent
-  run spacing, parent-shape layout, and square/wide/tall `spAutoFit` growth, with tracked
-  coverage/font metadata and ignored binaries.
-- Added a four-case native PowerPoint matrix for run/paragraph/shape text-color precedence,
-  covering `srgbClr`, `schemeClr`, explicit run overrides, `fontRef` fallback, and square/wide/tall
-  containers.
-- Added optional local font profiles and per-evaluation provenance for PPTX/ground-truth/font
-  hashes, renderer Git state, and the actual browser version.
+- Added a pinned ECMA-376 preset-geometry toolchain that validates the source, evaluates the full
+  guide-formula contract, emits deterministic SVG paths, and ships a generated runtime subset.
+- Added an evidence-driven capability loop with a tracked OOXML registry, bounded corpus inventory,
+  transparent ranking, generated work packets, and hash-bound native PowerPoint acceptance receipts.
+- Added native PowerPoint matrices and local visual gates for CJK text, text-color precedence,
+  flowchart geometry, bounded static 3D, ordinary-shape shadows, and reflections.
+- Added bounded embedded EOT/MTX font loading, host-provided font faces, and reproducible font/browser
+  provenance for visual evaluation.
 
 ### Changed
 
-- Add an explicit capability `planningMode` and mark the broad DrawingML shape-scene and
-  text-body-scene residuals as `observation-only`. Residual observations and
-  representative-document counts remain visible in the ledger, while the ranking and work-packet commands now select only bounded `ranked`
-  capabilities. This prevents an overlapping umbrella selector from repeatedly steering the loop
-  toward generic 3D work already covered in part by narrower native capabilities.
-- Split PresentationML timing discovery into an observation-only residual and a bounded ranked
-  entrance-fade candidate. The generated work matrix covers whole-shape 500 ms fade-in playback,
-  `clickEffect`/`withEffect`, timeline sampling and explicit inverse targets without claiming that
-  animation playback is already implemented.
-- Classify default `oracle-*` case aliases as validation fixtures during capability inventory while
-  keeping other local case aliases representative. Custom corpora can select either representative
-  or validation globs, and a representative alias wins when byte-identical content also has a
-  validation alias. This prevents generated oracle volume from reinforcing its own capability rank.
-- Added a bounded native-verified whole-group camera projection for the exact
-  `perspectiveLeft`/95-degree/two-picture tuple. It applies one homography to the completed live child
-  layer, rejects transformed or 3D-scene ancestors and unsupported child formats, and preserves
-  finite source crops. Group reflections now clone after child rendering so diagnostic reflected
-  groups contain their completed subtree. Native PowerPoint, manual, full-page regression, and
-  crop-sensitive local gates promote the exact tuple; reflection composition remains diagnostic.
-
-- Promote the bounded direct `a:outerShdw` lane for solid/simple-gradient `rect`, `roundRect`, and
-  `ellipse` shapes. Verified 92% and 102% uniformly scaled shadows now use a separate SVG silhouette
-  with their exact top-right and center anchors; zero-distance and scaled shadows use independently
-  native-calibrated blur widths. Only the seven positive matrix rows are promoted. Rotated/flipped
-  ancestor groups, unverified parameter combinations, nonuniform scale, skew, custom geometry, 3D,
-  effect DAGs, and compound effects retain the existing approximation.
-- Render bounded direct `a:reflection` effects through an explicit shape-local cloned layer with
-  ECMA-376 defaults, affine scale/skew/alignment/direction/distance handling, blur, and a final-space
-  alpha mask. Cloned SVG IDs and references are isolated, so absolute slide offsets and reusable
-  gradients are not applied or shared twice. Only the six declared native matrix rows are promoted;
-  text, picture, group-level, transformed, 3D, and compound-effect combinations remain bounded
-  fallback or discovery paths.
-- Route bounded-adjustment `donut` through the generated OOXML runtime after pinning its default,
-  polar-handle bounds, square/wide/tall behavior, grouped rendering, and adjusted picture clipping.
-- Promote finite nonnegative `a:srcRect` picture crops into the bounded static 3D top-bevel lane;
-  negative or degenerate crops keep the ordinary flat picture path with a stable fallback reason.
-- Render the verified zero-depth rectangle camera matrix for exact `orthographicFront`,
-  `perspectiveRelaxedModerately`, scene-only `perspectiveContrastingRightFacing`/`perspectiveLeft`,
-  and stretch-picture `perspectiveRight` tuples. Solid rows use independent SVG projection and a
-  native-calibrated material field; bounded no-fill text and picture rows use CSS homographies while
-  preserving live DOM content and normal picture cropping. Text-body/style, stroke, transform,
-  depth, bevel, contour, material, effect, camera, light, paint, stretch, blip-effect, and source-crop
-  values outside the accepted matrix retain the ordinary flat path with a diagnostic reason.
-- Project the native-verified standalone `1000×1000` multi-contour numeric line/cubic custom-path
-  profile directly through the exact `perspectiveRelaxedModerately` homography for three physical
-  bounds and explicit blue/white paint. Rational cubics are adaptively flattened in projected space
-  to a maximum `0.25px` error; guided, open, differently sized, transformed, styled, or effect-bearing
-  custom geometry retains the ordinary flat path.
-- Preserve the scene-only solid camera row's theme `effectRef=2` outer shadow on the visible
-  projected polygon, with a filter region derived from the projected four-corner bounds so wide and
-  tall planes are not clipped back to their pre-projection rectangle. Scale its blur and distance
-  with the measured horizontal camera projection, apply the native-calibrated `0.95` effect
-  footprint to orthographic rows, use sRGB filter interpolation for this bounded tuple, and require
-  at least `0.70` of measurable native shadow energy in the camera-local gate.
-- Render the verified `orthographicFront` circular top-bevel subset for opaque solid
-  `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular stretch-filled pictures with a
-  silhouette-aware interior
-  distance field, continuous perimeter normals, and a circular cross-section. Bevel width controls
-  edge extent while height controls lighting contrast; a bounded cached texture replaces a
-  synchronous vector fallback only after decode, preserving contour, group, outline, outer-shadow,
-  abort, and cleanup behavior. Picture lighting now uses its native-validated `twoPt:t` direction
-  and material intensity independently from solid-shape lighting. Solid highlights retain their
-  common material mapping while dark-face attenuation is interpolated across the native square,
-  wide, and tall matrices. Square ellipse/donut rows use the native-fitted effective 330° bearing;
-  other verified three-point rows retain 350°. Wide non-rounded surfaces and the tall-rectangle
-  sentinel use dedicated native anchors. Solid donuts now combine their bounded aspect response
-  with an aspect-interpolated broad shadow floor and compressed directional lobe, reducing locally
-  over-dark sectors while preserving the independently calibrated highlight and `roundRect` paths.
-  Schema-v7 bevel evidence adds a non-cancelling local-shadow-excess gate so equal total shadow
-  energy cannot hide a wrong angular distribution. Missing
-  circular top-bevel preset/width/height attributes now use the
-  DrawingML `circle` and 76200 EMU defaults independently. The native 6 pt square-rectangle row has
-  a bounded shadow anchor, while square donuts use their own `0.572` response so the default and
-  upper-adjustment rows no longer render a 1-2% stronger peak. Unmatched 3D tuples stay flat.
-- Render the native-verified edge-on bottom-bevel front material for standalone, non-placeholder
-  opaque `#4472C4` rectangles with zero depth, default-size `relaxedInset`/`circle` `bevelB`,
-  `orthographicFront`, bounded `threePt:t` light rotation, and `dkEdge` or implicit material. The
-  face remains uniform (`#4676CB` or `#4B7BD0`) with no invented bottom rim; parent containers and
-  transparent paint retain the diagnostic flat path.
-- Validate ellipse bevels across square explicit paint, wide theme-reference paint, and a tall
-  ellipse under a non-identity group transform; all three use the same source-silhouette distance
-  field instead of a geometry-specific lighting approximation.
-- Validate donut bevels across the `0..50000` adjustment bounds, the `25000` default, square/wide/tall
-  extents, a theme fill, and a non-identity group. Multi-contour lighting now preserves the hole
-  with explicit even-odd clipping, normalizes floating-point residue at a clamped zero arc radius,
-  and recognizes resolved solid theme fills without admitting theme gradients. A separate 3×3
-  native matrix validates the aspect shadow interpolation at `0.75`, `1.25`, and `2.0` across thin,
-  default, and thick ring adjustments.
-- Route all 28 zero-adjustment flowchart presets in shape IDs 61-88 through the generated OOXML
-  runtime: 20 single-path definitions plus eight ordered three-path definitions, after build-time,
-  renderer, browser, picture-clip, and native PowerPoint comparison gates. A reproducible 28-case,
-  84-slide native matrix now covers square explicit paint, wide theme-reference paint, and grouped
-  tall rendering for every preset.
-- Report per-slide oracle runtime failures separately from visual metrics, retry transient batch
-  failures, serialize browser startup and cancellation cleanup, and require case-level manual review
-  when any visible slide falls below the review threshold even if the case average remains above it.
-- The python-pptx corpus generator now supports native PDF export on macOS, repeatable exact/glob
-  case filters, and SHA-256 artifact records while keeping cached case metadata synchronized.
-- Map Office percentage line and paragraph spacing through its native line unit, trim outer
-  first/last paragraph spacing, and use text-container defaults validated by the 16-case CJK matrix.
-- Grow verified standalone horizontal `spAutoFit` text boxes at their authored font size when
-  native PowerPoint expands multi-paragraph or explicit-size content, while keeping explicit
-  overflow axes and bounded real-deck label handling authoritative.
-- Stage macOS PowerPoint input/output in one fixed ignored runtime directory and use a bounded
-  timeout so local corpus generation does not require a new folder grant for every case.
-- Make the native macro smoke validate a non-empty SmartArt catalog produced in the fixed runtime
-  directory.
-- Install `pytest-timeout` for the declared 180-second E2E limit and remove the unused
-  `asyncio_mode` setting, so pytest no longer ignores both configuration keys with warnings.
-- Allow the resolved `pdfjs-dist` root in the Vite development server so PDF Worker browser tests
-  remain valid when a Git worktree resolves dependencies outside its own directory.
-- Honor `PPTX_E2E_BROWSER_CHANNEL` in pytest browser fixtures as well as the evaluation API, so
-  local E2E runs can consistently use an installed branded Chrome.
+- Routed all 28 zero-adjustment flowcharts and bounded-adjustment `donut` through the generated
+  OOXML geometry runtime; other presets retain their compatible handwritten paths.
+- Expanded bounded static DrawingML 3D across top bevels, selected bottom-bevel materials, zero-depth
+  camera projection, source-cropped pictures, editable text, custom geometry, and a two-picture group.
+- Promoted verified ordinary-shape outer-shadow and reflection combinations while retaining stable
+  approximation or flat fallbacks outside their declared matrices.
+- Aligned CJK wrapping, Office percentage spacing, paragraph edges, text-color precedence, and
+  selected `spAutoFit` growth behavior more closely with native PowerPoint.
+- Improved compatible-content selection, color-map and placeholder inheritance, chart defaults,
+  sparse/literal chart data, conditional table borders, and clipped media/effect lifecycle handling.
+- Hardened native-oracle execution, provenance, per-slide review, local fault-detection metrics, and
+  representative-versus-validation corpus classification.
+- Added `planningMode` so broad residual features remain observable without repeatedly entering the
+  implementation queue; animation timing is currently planning evidence only, not playback support.
 
 ### Fixed
 
-- Preserve wrapped CJK `spAutoFit` text at its authored size instead of collapsing narrow or
-  compact-wide text boxes into a scaled single line; font-ready remeasurement now also restores
-  the original wrapper and SVG dimensions before applying the final fit.
-- Keep near-fit, single-paragraph square-wrapped headings on one line with a conservative 2%
-  browser-metric correction while preserving deliberate multi-line text.
-- Resolve macOS PowerPoint exports and macro hosts by exact full path, close only that presentation,
-  and qualify VBA procedures with the host filename so unrelated open decks cannot become the
-  export/close target and unqualified macros do not fail with `-18`.
-- Preserve AppleScript stderr, including environment codes such as `-9074`; bound exports and
-  macros, remove stale output before native execution, and classify timeouts as an unlocked-session
-  or pending permission problem instead of retrying a blocked UI.
-- Generate CJK soft line breaks as DrawingML `a:br` elements so local oracle inputs do not contain
-  visible `_x000B_` escape text.
-
-- Align default vertical column, line, area, scatter, and bubble plot areas and side legends
-  more closely with PowerPoint while preserving manual layouts, overlay legends, negative-value
-  columns, and horizontal bars.
-- Wait for fonts, images, and stable chart canvas output before oracle screenshots without
-  changing ECharts animation or the public `SlideHandle.ready` contract.
-- Select one compatible MCE Choice or Fallback across slide/template/group content and
-  OLE picture previews, including the supported SVG picture extension and lazy paths.
-- Preserve slide/layout/master color-map identity/reset semantics and isolate chart-local
-  overrides from the parent slide.
-- Follow matched layout placeholder categories during master inheritance, preserve explicit
-  zero transforms/insets, and resolve body-property/autofit choices and text-container whitespace.
-- Preserve sparse scatter/bubble coordinates and literal chart data; respect explicit negative-bar
-  inversion flags and merged/conditional table borders, including corner styles and no-fill clears.
-- Keep clipped picture effects and asynchronous media work attached to their owning render
-  handle; preserve external handles across viewer reload/destroy and cancel disposed chart setup.
-- Restrict segmented-cycle geometry compensation to matching SmartArt layout provenance.
-
-- Prevented tolerated text metric overhang from turning PowerPoint text boxes into browser
-  scroll containers, which could expose scrollbars and change wrapping on Windows.
-- Sized tables from their column/row grid (Σ column widths × Σ row heights) instead of the
-  graphicFrame `<a:ext>`, so tables authored in Google Slides — which export a stale
-  placeholder ext — no longer render squished with clipped cell text.
-- Fixed group child coordinate remapping for flat groups whose child extent is zero on one
-  axis (e.g. a divider/underline built from horizontal connectors). The populated axis is now
-  offset and scaled correctly instead of skipping the remap, which had left the children
-  displaced by the group's child offset.
+- Prevented host CSS and browser text metrics from changing PowerPoint wrapping, causing unwanted
+  scrollbars, or collapsing bounded CJK `spAutoFit` text.
+- Preserved paragraph `defRPr` colors over shape `fontRef` fallback colors and generated native soft
+  line breaks without visible escape text.
+- Corrected bounded 3D bevel defaults, picture crops, camera-plane shadows, material response, and
+  donut lighting across aspect ratios, adjustments, and group transforms.
+- Stabilized chart layout/screenshots, group coordinate remapping, Google Slides table sizing,
+  compatible SVG/OLE fallbacks, and asynchronous media cleanup.
+- Made macOS PowerPoint export and macro automation path-safe, bounded, and explicit about locked or
+  permission-blocked environments.
 
 ## [1.2.4] - 2026-07-10
 
