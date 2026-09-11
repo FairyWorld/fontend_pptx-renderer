@@ -652,8 +652,11 @@ representative alias wins.
 Ranking is lexicographic and retains every input dimension: impact, currently reproduced issues,
 unique representative packages, all unique observed packages, failure type, native-oracle
 readiness, dependency depth, then capability ID. It does not generate a weighted quality
-percentage. `unknown`, stable `verified`, and externally
-`blocked` rows remain visible in the ledger but do not enter the executable queue. An open issue only
+percentage. The registry defaults `planningMode` to `ranked`; an explicit `observation-only` row
+remains visible in inventory and the ledger but cannot enter the executable queue or produce a work
+packet. This is the required mode for a broad residual selector that overlaps narrower bounded
+capabilities. `unknown`, stable `verified`, and externally `blocked` rows likewise remain visible in
+the ledger but do not enter the executable queue. An open issue only
 contributes demand after the issue snapshot explicitly records a current reproduction.
 Selecting anything other than the first executable row requires `work-packet --selection-reason`;
 the resulting packet records both the original rank and the reason, such as a previously committed
@@ -784,8 +787,9 @@ local transform, transformed/effect-bearing ancestor, or ancestor 3D scene. Veri
 all earlier/current report pairs plus the derived schema-v7 `camera-local`
 plane/custom/text/picture/picture-group report
 and the same caller-run gate classes. The broad
-`drawingml.shape.3d.scene` fallback remains in inventory as a conservative residual, so observing a
-verified narrow tuple cannot hide unimplemented scene values.
+`drawingml.shape.3d.scene` fallback remains in inventory as a conservative `observation-only`
+residual, so observing a verified narrow tuple cannot hide unimplemented scene values or make the
+overlapping umbrella itself the next work packet.
 
 Case 0020 supplies the native group evidence: square/wide/tall and nested source-crop positives are
 paired with scene-absent inverses. Group reflection composition remains browser/real-corpus

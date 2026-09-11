@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 SCHEMA_VERSION = 1
 RENDER_MODES = frozenset({"none", "fallback", "approximate", "native", "excluded"})
+PLANNING_MODES = frozenset({"ranked", "observation-only"})
 IMPACTS = frozenset(
     {"security", "crash", "missing", "semantics", "reliability", "fidelity", "enhancement"}
 )
@@ -78,6 +79,7 @@ class CapabilityDefinition:
     implementation_paths: tuple[str, ...]
     required_gates: tuple[str, ...]
     issue_urls: tuple[str, ...]
+    planning_mode: str
 
 
 @dataclass(frozen=True)
@@ -284,6 +286,7 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
             "requiredGates",
             "issueUrls",
         },
+        optional={"planningMode"},
         label=label,
     )
     capability_id = _nonempty_string(value["id"], f"{label} id")
@@ -295,6 +298,14 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
     impact = _nonempty_string(value["impact"], f"capability {capability_id} impact")
     if impact not in IMPACTS:
         raise ValueError(f"capability {capability_id} has unsupported impact: {impact}")
+    planning_mode = _nonempty_string(
+        value.get("planningMode", "ranked"),
+        f"capability {capability_id} planningMode",
+    )
+    if planning_mode not in PLANNING_MODES:
+        raise ValueError(
+            f"capability {capability_id} has unsupported planningMode: {planning_mode}"
+        )
     selectors_value = value["selectors"]
     if not isinstance(selectors_value, list):
         raise ValueError(f"capability {capability_id} selectors must be a list")
@@ -352,6 +363,7 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
         implementation_paths=implementation_paths,
         required_gates=required_gates,
         issue_urls=issue_urls,
+        planning_mode=planning_mode,
     )
 
 
@@ -418,6 +430,8 @@ def capability_definition_fingerprint(capability: CapabilityDefinition) -> str:
             for selector in capability.selectors
         ],
     }
+    if capability.planning_mode != "ranked":
+        payload["planningMode"] = capability.planning_mode
     encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 

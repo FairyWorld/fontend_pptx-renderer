@@ -57,7 +57,9 @@ ordinary-shape evidence cohort. Omitting both constraints preserves unscoped mat
 This distinction matters for DrawingML 3D. An `a:scene3d` directly under `p:spPr` or `p:grpSpPr`
 is shape/group scene data. The same element directly under `a:bodyPr` is text-body 3D and is
 tracked separately. Inventory observation does not imply renderer support; the capability's
-`renderMode`, bounded scope, gates, and fresh promotion receipt determine the support claim.
+`renderMode`, `planningMode`, bounded scope, gates, and fresh promotion receipt determine the
+support claim. `planningMode` defaults to `ranked`. Set it to `observation-only` for an umbrella
+selector that must remain measurable but is too broad to become an executable work packet.
 
 The inventory scanner enforces both constraint forms while streaming XML with a bounded ancestor
 stack. Contract and scanner behavior are covered by `test_capability_contract.py` and
@@ -98,8 +100,10 @@ verified aspect ratio. Group, placeholder, layout, and master provenance is carr
 inventory selector.
 
 The broad `drawingml.shape.3d.scene` row deliberately overlaps bounded native rows and remains a
-fallback residual. As a result, inventory still exposes unverified camera, light, or backdrop values
-even when the same package also contains a verified top-bevel or camera-plane candidate. Only a
-fresh receipt for the exact registry scope supports a public native claim.
+fallback residual with `planningMode: observation-only`. As a result, inventory still exposes
+unverified camera, light, or backdrop values even when the same package also contains a verified
+top-bevel or camera-plane candidate, while ranking cannot select the overlapping umbrella directly.
+Only a newly registered bounded capability can produce a work packet, and only a fresh receipt for
+its exact registry scope supports a public native claim.
 
 See `CORPUS_CLASSIFICATION.md` for the separate representative-versus-validation ranking signal.

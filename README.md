@@ -40,7 +40,7 @@ presentations without treating the active window as the export target.
 
 Renderer support is tracked by bounded OOXML capability rather than by a single aggregate score.
 The tracked registry at `test/e2e/oracle/capabilities.json` declares each feature's exact scope,
-current render mode, fallback, relevant implementation files, and mandatory gates. Promotion
+current render mode, planning mode, fallback, relevant implementation files, and mandatory gates. Promotion
 receipts in `test/e2e/oracle/capability-acceptance.json` bind an accepted scope to its implementation,
 PPTX inputs, PowerPoint ground truth, environment, and revision hashes.
 
@@ -60,6 +60,9 @@ and all other aliases as representative documents, so adding an oracle cannot in
 representative-demand score. For a custom mixed corpus, pass either repeatable
 `--representative-alias` globs or repeatable `--validation-alias` globs; the two modes are mutually
 exclusive. If byte-identical content has both roles, its representative alias takes precedence.
+Capabilities marked `planningMode: observation-only` stay visible in inventory and the ledger but
+cannot enter the executable ranking or produce a work packet. This is used for broad residual
+selectors whose matches overlap narrower, machine-verifiable capability scopes.
 The `verify` command converts raw `/api/evaluate` results into the promotion schema and derives
 native-PowerPoint, manual-review, regression, and capability-specific local gates from those
 results. A capability that requires `shadow-local` or `reflection-local` must also receive the

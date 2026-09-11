@@ -219,6 +219,7 @@
       "id": "drawingml.shape.3d.scene",
       "component": "shape",
       "renderMode": "fallback",
+      "planningMode": "observation-only",
       "impact": "fidelity",
       "selectors": [
         {

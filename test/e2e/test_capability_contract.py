@@ -80,6 +80,39 @@ def test_non_native_mode_requires_a_fallback_description(tmp_path: Path):
         load_capability_registry(path)
 
 
+def test_capability_planning_mode_defaults_to_ranked_and_accepts_observation_only(
+    tmp_path: Path,
+):
+    ranked_entry = capability("drawingml.shape.geometry.ranked")
+    observation_entry = capability("drawingml.shape.geometry.scene-residual")
+    observation_entry["planningMode"] = "observation-only"
+    registry = load_capability_registry(
+        write_json(
+            tmp_path / "capabilities.json",
+            {
+                "schemaVersion": 1,
+                "capabilities": [ranked_entry, observation_entry],
+            },
+        )
+    )
+
+    by_id = registry.by_id()
+    assert by_id[ranked_entry["id"]].planning_mode == "ranked"
+    assert by_id[observation_entry["id"]].planning_mode == "observation-only"
+
+
+def test_capability_rejects_unknown_planning_mode(tmp_path: Path):
+    entry = capability()
+    entry["planningMode"] = "background-maybe"
+    path = write_json(
+        tmp_path / "capabilities.json",
+        {"schemaVersion": 1, "capabilities": [entry]},
+    )
+
+    with pytest.raises(ValueError, match="planningMode"):
+        load_capability_registry(path)
+
+
 def test_registry_rejects_unknown_keys_and_unsafe_paths(tmp_path: Path):
     entry = capability()
     entry["renderMdoe"] = entry["renderMode"]
@@ -332,6 +365,8 @@ def test_tracked_capability_contract_is_valid():
     validate_acceptance_history(registry, history)
     assert len(registry.capabilities) == 17
     camera_plane = registry.by_id()["drawingml.shape.3d.camera-projected-plane"]
+    scene_residual = registry.by_id()["drawingml.shape.3d.scene"]
+    assert scene_residual.planning_mode == "observation-only"
     scene_selector = next(
         selector for selector in camera_plane.selectors if selector.local_name == "scene3d"
     )

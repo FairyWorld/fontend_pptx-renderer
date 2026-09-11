@@ -5,9 +5,9 @@ This directory contains the local-macOS PowerPoint oracle pipeline used to drive
 ## Capability Loop
 
 The oracle now has a tracked capability contract in `capabilities.json` and sanitized historical
-promotion receipts in `capability-acceptance.json`. The loop separates intended render mode from
-current evidence state and only permits a public `supported` claim when a bounded capability is
-both `native` and freshly `verified`.
+promotion receipts in `capability-acceptance.json`. The loop separates intended render mode,
+planning mode, and current evidence state. It only permits a public `supported` claim when a bounded
+capability is both `native` and freshly `verified`.
 
 ```bash
 # From the repository root
@@ -41,6 +41,9 @@ failed structural checks, or an unresolved manual-review row blocks promotion. C
 and report rejected packages instead of losing all other observations; use `--fail-on-rejected` for
 a strict nonzero exit after the report is written. Unknown, verified, and externally blocked rows
 remain in the ledger for observation but are not selected as the next implementation cohort.
+The default `planningMode` is `ranked`. Broad residual selectors must use `observation-only`; their
+counts remain visible in the ledger, but they cannot enter the executable ranking or produce a work
+packet. A new bounded capability must be registered before work on one of those residuals begins.
 When a committed goal deliberately selects a lower-ranked cohort, pass `--selection-reason`; the
 work packet records the override instead of silently hiding the global ordering.
 

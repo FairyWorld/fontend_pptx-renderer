@@ -5,6 +5,7 @@ from typing import Any, Mapping, Sequence
 
 from oracle.capability_contract import (
     IMPACTS,
+    PLANNING_MODES,
     RENDER_MODES,
     CapabilityDefinition,
     CapabilityRegistry,
@@ -46,6 +47,7 @@ class LedgerRow:
     render_mode: str
     blockers: tuple[str, ...]
     issue_urls: tuple[str, ...]
+    planning_mode: str = "ranked"
 
 
 @dataclass(frozen=True)
@@ -80,6 +82,8 @@ def _validate_row(row: LedgerRow) -> None:
         raise ValueError(f"unsupported evidence state: {row.evidence_state}")
     if row.render_mode not in RENDER_MODES:
         raise ValueError(f"unsupported render mode: {row.render_mode}")
+    if row.planning_mode not in PLANNING_MODES:
+        raise ValueError(f"unsupported planning mode: {row.planning_mode}")
     if len(row.blockers) != len(set(row.blockers)):
         raise ValueError(f"duplicate blockers for {row.capability_id}")
 
@@ -116,6 +120,8 @@ def rank_capabilities(rows: list[LedgerRow] | tuple[LedgerRow, ...]) -> tuple[Ra
         if row.capability_id in seen:
             raise ValueError(f"duplicate ledger capability: {row.capability_id}")
         seen.add(row.capability_id)
+        if row.planning_mode == "observation-only":
+            continue
         if row.evidence_state in {"unknown", "verified", "blocked"}:
             continue
         ranked.append(_ranked(row))
@@ -158,6 +164,7 @@ def ledger_row_to_dict(row: LedgerRow) -> dict[str, Any]:
         "renderMode": row.render_mode,
         "blockers": list(row.blockers),
         "issueUrls": list(row.issue_urls),
+        "planningMode": row.planning_mode,
     }
 
 
@@ -179,6 +186,7 @@ def ledger_row_from_dict(value: Mapping[str, Any]) -> LedgerRow:
             render_mode=str(value["renderMode"]),
             blockers=tuple(str(item) for item in value.get("blockers", [])),
             issue_urls=tuple(str(item) for item in value.get("issueUrls", [])),
+            planning_mode=str(value.get("planningMode", "ranked")),
         )
     except (KeyError, TypeError, ValueError) as error:
         raise ValueError("invalid capability ledger row") from error
@@ -371,6 +379,7 @@ def build_ledger_rows(
                 render_mode=capability.render_mode,
                 blockers=tuple(blockers),
                 issue_urls=capability.issue_urls,
+                planning_mode=capability.planning_mode,
             )
         )
     return tuple(rows)
@@ -465,6 +474,10 @@ def build_work_packet(
     capability = registry.by_id().get(selected.capability_id)
     if capability is None:
         raise ValueError(f"selected capability is not registered: {selected.capability_id}")
+    if capability.planning_mode != "ranked":
+        raise ValueError(
+            f"capability is observation-only and cannot produce a work packet: {capability.id}"
+        )
     row = selected.row
     return {
         "schemaVersion": 1,

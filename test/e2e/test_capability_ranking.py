@@ -27,8 +27,9 @@ def row(
     evidence_state: str = "observed",
     render_mode: str = "fallback",
     blockers: tuple[str, ...] = (),
+    planning_mode: str | None = None,
 ) -> LedgerRow:
-    return LedgerRow(
+    values = dict(
         capability_id=capability_id,
         impact=impact,
         current_issue_count=current_issues,
@@ -44,6 +45,9 @@ def row(
         blockers=blockers,
         issue_urls=(),
     )
+    if planning_mode is not None:
+        values["planning_mode"] = planning_mode
+    return LedgerRow(**values)
 
 
 def test_missing_real_deck_feature_precedes_unobserved_enhancement():
@@ -161,6 +165,7 @@ def test_ledger_counts_representative_and_validation_observations_separately():
 
     assert scene.observed_unique_packages == 2
     assert scene.observed_representative_packages == 1
+    assert scene.planning_mode == "observation-only"
 
 
 def test_oracle_readiness_then_dependency_depth_then_id_break_ties():
@@ -187,6 +192,22 @@ def test_unknown_verified_and_blocked_rows_are_watched_but_not_selected():
     )
 
     assert [item.capability_id for item in ranked] == ["cap.d"]
+
+
+def test_observation_only_rows_remain_visible_but_are_not_executable():
+    observation = row(
+        "cap.scene-residual",
+        observed=20,
+        representative=5,
+        planning_mode="observation-only",
+    )
+    executable = row("cap.next-bounded-family", observed=1)
+
+    restored = ledger_row_from_dict(ledger_row_to_dict(observation))
+    ranked = rank_capabilities([observation, executable])
+
+    assert restored.planning_mode == "observation-only"
+    assert [item.capability_id for item in ranked] == ["cap.next-bounded-family"]
 
 
 def test_ranking_rejects_invalid_or_duplicate_rows():

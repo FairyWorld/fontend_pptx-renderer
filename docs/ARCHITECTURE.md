@@ -12,8 +12,8 @@ results, but does not bypass or rewrite the Parse → Model → Render boundarie
 ## Capability Evidence Boundary
 
 `test/e2e/oracle/capabilities.json` is the tracked support contract. Each stable capability ID
-declares namespace-aware OOXML selectors, a bounded scope, current render mode, fallback, relevant
-implementation/test paths, and required gates. `capability-acceptance.json` stores only sanitized
+declares namespace-aware OOXML selectors, a bounded scope, current render mode, planning mode,
+fallback, relevant implementation/test paths, and required gates. `capability-acceptance.json` stores only sanitized
 promotion receipts; private PPTX/PDF/PNG artifacts and generated inventory remain ignored.
 
 The loop has five domain modules and a thin CLI:
@@ -32,11 +32,13 @@ The loop has five domain modules and a thin CLI:
 - `scripts/run_capability_loop.py` composes `validate`, `inventory`, `rank`, `work-packet`,
   `verify`, and `accept`; it does not edit GitHub issues or accept visual baselines.
 
-Render mode and evidence state are independent. Render modes are `none`, `fallback`, `approximate`,
+Render mode, planning mode, and evidence state are independent. Render modes are `none`, `fallback`, `approximate`,
 `native`, and `excluded`; evidence moves through `unknown`, `observed`, `reproducible`, `candidate`,
 `verified`, `regressed`, or `blocked`. User-facing support requires both `native` and `verified` for
-the declared scope. A relevant implementation or scope change invalidates the receipt, while an
-unrelated documentation-only commit does not.
+the declared scope. Planning mode is `ranked` by default; `observation-only` keeps broad residual
+selectors visible in the ledger while excluding them from executable ranking and work packets. A
+relevant implementation or scope change invalidates the receipt, while an unrelated
+documentation-only commit does not.
 
 ## 1) Parse Layer
 

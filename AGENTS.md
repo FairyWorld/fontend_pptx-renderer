@@ -190,6 +190,8 @@ font binaries; use an ignored testdata font profile and local file/symlink inste
 `pnpm capability:inventory` treats aliases containing `oracle-` as validation fixtures and other
 default-case aliases as representative documents. Preserve that distinction when adding local
 ground-truth matrices so generated case volume cannot raise its own capability rank.
+Broad residual capability selectors must use `planningMode: observation-only`. Keep their counts in
+the ledger for discovery, and define a bounded `ranked` capability before generating a work packet.
 
 ## E2E Test Suite (`test/e2e/`)
 
