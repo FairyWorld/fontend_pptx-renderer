@@ -13,6 +13,8 @@ capability is both `native` and freshly `verified`.
 # From the repository root
 pnpm capability:check
 pnpm capability:inventory
+pnpm verify:plan -- --base HEAD^
+pnpm verify:affected -- --base HEAD^
 
 # Inspect all commands
 python3 test/e2e/scripts/run_capability_loop.py --help
@@ -51,6 +53,21 @@ picture, paragraph-range, after-effect and non-fade inverses. A static PDF canno
 temporal oracle.
 When a committed goal deliberately selects a lower-ranked cohort, pass `--selection-reason`; the
 work packet records the override instead of silently hiding the global ordering.
+
+`verify_affected.py` is the fast development-loop entry point. It uses exact or declared-glob
+`implementationPaths` matches to select affected capabilities, de-duplicates their tracked unit
+and Python tests, and reports the native case set from the latest receipt. It deliberately defers
+browser and native runs for targeted plans so they execute once at pre-commit or pre-merge rather
+than after every edit. Markdown-only changes run formatting plus documentation and distribution
+contract tests without invalidating the fast visual plan. Unclassified non-documentation paths
+fail closed to the full TypeScript, Python, typecheck, and browser plan. Registry or unclassified
+global runtime/control changes also retain every registered capability's native and local gates;
+shared evaluation, provenance, evidence, and loop-control changes additionally run
+`capability:check`. Local case artifacts must match the latest receipt's source and selected
+ground-truth fingerprints; case-name existence alone is insufficient. Missing accepted case sets
+or exact local artifacts remain explicit gaps. Repeat `--case-report` with fresh per-case API
+reports to receive complete commands for required `bevel-local`, `camera-local`, `shadow-local`, and
+`reflection-local` gates.
 
 `verify` consumes raw `/api/evaluate` JSON reports from one clean committed renderer revision. It
 derives native-PowerPoint, manual-review, and regression status, including a matching baseline case
@@ -568,7 +585,8 @@ corpora; do not mix untrusted macro-enabled documents into that session.
 
 1. Expand shape/smartart coverage in `oracle/cases/*.json`.
 2. Add auto-minimization for failing cases and persist them into a stable regression suite.
-3. Add PR (`smoke`) vs nightly (`full`) matrix commands in CI scripts.
+3. Reuse exact-provenance render artifacts across metric-only changes, then add PR (`smoke`) vs
+   nightly (`full`) matrix commands in CI.
 
 ## Standard TDD Loop For New Render Support
 

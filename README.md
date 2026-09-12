@@ -47,6 +47,8 @@ PPTX inputs, PowerPoint ground truth, environment, and revision hashes.
 ```bash
 pnpm capability:check      # validate tracked contracts and relevant file paths
 pnpm capability:inventory  # scan the local ignored corpus into an ignored evidence report
+pnpm verify:plan -- --base HEAD^      # show affected fast checks and deferred oracle cases
+pnpm verify:affected -- --base HEAD^  # run affected unit/Python/typecheck gates
 python3 test/e2e/scripts/run_capability_loop.py verify --help
 ```
 
@@ -55,6 +57,13 @@ Inventory, ledger, ranking, work-packet, and verification reports stay under the
 the public `supported` claim additionally requires a fresh `verified` receipt. A report from a
 dirty tree, a changed capability scope, changed implementation files, changed input/ground-truth
 hashes, skipped cases, or an unresolved manual review cannot promote a capability.
+During implementation, `verify:affected` maps changed files to the capability registry and runs the
+small deterministic subset first. It lists browser and native PowerPoint work for the pre-commit
+or pre-merge gate; any unclassified non-documentation file fails closed to a full plan, while
+global runtime or capability-registry changes expand the native scope to every capability. Local
+oracle/evidence control changes also run the capability receipt check. Local artifacts satisfy a
+receipt only when their source and ground-truth hashes match exactly. See
+[`docs/TESTING.md`](docs/TESTING.md) for the three verification tiers.
 The default inventory treats case aliases containing `oracle-` as generated validation fixtures
 and all other aliases as representative documents, so adding an oracle cannot increase its own
 representative-demand score. For a custom mixed corpus, pass either repeatable

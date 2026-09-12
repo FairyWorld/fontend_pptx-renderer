@@ -7,6 +7,60 @@ This project uses layered verification across two test ecosystems:
   matrix, and isolated PDF.js Worker rendering in Chromium.
 - **E2E tests** (pytest + Playwright): structural validation, visual comparison against PowerPoint PDF output, and baseline-driven shape/SmartArt regression.
 
+## Fast Feedback By Change Impact
+
+Use the affected-verification planner during implementation instead of repeating every gate after
+each edit:
+
+```bash
+# Inspect the previous commit without running checks
+pnpm verify:plan -- --base HEAD^
+
+# Run only the planned fast checks
+pnpm verify:affected -- --base HEAD^
+
+# Plan explicit working files while iterating
+pnpm verify:plan -- --changed-path src/renderer/ChartRenderer.ts
+
+# Make required local visual-gate commands executable from fresh per-case reports
+pnpm verify:plan -- --changed-path src/renderer/Shape3DRenderer.ts \
+  --case-report test/e2e/reports/case-a.json \
+  --case-report test/e2e/reports/case-b.json
+```
+
+The planner maps changed files through exact or declared-glob `implementationPaths` in
+`capabilities.json`, de-duplicates their unit and Python tests, and lists the native PowerPoint case
+IDs already bound by the latest acceptance receipts. A targeted run executes only those
+unit/Python checks plus TypeScript type checking when runtime TypeScript changed. Browser checks
+and native rendering stay visible as deferred pre-commit and pre-merge gates. Documentation-only
+changes run formatting plus all known documentation and distribution contract tests and do not
+request a visual rerender. Any unclassified non-documentation path fails closed to the full
+TypeScript, Python, typecheck, and browser plan. A capability-registry or unclassified global
+runtime/control change expands the native scope to every registered capability. Shared evaluation,
+provenance, evidence, and capability-loop control changes do the same and add `capability:check`.
+Native artifacts count as available only when their source and selected ground-truth SHA-256 values
+match the latest receipt exactly; same-stem cases from another local corpus cannot satisfy the
+check. Missing case sets, mismatched artifacts, and required local visual gates without a complete
+repeatable `--case-report` set are reported explicitly instead of silently passing. Targeted Python
+commands run from `test/e2e`, where the suite's fixture and testdata paths are defined.
+
+The package commands use `scripts/run-python.mjs`, preferring `PYTHON`, then the platform-specific
+E2E virtual environment, then an installed Python 3 launcher. This keeps the same entry points
+usable on macOS, Linux, and Windows.
+
+Use three verification tiers:
+
+1. **Edit loop:** `pnpm verify:affected` for affected deterministic tests, normally seconds to a
+   few minutes.
+2. **Pre-commit:** add the planner-requested browser suite and evaluate only its listed native
+   cases. Keep the dev servers alive across cases.
+3. **Pre-merge/release:** run the complete required suite, package gates, capability receipt check,
+   and any deliberately global native matrix.
+
+This changes when verification runs, not what constitutes acceptance. Cached or previously
+accepted evidence is reusable only while its capability implementation, source, ground truth,
+browser/capture profile, and font provenance still match.
+
 ## Unit Tests
 
 ```bash
@@ -883,15 +937,15 @@ instead of silently passing.
 
 The bounded local gate requires all of the following:
 
-| Signal | Column/bar/area | Line | Failure protected against |
-| --- | ---: | ---: | --- |
-| Maximum plot-side error / shorter raster side | <= 0.01 | <= 0.01 | Shifted or resized plot area |
-| Tolerant chromatic-series IoU | >= 0.90 | >= 0.65 | Missing or displaced bars, areas, or thin lines |
-| Series-ink area ratio | >= 0.88 | >= 0.88 | Missing or overdrawn data ink |
-| Series Chamfer score | >= 0.995 | >= 0.995 | Local contour/path displacement |
-| Series centroid distance | <= 0.005 | <= 0.005 | Whole-series translation |
-| Reference pixels with candidate ink within 3 px | >= 0.95 | >= 0.95 | Sparse/missing candidate series |
-| Mean normalized Lab distance | <= 0.12 | <= 0.12 | Wrong series colors |
+| Signal                                          | Column/bar/area |     Line | Failure protected against                       |
+| ----------------------------------------------- | --------------: | -------: | ----------------------------------------------- |
+| Maximum plot-side error / shorter raster side   |         <= 0.01 |  <= 0.01 | Shifted or resized plot area                    |
+| Tolerant chromatic-series IoU                   |         >= 0.90 |  >= 0.65 | Missing or displaced bars, areas, or thin lines |
+| Series-ink area ratio                           |         >= 0.88 |  >= 0.88 | Missing or overdrawn data ink                   |
+| Series Chamfer score                            |        >= 0.995 | >= 0.995 | Local contour/path displacement                 |
+| Series centroid distance                        |        <= 0.005 | <= 0.005 | Whole-series translation                        |
+| Reference pixels with candidate ink within 3 px |         >= 0.95 |  >= 0.95 | Sparse/missing candidate series                 |
+| Mean normalized Lab distance                    |         <= 0.12 |  <= 0.12 | Wrong series colors                             |
 
 The candidate series-mask erasure sanity check must also turn the series gate from pass to fail.
 Plot, value-axis, category-axis, and right-legend SSIM values remain diagnostics because a mostly

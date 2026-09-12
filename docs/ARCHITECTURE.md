@@ -16,7 +16,7 @@ declares namespace-aware OOXML selectors, a bounded scope, current render mode, 
 fallback, relevant implementation/test paths, and required gates. `capability-acceptance.json` stores only sanitized
 promotion receipts; private PPTX/PDF/PNG artifacts and generated inventory remain ignored.
 
-The loop has five domain modules and a thin CLI:
+The loop has six domain modules and two thin CLIs:
 
 - `capability_contract.py` validates immutable registry and receipt types.
 - `capability_inventory.py` scans PPTX ZIP/XML within fixed entry and decoded-byte limits and
@@ -29,16 +29,29 @@ The loop has five domain modules and a thin CLI:
   the API report and the current raster files.
 - `capability_ranking.py` applies a documented lexicographic priority and emits one bounded work
   packet.
+- `verification_impact.py` maps changed repository paths through exact or declared-glob capability
+  ownership to deterministic tests, browser/native requirements, and the latest accepted native
+  case sets. Documentation-only edits run documentation contracts without entering the visual
+  plan; unclassified non-documentation paths fail closed to full TypeScript, Python, typecheck, and
+  browser verification. Capability-registry and unclassified global runtime/control changes expand
+  impact to every registered capability. Shared evaluation, provenance, evidence, and loop-control
+  changes do the same and add the capability receipt check. Native artifacts are matched to
+  receipt-bound source and ground-truth fingerprints rather than case names alone. The planner also
+  exposes missing native artifacts and the exact local metric commands still required.
 - `scripts/run_capability_loop.py` composes `validate`, `inventory`, `rank`, `work-packet`,
   `verify`, and `accept`; it does not edit GitHub issues or accept visual baselines.
+- `scripts/verify_affected.py` prints that impact plan and optionally executes its fast commands in
+  their declared working directories; targeted browser and native work remains a visible
+  pre-commit/pre-merge obligation.
 
 Render mode, planning mode, and evidence state are independent. Render modes are `none`, `fallback`, `approximate`,
 `native`, and `excluded`; evidence moves through `unknown`, `observed`, `reproducible`, `candidate`,
 `verified`, `regressed`, or `blocked`. User-facing support requires both `native` and `verified` for
 the declared scope. Planning mode is `ranked` by default; `observation-only` keeps broad residual
 selectors visible in the ledger while excluding them from executable ranking and work packets. A
-relevant implementation or scope change invalidates the receipt, while an unrelated
-documentation-only commit does not.
+relevant implementation or scope change invalidates the receipt. The edit-loop planner treats
+Markdown-only work as non-rendering work, while the final receipt check still follows each
+capability's tracked `implementationPaths` exactly.
 
 Umbrella feature markers must be split before implementation. For animation, a slide-level
 `p:timing` match remains the observation-only residual, while the ranked
