@@ -245,13 +245,15 @@ export function applyLegendGridMargins(
       posVal === 'r' && isLineChart && seriesCount === 1 && categoryCount >= 20;
     const legendPaddingPx = isLineChart
       ? isDenseSingleSeriesLineRightLegend
-        ? -4
-        : 6
-      : isBubbleChart
-        ? 10
-        : usesCompactBarLegend
-          ? 15
-          : 18;
+        ? -10
+        : 2
+      : isAreaChart
+        ? 8
+        : isBubbleChart
+          ? 10
+          : usesCompactBarLegend
+            ? 15
+            : 18;
     const gridMarginPx = Math.max(84, Math.round(estimatedLegendPx + legendPaddingPx));
 
     if (typeof opt.grid.left === 'string' && opt.grid.left.includes('%')) return;

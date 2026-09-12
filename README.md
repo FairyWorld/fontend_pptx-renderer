@@ -845,6 +845,9 @@ Powered by [ECharts](https://echarts.apache.org/). Supports Bar/Column (clustere
 A 21-case native PowerPoint matrix exercises these two-dimensional families and their common data
 variants. The runtime coverage is broad, while the capability remains explicitly `approximate`
 until the chart-family gates close the remaining plot-area, axis, label, and legend differences.
+Automatic Cartesian layout is calibrated for common compact columns, negative-value zero
+crossings, horizontal bars, and right-side line/area legends while preserving explicit plot
+layouts and top/bottom legend reservations.
 
 The renderer registers only the ECharts charts, components, features, and Canvas renderer
 that it uses. Bundler consumers keep ECharts external; the standalone browser entry

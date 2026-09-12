@@ -137,7 +137,10 @@ matrix still render, but do not inherit its native-fidelity claim.
 Two-dimensional charts use the modular ECharts canvas runtime. A 21-case native matrix spans the
 implemented chart families, while the capability remains `approximate` until the family-specific
 plot-area, axis, label, and legend gates pass. Chart data semantics and visual layout are tested as
-separate concerns so layout tuning cannot conceal a dropped series or malformed cache.
+separate concerns so layout tuning cannot conceal a dropped series or malformed cache. Automatic
+Cartesian layout has a native-calibrated path for compact columns, negative-value zero crossings,
+horizontal bars, and right-side line/area legends; explicit plot layouts and top/bottom legend
+reservations retain their OOXML-defined behavior.
 
 PowerPoint math is an Office Drawing extension: an `mc:AlternateContent` choice contains a shape
 whose paragraph includes `a14:m` and OMML, while the fallback contains a `p:sp` or

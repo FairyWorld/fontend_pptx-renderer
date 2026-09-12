@@ -87,7 +87,32 @@ describe('chart option post-process helpers', () => {
 
     applyLegendGridMargins(option, chartNode, undefined);
 
-    expect(option.grid.right).toBe(105);
+    expect(option.grid.right).toBe(101);
+    expect(option.legend.right).toBe('1%');
+  });
+
+  it('keeps the native plot span for area charts with a right legend', () => {
+    const option = {
+      grid: { left: 12, right: 15 },
+      legend: {
+        data: [{ name: 'Curve' }],
+        itemWidth: 18,
+        textStyle: { fontSize: 18 },
+      },
+      xAxis: { type: 'category', data: ['A', 'B'] },
+      yAxis: { type: 'value' },
+      series: [{ type: 'line', areaStyle: {} }],
+    };
+    const chartNode = parseXml(`
+      <c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:plotArea><c:areaChart/></c:plotArea>
+        <c:legend><c:legendPos val="r"/><c:overlay val="0"/></c:legend>
+      </c:chart>
+    `);
+
+    applyLegendGridMargins(option, chartNode, undefined);
+
+    expect(option.grid.right).toBe(98);
     expect(option.legend.right).toBe('1%');
   });
 

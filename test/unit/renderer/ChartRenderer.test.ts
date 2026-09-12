@@ -256,7 +256,26 @@ describe('ChartRenderer', () => {
         { w: 960, h: 576 },
       );
 
-      expect(option.grid).toMatchObject({ left: 12, right: 15, top: 9, bottom: 23 });
+      expect(option.grid).toMatchObject({ left: 14, right: 15, top: 9, bottom: 23 });
+    });
+
+    it('uses grouping-specific left insets for stacked Cartesian bars', () => {
+      const stackedXml = buildChartSpaceXml({ valAxDeleted: false }).replace(
+        '<c:grouping val="clustered"/>',
+        '<c:grouping val="stacked"/>',
+      );
+      const percentStackedXml = buildChartSpaceXml({ valAxDeleted: false }).replace(
+        '<c:grouping val="clustered"/>',
+        '<c:grouping val="percentStacked"/>',
+      );
+      const horizontalStackedXml = stackedXml.replace(
+        '<c:barDir val="col"/>',
+        '<c:barDir val="bar"/>',
+      );
+
+      expect(parseChartOption(stackedXml).option.grid).toMatchObject({ left: 12 });
+      expect(parseChartOption(percentStackedXml).option.grid).toMatchObject({ left: 13 });
+      expect(parseChartOption(horizontalStackedXml).option.grid).toMatchObject({ left: 14 });
     });
 
     it('preserves zero-crossing and horizontal-bar plot defaults', () => {
@@ -280,7 +299,26 @@ describe('ChartRenderer', () => {
       ).option.grid;
 
       expect(negative).toMatchObject({ left: 18, right: 10, top: 20, bottom: 20 });
-      expect(horizontal).toMatchObject({ left: 15, right: 10, top: 60, bottom: 20 });
+      expect(horizontal).toMatchObject({ left: 12, right: 10, top: 61, bottom: 23 });
+    });
+
+    it('keeps horizontal-bar space for explicit top and bottom legends', () => {
+      const topLegendXml = buildChartSpaceXml({
+        hasLegend: true,
+        legendPos: 't',
+        valAxDeleted: false,
+      }).replace('<c:barDir val="col"/>', '<c:barDir val="bar"/>');
+      const bottomLegendXml = buildChartSpaceXml({
+        hasLegend: true,
+        legendPos: 'b',
+        valAxDeleted: false,
+      }).replace('<c:barDir val="col"/>', '<c:barDir val="bar"/>');
+
+      const topLegendGrid = parseChartOption(topLegendXml).option.grid;
+      const bottomLegendGrid = parseChartOption(bottomLegendXml).option.grid;
+
+      expect(topLegendGrid).toMatchObject({ top: 32, bottom: 23 });
+      expect(bottomLegendGrid).toMatchObject({ top: 14, bottom: 35 });
     });
 
     it('scales numeric-axis margins with the chart frame', () => {
@@ -3586,7 +3624,7 @@ describe('ChartRenderer', () => {
       const grid = option.grid as any;
       const series = option.series as any[];
 
-      expect(grid.left).toBe(12);
+      expect(grid.left).toBe(14);
       expect(grid.bottom).toBe(23);
       expect(series[0].barGap).toBe('0%');
     });
@@ -3650,9 +3688,10 @@ describe('ChartRenderer', () => {
       const { option } = parseChartOption(xml);
       const grid = option.grid as any;
 
-      expect(grid.left).toBe(15);
+      expect(grid.left).toBe(12);
       expect(grid.right).toBe(10);
-      expect(grid.top).toBe(60);
+      expect(grid.top).toBe(61);
+      expect(grid.bottom).toBe(23);
     });
 
     it('uses PowerPoint-like automatic value axis range for line charts (oracle-pypptx-chart-0007)', () => {
@@ -6356,6 +6395,22 @@ describe('ChartRenderer', () => {
       expect(option.grid.left).toBeGreaterThanOrEqual(48);
     });
 
+    it('scales zero-crossing value-label space for a native 10-inch chart frame', () => {
+      const option: any = {
+        grid: { left: 18, right: 10, top: 68, bottom: 20 },
+        xAxis: {
+          type: 'category',
+          axisLine: { onZero: true },
+          axisLabel: { fontSize: 24 },
+        },
+        yAxis: { type: 'value', min: -15, max: 25 },
+      };
+
+      applyZeroCrossingAxisLabelLayout(option, { w: 960, h: 576 });
+
+      expect(option.grid.left).toBe(62);
+    });
+
     it('keeps dense line chart category labels horizontal unless OOXML requests rotation (oracle-pypptx-chart-0021)', () => {
       const categories = Array.from({ length: 24 }, (_, idx) => idx + 1);
       const points = categories
@@ -6395,7 +6450,7 @@ describe('ChartRenderer', () => {
 
       const { option } = parseChartOption(xml);
       expect((option.xAxis as any).axisLabel.rotate).toBe(0);
-      expect((option.grid as any).right).toBe(114);
+      expect((option.grid as any).right).toBe(108);
     });
 
     it('uses the chart-level line marker default when series markers are omitted (oracle-pypptx-chart-0021)', () => {
@@ -6874,6 +6929,7 @@ describe('ChartRenderer', () => {
       expect(xAxis.boundaryGap).toBe(false);
       expect(yAxis.interval).toBe(2);
       expect(yAxis.max).toBe(14);
+      expect((option.grid as any).left).toBe(14);
     });
 
     it('uses PowerPoint-like axis headroom for standard area charts (oracle-pypptx-chart-0014)', () => {
@@ -6950,6 +7006,7 @@ describe('ChartRenderer', () => {
       expect(xAxis.boundaryGap).toBeUndefined();
       expect(legend.data.map((item: any) => item.name)).toEqual(['B', 'A']);
       expect(legend.data.map((item: any) => item.lineStyle.color)).toEqual(['#ED7D31', '#4472C4']);
+      expect((option.grid as any).left).toBe(12);
     });
 
     it('applies maxMin axis orientation as ECharts inverse axes', () => {

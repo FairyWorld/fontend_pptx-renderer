@@ -110,9 +110,10 @@ remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
 
 ### Fixed
 
-- Improved chart fidelity across axis density, tick visibility, label sizing, legend
-  order, legend margins, marker defaults, blank data points, data table semantics, rich
-  chart titles, text shadows, plot-area backgrounds, and radar manual layout.
+- Improved chart fidelity across plot-area extents, zero-crossing label space, axis density,
+  tick visibility, label sizing, legend order and margins, marker defaults, blank data points,
+  data table semantics, rich chart titles, text shadows, plot-area backgrounds, and radar manual
+  layout.
 - Improved pie, doughnut, radar, scatter, bubble, horizontal bar, stacked, stock, and
   dense line chart defaults so compact and Office-authored charts render closer to
   PowerPoint.

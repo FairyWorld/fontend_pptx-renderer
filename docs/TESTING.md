@@ -865,7 +865,11 @@ Chart rendering is validated at two levels:
 The 21-case python-pptx matrix covers column/bar, line/area, pie/doughnut, scatter, radar, bubble,
 and stock families. Treat the broad runtime as approximate until each family passes its native
 gate. Diagnose Cartesian plot area, axes, labels, and legends separately before changing series
-geometry or data parsing.
+geometry or data parsing. The Cartesian automatic-layout matrix keeps explicit plot layouts and
+top/bottom legend reservations as opt-outs, and covers compact columns, zero-crossing category
+labels, horizontal bars, and right-side line/area legends. A whole-slide score is supporting
+evidence only; semantic assertions and plot-region inspection decide whether a layout change is
+acceptable.
 
 Formula verification has two distinct gates. MCE fallback tests prove that an unsupported
 `a14:m` equation retains its package-authored `p:sp` or `p:graphicFrame` fallback. Direct support

@@ -874,17 +874,32 @@ function buildBarChartOption(
     !hasManualGrid(manualGrid) &&
     !hasNegativeSeriesValue(seriesArr);
   const hasTitle = !!titleOption;
-  const gridTop =
-    isHorizontal && hasTitle ? 60 : getGridTopPx(hasTitle, legendInfo, useCompactDefaults);
+  const useNativeHorizontalTop =
+    isHorizontal && !(legendIsAtTop(legendInfo) && !legendInfo?.overlay);
+  const gridTop = useNativeHorizontalTop
+    ? hasTitle
+      ? 61
+      : 14
+    : getGridTopPx(hasTitle, legendInfo, useCompactDefaults);
   const legendTopPx = getLegendTopPx(hasTitle, legendInfo);
+  const compactVerticalLeft = isPercentStacked ? 13 : isStacked ? 12 : 14;
+  const compactHorizontalLeft = isStacked ? 14 : 12;
   // When value axis is hidden, reduce left/right padding so bars use full width
-  const gridLeft = isHorizontal ? 15 : valueAxis.deleted ? 4 : useCompactDefaults ? 12 : 18;
+  const gridLeft = isHorizontal
+    ? compactHorizontalLeft
+    : valueAxis.deleted
+      ? 4
+      : useCompactDefaults
+        ? compactVerticalLeft
+        : 18;
   // ECharts containLabel already reserves the final value label. Keeping an
   // additional 28 px inset shortens horizontal bars compared with Office's
   // automatic plot area, so use the regular Cartesian edge inset here.
   const gridRight = isHorizontal ? 10 : useCompactDefaults ? 15 : 10;
   const tooltipFmt = pctFormat || sharedSeriesFormat;
-  const gridBottom = getGridBottomPx(legendInfo) + (useCompactDefaults ? 3 : 0);
+  const baseGridBottom = getGridBottomPx(legendInfo);
+  const gridBottom =
+    isHorizontal && baseGridBottom === 20 ? 23 : baseGridBottom + (useCompactDefaults ? 3 : 0);
   const containLabel = !hasManualGrid(manualGrid);
 
   return {
@@ -1121,7 +1136,8 @@ function buildLineChartOption(
     !legendInfo?.overlay && !hasManualGrid(manualGrid) && !hasNegativeSeriesValue(seriesArr);
   const gridTop = getGridTopPx(!!titleOption, legendInfo, useCompactDefaults);
   const legendTopPx = getLegendTopPx(!!titleOption, legendInfo);
-  const gridLeft = valueAxis.deleted ? 4 : useCompactDefaults ? 12 : 18;
+  const compactGridLeft = isStacked && !isArea ? 12 : 14;
+  const gridLeft = valueAxis.deleted ? 4 : useCompactDefaults ? compactGridLeft : 18;
   const tooltipFmt = pctFormat || sharedSeriesFormat;
   const gridBottom = getGridBottomPx(legendInfo) + (useCompactDefaults ? 3 : 0);
   const containLabel = !hasManualGrid(manualGrid);
@@ -2312,7 +2328,11 @@ export function applyZeroCrossingAxisLabelLayout(
 
   if (applied && grid) {
     grid.containLabel = false;
-    grid.left = Math.max(gridEdgePx(grid.left, chartSize.w, 0), 48);
+    grid.left = Math.max(
+      gridEdgePx(grid.left, chartSize.w, 0),
+      48,
+      Math.round(chartSize.w * 0.065),
+    );
   }
 }
 
