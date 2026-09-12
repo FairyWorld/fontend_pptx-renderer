@@ -1180,6 +1180,7 @@
               mae: null,
               fgIou: null,
               fgIouTolerant: null,
+              cartesianChart: null,
               needsReview: null,
               hasDiff: false,
               hasComparablePdf,
@@ -1581,6 +1582,39 @@
             </div>
           `;
           detail.appendChild(diagnostics);
+          if (r.cartesianChart) {
+            const chart = r.cartesianChart;
+            const chartEvidence = document.createElement('div');
+            chartEvidence.className = 'slide-diagnostics-grid';
+            chartEvidence.style.marginTop = '8px';
+            const localStatus = chart.evaluable
+              ? chart.passed
+                ? 'LOCAL PASS'
+                : 'LOCAL FAIL'
+              : `N/A (${chart.reason || 'not evaluable'})`;
+            const rows = [
+              ['Cartesian Local Evidence', localStatus],
+              ['Chart Family', chart.family || 'N/A'],
+              ['Plot-bound Error ↓', fmtPct(chart.plotBounds?.maxErrorRatio)],
+              ['Series Ink IoU ↑', fmtPct(chart.seriesInk?.fgIouTolerant)],
+              ['Series Color Error ↓', fmtPct(chart.seriesInk?.meanLabDistance)],
+            ];
+            for (const [label, value] of rows) {
+              const row = document.createElement('div');
+              row.className = 'detail-kv';
+              const key = document.createElement('span');
+              key.className = 'k';
+              key.textContent = label;
+              const result = document.createElement('span');
+              result.textContent = value;
+              row.append(key, result);
+              chartEvidence.appendChild(row);
+            }
+            const note = document.createElement('div');
+            note.style.cssText = 'margin-top:5px;color:#778899;font-size:10px;';
+            note.textContent = 'Local chart evidence is diagnostic and does not replace the full-slide gate.';
+            detail.append(chartEvidence, note);
+          }
           card.appendChild(detail);
 
           if (r.testFile && serverAvailable) {

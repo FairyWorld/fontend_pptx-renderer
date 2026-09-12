@@ -142,6 +142,18 @@ Cartesian layout has a native-calibrated path for compact columns, negative-valu
 horizontal bars, and right-side line/area legends; explicit plot layouts and top/bottom legend
 reservations retain their OOXML-defined behavior.
 
+`test/e2e/oracle/chart_metrics.py` adds a separate local-evidence path for eligible single-chart
+column, bar, line, and area slides. It follows `presentation.xml` slide order, resolves the chart
+part through the slide relationship, and constrains raster analysis to the chart frame from
+`p:graphicFrame/p:xfrm`. Within that frame it detects the neutral axis/grid field, removes a
+neutral or stable solid plot background, compares plot bounds and aggregate chromatic series
+geometry/color, and emits plot, orientation-correct axis, and right-legend diagnostics. A detected
+series-mask erasure sanity check must fail before a local pass is accepted. The server attaches
+this result as `perSlide[].cartesianChart`; it does not alter the established full-slide
+`supported` or `needsReview` result. Combo charts, grouped or unresolved chart frames, more than
+eight series, neutral-only series, unsupported chromatic backgrounds, unstable axis/grid
+detections, and mismatched oracle pages remain explicitly unevaluable by this local metric.
+
 PowerPoint math is an Office Drawing extension: an `mc:AlternateContent` choice contains a shape
 whose paragraph includes `a14:m` and OMML, while the fallback contains a `p:sp` or
 `p:graphicFrame`. The current MCE path deliberately does not advertise the whole `a14` namespace;

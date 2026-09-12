@@ -248,6 +248,117 @@ def test_low_foreground_overlap_warning_requires_manual_review(tmp_path: Path, m
     assert "warn:low_foreground_overlap_check_manually" in result["quality"]["warnings"]
 
 
+def test_cartesian_chart_evidence_is_attached_without_reclassifying_full_slide(
+    tmp_path: Path,
+    monkeypatch,
+):
+    pptx_path = tmp_path / "source.pptx"
+    pdf_path = tmp_path / "ground-truth.pdf"
+    pptx_path.write_bytes(b"pptx")
+    pdf_path.write_bytes(b"pdf")
+    image = np.full((8, 8, 3), 255, dtype=np.uint8)
+    profile = {
+        "evaluable": True,
+        "family": "line",
+        "orientation": "vertical",
+    }
+    chart_evidence = {
+        "evaluable": True,
+        "family": "line",
+        "passed": True,
+    }
+
+    class Browser:
+        version = "test"
+
+    async def get_browser():
+        return Browser()
+
+    async def screenshot_slide(*_args, **_kwargs):
+        return image
+
+    monkeypatch.setattr(server.tdp, "source_pptx", lambda *_args: pptx_path)
+    monkeypatch.setattr(server.tdp, "ground_truth_pdf", lambda *_args: pdf_path)
+    monkeypatch.setattr(server.tdp, "has_png_ground_truth", lambda *_args: False)
+    monkeypatch.setattr(server.tdp, "slide_png", lambda *_args: tmp_path / "missing.png")
+    monkeypatch.setattr(server, "get_browser", get_browser)
+    monkeypatch.setattr(server, "build_slide_to_pdf_mapping", lambda *_args: [0])
+    monkeypatch.setattr(server, "get_pdf_page_count", lambda *_args: 1)
+    monkeypatch.setattr(server, "collect_evaluation_provenance", lambda **_kwargs: {})
+    monkeypatch.setattr(server, "extract_cartesian_chart_profiles", lambda *_args: {0: profile})
+    monkeypatch.setattr(server, "pdf_page_to_image", lambda *_args: image)
+    monkeypatch.setattr(server, "screenshot_slide", screenshot_slide)
+    monkeypatch.setattr(
+        server,
+        "compute_visual_metrics",
+        lambda *_args: {"ssim": 0.94, "mae": 0.1, "color_hist_corr": 1.0},
+    )
+    monkeypatch.setattr(
+        server,
+        "compute_foreground_shape_metrics",
+        lambda *_args: {
+            "fg_iou": 1.0,
+            "fg_iou_tolerant": 1.0,
+            "chamfer_score": 1.0,
+        },
+    )
+    monkeypatch.setattr(
+        server,
+        "compute_cartesian_chart_metrics",
+        lambda reference, candidate, received_profile: (
+            chart_evidence
+            if reference is image and candidate is image and received_profile is profile
+            else None
+        ),
+    )
+    monkeypatch.setattr(server, "make_diff_heatmap", lambda *_args: image)
+    monkeypatch.setattr(server, "_save_image", lambda *_args: None)
+    monkeypatch.setattr(server, "_render_artifacts", lambda *_args: {})
+    server._eval_cache.clear()
+
+    result = asyncio.run(server.evaluate_file("cartesian-chart"))
+
+    assert result["perSlide"][0]["cartesianChart"] == chart_evidence
+    assert result["supported"] is False
+    assert "metric:ssim" in result["quality"]["reasons"]
+
+
+def test_cartesian_chart_metric_error_is_scoped_to_its_evidence(monkeypatch):
+    image = np.full((8, 8, 3), 255, dtype=np.uint8)
+
+    def fail(*_args):
+        raise ValueError("axis detector failed")
+
+    monkeypatch.setattr(server, "compute_cartesian_chart_metrics", fail)
+
+    assert server._cartesian_chart_evidence(image, image, {"evaluable": True}) == {
+        "evaluable": False,
+        "reason": "metric-error",
+        "error": "axis detector failed",
+    }
+
+
+def test_cartesian_chart_evidence_is_not_scored_against_a_mismatched_oracle_page(
+    monkeypatch,
+):
+    image = np.full((8, 8, 3), 255, dtype=np.uint8)
+
+    def fail(*_args):
+        raise AssertionError("local chart metric must not run against the wrong PDF page")
+
+    monkeypatch.setattr(server, "compute_cartesian_chart_metrics", fail)
+
+    assert server._cartesian_chart_evidence(
+        image,
+        image,
+        {"evaluable": True, "family": "line"},
+        oracle_mismatch={"expectedPdfPage": 0, "bestPdfPage": 1},
+    ) == {
+        "evaluable": False,
+        "reason": "oracle-ground-truth-mismatch",
+    }
+
+
 def test_batch_retry_recovers_a_transient_per_slide_runtime_error():
     run_all = _load_run_all_module()
 

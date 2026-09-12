@@ -23,7 +23,7 @@ A complex slide with charts, text styles, shapes, and SmartArt — PowerPoint gr
 
 ## Visual Regression Testing
 
-Visual regression suites compare selected shape, SmartArt, fill/stroke, text, table, and chart cases against PowerPoint output. Each API evaluation records the renderer revision, browser, optional font profile, and SHA-256 fingerprints of its PPTX and ground truth so results can be compared against the same inputs. A passing aggregate score does not establish semantic correctness or full PowerPoint parity; structural assertions and targeted browser/native inspection complement the metrics.
+Visual regression suites compare selected shape, SmartArt, fill/stroke, text, table, and chart cases against PowerPoint output. Each API evaluation records the renderer revision, browser, optional font profile, and SHA-256 fingerprints of its PPTX and ground truth so results can be compared against the same inputs. Eligible single-chart Cartesian slides also expose plot-bound, data-ink, series-color, and region diagnostics so page whitespace cannot hide a missing or displaced series. A passing aggregate or local score does not establish semantic correctness or full PowerPoint parity; structural assertions and targeted browser/native inspection complement the metrics.
 
 <img src="docs/example/e2e-test-page.png" alt="E2E evaluation dashboard" width="800" />
 
@@ -848,6 +848,15 @@ until the chart-family gates close the remaining plot-area, axis, label, and leg
 Automatic Cartesian layout is calibrated for common compact columns, negative-value zero
 crossings, horizontal bars, and right-side line/area legends while preserving explicit plot
 layouts and top/bottom legend reservations.
+
+For the 12 single-chart column, bar, line, and area cases, the E2E API also reports a bounded
+`cartesianChart` signal. It resolves presentation order and the chart frame from OOXML, then
+compares native and browser plot rectangles, chromatic series geometry and color, and localized
+plot/axis/legend regions. A series-mask erasure sanity check guards the metric wiring. The signal
+is diagnostic and does not replace the full-slide gate or source/model series assertions.
+Combination charts, grouped or unresolved chart frames, charts with more than eight series,
+neutral-only series, unsupported chromatic backgrounds, and charts without a stable neutral
+axis/grid field are reported as not evaluable by this metric.
 
 The renderer registers only the ECharts charts, components, features, and Canvas renderer
 that it uses. Bundler consumers keep ECharts external; the standalone browser entry

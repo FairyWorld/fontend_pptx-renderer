@@ -64,6 +64,16 @@ current files. Other `--passed-gate` values only record checks already executed 
 are not run by the command. The API promotes any visible per-slide review flag to the case level, so
 a strong average cannot hide a local mismatch. Review rows require an explicit case verdict.
 
+Ordinary single-chart column, bar, line, and area evaluations also attach a scoped
+`perSlide[].cartesianChart` diagnostic. It follows presentation order, limits detection to the
+OOXML chart frame, and compares native/browser plot bounds plus aggregate chromatic series geometry
+and color. A detected series-mask erasure sanity check guards the metric wiring. This signal helps
+separate data-graphic usability from whole-page typography and whitespace differences. It does not
+change the full-slide gate, replace source/model series assertions, or promote
+`drawingml.chart.2d.common`; unsupported chart families, combo charts, grouped or unresolved chart
+frames, more than eight series, neutral-only series, unsupported chromatic backgrounds, unstable
+axis/grid fields, and mismatched oracle pages are explicitly unevaluable.
+
 ## Current Implemented Pieces
 
 1. `powerpoint_oracle.py`

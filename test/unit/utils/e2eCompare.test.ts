@@ -142,6 +142,11 @@ describe('mergeServerMetricsIntoSlides', () => {
         chamferScore: 0.97,
         colorHistCorr: 0.95,
         needsReview: true,
+        cartesianChart: {
+          evaluable: true,
+          family: 'line',
+          passed: true,
+        },
       },
       {
         slideIdx: 1,
@@ -157,6 +162,11 @@ describe('mergeServerMetricsIntoSlides', () => {
       chamferScore: 0.97,
       colorHistCorr: 0.95,
       needsReview: true,
+      cartesianChart: {
+        evaluable: true,
+        family: 'line',
+        passed: true,
+      },
       hasDiff: true,
     });
     expect(merged[1]).toMatchObject({

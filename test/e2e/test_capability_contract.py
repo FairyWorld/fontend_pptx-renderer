@@ -368,6 +368,16 @@ def test_tracked_capability_contract_is_valid():
     common_table = registry.by_id()["drawingml.table.common"]
     formula = registry.by_id()["drawingml.text.math.omml"]
     assert chart_2d.render_mode == "approximate"
+    assert chart_2d.scope["cartesianLocalEvidence"] == (
+        "single-chart",
+        "bar-column-line-area",
+        "one-to-eight-series",
+        "direct-chart-frame-roi",
+        "chromatic-series",
+        "neutral-axis-grid",
+        "neutral-or-solid-plot-background",
+    )
+    assert "test/e2e/oracle/chart_metrics.py" in chart_2d.implementation_paths
     assert common_table.render_mode == "native"
     assert formula.render_mode == "approximate"
     assert formula.scope["output"] == ("Presentation MathML",)

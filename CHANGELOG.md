@@ -37,7 +37,8 @@ remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
 - Improved compatible-content selection, color-map and placeholder inheritance, chart defaults,
   sparse/literal chart data, conditional table borders, and clipped media/effect lifecycle handling.
 - Hardened native-oracle execution, matched PDF/browser raster density, provenance, per-slide
-  review, local fault-detection metrics, and representative-versus-validation corpus classification.
+  review, local fault-detection and Cartesian chart evidence, and representative-versus-validation
+  corpus classification.
 - Added `planningMode` so broad residual features remain observable without repeatedly entering the
   implementation queue; animation timing is currently planning evidence only, not playback support.
 

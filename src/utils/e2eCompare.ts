@@ -3,6 +3,23 @@ export interface CompareSlideCounts {
   comparableSlideCount: number;
 }
 
+export interface CartesianChartEvidence {
+  evaluable: boolean;
+  reason?: string;
+  family?: string;
+  orientation?: string;
+  passed?: boolean;
+  plotBounds?: {
+    maxErrorRatio?: number;
+    passed?: boolean;
+  };
+  seriesInk?: {
+    fgIouTolerant?: number;
+    meanLabDistance?: number;
+    passed?: boolean;
+  };
+}
+
 export interface SlideVisualMetricFields {
   ssim: number | null;
   mae: number | null;
@@ -12,6 +29,7 @@ export interface SlideVisualMetricFields {
   colorHistCorr: number | null;
   needsReview: boolean | null;
   hasDiff: boolean;
+  cartesianChart?: CartesianChartEvidence | null;
 }
 
 export interface ServerPerSlideMetrics {
@@ -24,6 +42,7 @@ export interface ServerPerSlideMetrics {
   chamferScore?: number | null;
   colorHistCorr?: number | null;
   needsReview?: boolean | null;
+  cartesianChart?: CartesianChartEvidence | null;
 }
 
 export type CompareViewMode = 'diff-first' | 'side-by-side' | 'triple';
@@ -149,6 +168,7 @@ export function mergeServerMetricsIntoSlides<T extends MergeableSlide>(
         colorHistCorr: null,
         needsReview: null,
         hasDiff: false,
+        cartesianChart: null,
       };
     }
     if (!slide.hasComparablePdf || !metrics || typeof metrics.ssim !== 'number') {
@@ -162,6 +182,7 @@ export function mergeServerMetricsIntoSlides<T extends MergeableSlide>(
         colorHistCorr: null,
         needsReview: null,
         hasDiff: false,
+        cartesianChart: null,
       };
     }
     return {
@@ -173,6 +194,7 @@ export function mergeServerMetricsIntoSlides<T extends MergeableSlide>(
       chamferScore: typeof metrics.chamferScore === 'number' ? metrics.chamferScore : null,
       colorHistCorr: typeof metrics.colorHistCorr === 'number' ? metrics.colorHistCorr : null,
       needsReview: typeof metrics.needsReview === 'boolean' ? metrics.needsReview : null,
+      cartesianChart: metrics.cartesianChart || null,
       hasDiff: true,
     };
   });

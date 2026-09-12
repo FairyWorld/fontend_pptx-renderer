@@ -56,10 +56,11 @@
       "scope": {
         "families": ["area", "bar-column", "bubble", "doughnut", "line", "pie", "radar", "scatter", "stock"],
         "matrix": ["oracle-pypptx-chart-0001-through-0021"],
-        "runtime": ["echarts-canvas"]
+        "runtime": ["echarts-canvas"],
+        "cartesianLocalEvidence": ["single-chart", "bar-column-line-area", "one-to-eight-series", "direct-chart-frame-roi", "chromatic-series", "neutral-axis-grid", "neutral-or-solid-plot-background"]
       },
       "fallback": "Render supported chart families through ECharts while retaining an explicit approximation status for Office plot-area, axis, label, and legend layout differences.",
-      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/ChartNode.ts", "src/renderer/ChartRenderer.ts", "src/renderer/chart/echartsRuntime.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-chart-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/unit/renderer/ChartRenderer.test.ts"],
+      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/ChartNode.ts", "src/renderer/ChartRenderer.ts", "src/renderer/chart/echartsRuntime.ts", "src/utils/e2eCompare.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-chart-*.json", "test/e2e/oracle/chart_metrics.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/server.py", "test/e2e/test_cartesian_chart_metrics.py", "test/pages/e2e-compare.html", "test/unit/renderer/ChartRenderer.test.ts", "test/unit/utils/e2eCompare.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },

@@ -871,6 +871,36 @@ labels, horizontal bars, and right-side line/area legends. A whole-slide score i
 evidence only; semantic assertions and plot-region inspection decide whether a layout change is
 acceptable.
 
+For an eligible single-chart column, bar, line, or area slide, `/api/evaluate/{case}` adds
+`perSlide[].cartesianChart`. This local evidence is deliberately independent of the full-slide
+pass/fail result. The profile follows presentation order and resolves both the chart relationship
+and chart-frame transform. Analysis stays inside that frame. The reference must have one to eight
+series with chromatic ink; both rasters must expose a stable neutral axis/grid field and either a
+neutral or stable solid plot background. Combo charts, grouped or unresolved chart frames, larger
+series sets, neutral-only series, unsupported chromatic backgrounds, charts without enough
+parallel grid evidence, and pages with an oracle mapping mismatch return `evaluable: false`
+instead of silently passing.
+
+The bounded local gate requires all of the following:
+
+| Signal | Column/bar/area | Line | Failure protected against |
+| --- | ---: | ---: | --- |
+| Maximum plot-side error / shorter raster side | <= 0.01 | <= 0.01 | Shifted or resized plot area |
+| Tolerant chromatic-series IoU | >= 0.90 | >= 0.65 | Missing or displaced bars, areas, or thin lines |
+| Series-ink area ratio | >= 0.88 | >= 0.88 | Missing or overdrawn data ink |
+| Series Chamfer score | >= 0.995 | >= 0.995 | Local contour/path displacement |
+| Series centroid distance | <= 0.005 | <= 0.005 | Whole-series translation |
+| Reference pixels with candidate ink within 3 px | >= 0.95 | >= 0.95 | Sparse/missing candidate series |
+| Mean normalized Lab distance | <= 0.12 | <= 0.12 | Wrong series colors |
+
+The candidate series-mask erasure sanity check must also turn the series gate from pass to fail.
+Plot, value-axis, category-axis, and right-legend SSIM values remain diagnostics because a mostly
+blank region can otherwise produce a misleading score. Source/model assertions still decide
+whether series, categories, values, and chart semantics survived parsing; the aggregate ink gate
+does not prove every small series independently. A local pass supports a
+user-usable assessment for this bounded matrix; it does not promote the broad 2D chart capability
+from `approximate` or suppress an existing full-slide review flag.
+
 Formula verification has two distinct gates. MCE fallback tests prove that an unsupported
 `a14:m` equation retains its package-authored `p:sp` or `p:graphicFrame` fallback. Direct support
 uses an eight-case native PowerPoint matrix spanning inline runs, fractions, radicals,

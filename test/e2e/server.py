@@ -52,6 +52,10 @@ sys.path.insert(0, str(E2E_DIR))
 
 import testdata_paths as tdp  # noqa: E402
 from extract_ground_truth import extract_ground_truth  # noqa: E402
+from oracle.chart_metrics import (  # noqa: E402
+    compute_cartesian_chart_metrics,
+    extract_cartesian_chart_profiles,
+)
 from oracle.metrics import (  # noqa: E402
     compute_foreground_shape_metrics,
     compute_visual_metrics,
@@ -175,6 +179,30 @@ def _evaluation_errors(per_slide: list[dict]) -> list[dict]:
         for slide in per_slide
         if "error" in slide
     ]
+
+
+def _cartesian_chart_evidence(
+    reference: np.ndarray,
+    candidate: np.ndarray,
+    profile: dict,
+    *,
+    oracle_mismatch: dict | None = None,
+) -> dict:
+    if oracle_mismatch is not None:
+        return {
+            "evaluable": False,
+            "reason": "oracle-ground-truth-mismatch",
+        }
+    if not profile.get("evaluable"):
+        return dict(profile)
+    try:
+        return compute_cartesian_chart_metrics(reference, candidate, profile)
+    except Exception as error:
+        return {
+            "evaluable": False,
+            "reason": "metric-error",
+            "error": str(error).strip() or type(error).__name__,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -600,6 +628,13 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
         capture_profile=_capture_profile(),
         font_profile_ref=_configured_font_profile_ref(),
     )
+    try:
+        cartesian_chart_profiles = await asyncio.to_thread(
+            extract_cartesian_chart_profiles,
+            pptx_path,
+        )
+    except Exception:
+        cartesian_chart_profiles = {}
 
     per_slide = []
     ssim_scores = []
@@ -641,6 +676,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
             )
             visual = compute_visual_metrics(gt_img, html_img)
             fg = compute_foreground_shape_metrics(gt_img, html_img)
+            cartesian_profile = cartesian_chart_profiles.get(slide_idx)
 
             score = float(visual["ssim"])
             mae = float(visual["mae"])
@@ -684,7 +720,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
 
             if oracle_mismatch:
                 oracle_mismatch_count += 1
-                per_slide.append({
+                slide_result = {
                     "slideIdx": slide_idx,
                     "pdfPage": pdf_page_idx,
                     "ssim": round(score, 4),
@@ -699,7 +735,15 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
                     "renderArtifacts": render_artifacts,
                     "oracleMismatch": oracle_mismatch,
                     "excludedFromAverage": True,
-                })
+                }
+                if cartesian_profile is not None:
+                    slide_result["cartesianChart"] = _cartesian_chart_evidence(
+                        gt_img,
+                        html_img,
+                        cartesian_profile,
+                        oracle_mismatch=oracle_mismatch,
+                    )
+                per_slide.append(slide_result)
                 continue
 
             ssim_scores.append(score)
@@ -709,7 +753,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
             fg_iou_tolerant_scores.append(fg_iou_tolerant)
             chamfer_scores.append(chamfer)
 
-            per_slide.append({
+            slide_result = {
                 "slideIdx": slide_idx,
                 "pdfPage": pdf_page_idx,
                 "ssim": round(score, 4),
@@ -722,7 +766,14 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
                 "hidden": False,
                 "captureDeviceScaleFactor": capture_device_scale_factor,
                 "renderArtifacts": render_artifacts,
-            })
+            }
+            if cartesian_profile is not None:
+                slide_result["cartesianChart"] = _cartesian_chart_evidence(
+                    gt_img,
+                    html_img,
+                    cartesian_profile,
+                )
+            per_slide.append(slide_result)
         except Exception as e:
             per_slide.append({
                 "slideIdx": slide_idx,
