@@ -662,7 +662,8 @@ If a user reports a metric that conflicts with local evaluation:
 This avoids chasing ghosts caused by outdated `windows-all-eval.json` or old screenshot artifacts.
 
 Every new API evaluation must retain `provenance`: source/ground-truth hashes, renderer Git state,
-actual browser version, and optional font-profile/font hashes. Compare scores only when the
+actual browser version, raster capture density, and optional font-profile/font hashes. PDF-backed
+evaluation must capture the browser at `PDF DPI / 96`; direct PNG oracles retain scale `1`. Compare scores only when the
 relevant provenance matches. Use `PPTX_E2E_VITE_SERVER_URL` to point the API at the intended
 worktree and `PPTX_E2E_BROWSER_CHANNEL`/`PPTX_E2E_FONT_PROFILE` for explicit runtime inputs.
 On macOS, native PowerPoint export requires an unlocked interactive session; `-9074` under a

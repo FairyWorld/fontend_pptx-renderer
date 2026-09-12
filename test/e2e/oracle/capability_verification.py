@@ -2487,6 +2487,7 @@ def normalize_native_evaluation_reports(
         "platform": runtime.get("platform"),
         "python": runtime.get("python"),
         "browser": runtime.get("browser"),
+        "capture": runtime.get("capture"),
         "fontProfile": runtime.get("fontProfile"),
     }
     return {

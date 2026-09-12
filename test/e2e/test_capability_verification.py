@@ -766,6 +766,33 @@ def test_normalizes_native_reports_into_promotion_evidence(tmp_path: Path):
     assert verification["environment"]["browser"] == {"name": "chrome", "version": "152"}
 
 
+def test_verification_receipt_preserves_capture_environment(tmp_path: Path):
+    repo, capability = capability_fixture(tmp_path)
+    current = native_report("donut-thin")
+    baseline = native_report("donut-thin", revision="b" * 40)
+    capture = {
+        "browserCssDpi": 96,
+        "pdfRasterDpi": 150,
+        "pdfDeviceScaleFactor": 1.5625,
+        "pngDeviceScaleFactor": 1.0,
+    }
+    current["provenance"]["runtime"]["capture"] = capture
+    baseline["provenance"]["runtime"]["capture"] = capture
+
+    verification = normalize_native_evaluation_reports(
+        capability,
+        [current],
+        repo,
+        oracle="powerpoint-macos",
+        baseline_reports=[baseline],
+        passed_gates=("source", "structural", "unit", "browser", "docs"),
+    )
+
+    assert verification["environment"]["capture"] == current["provenance"]["runtime"][
+        "capture"
+    ]
+
+
 def test_rejects_regression_beyond_the_ssim_budget(tmp_path: Path):
     repo, capability = capability_fixture(tmp_path)
 

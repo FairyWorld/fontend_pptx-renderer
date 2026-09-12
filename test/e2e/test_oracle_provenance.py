@@ -54,6 +54,12 @@ def test_collect_evaluation_provenance_fingerprints_inputs_and_font_profile(tmp_
         ground_truth_kind="pdf",
         browser_name="chromium",
         browser_version="140.0.0.0",
+        capture_profile={
+            "browserCssDpi": 96,
+            "pdfRasterDpi": 150,
+            "pdfDeviceScaleFactor": 1.5625,
+            "pngDeviceScaleFactor": 1.0,
+        },
         font_profile_ref="font-profiles/sample.json",
         renderer_revision="abc123",
         renderer_dirty=False,
@@ -66,6 +72,12 @@ def test_collect_evaluation_provenance_fingerprints_inputs_and_font_profile(tmp_
     assert provenance["runtime"]["browser"] == {
         "name": "chromium",
         "version": "140.0.0.0",
+    }
+    assert provenance["runtime"]["capture"] == {
+        "browserCssDpi": 96,
+        "pdfRasterDpi": 150,
+        "pdfDeviceScaleFactor": 1.5625,
+        "pngDeviceScaleFactor": 1.0,
     }
     assert provenance["runtime"]["fontProfile"]["id"] == "sample-font-profile"
     assert provenance["runtime"]["fontProfile"]["faces"][0]["file"]["sha256"]

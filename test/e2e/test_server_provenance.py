@@ -63,6 +63,13 @@ def test_render_slide_url_omits_font_profile_by_default(monkeypatch):
     assert "fontProfile=" not in server._render_slide_url("sample", 0, None)
 
 
+def test_pdf_capture_scale_matches_the_reference_raster_density():
+    assert server._capture_device_scale_factor(using_png_ground_truth=False) == pytest.approx(
+        server.PDF_RASTER_DPI / server.BROWSER_CSS_DPI
+    )
+    assert server._capture_device_scale_factor(using_png_ground_truth=True) == 1.0
+
+
 @pytest.mark.parametrize(
     "profile_ref",
     ["../escape.json", "/absolute.json", "https://example.com/profile.json", r"..\escape.json"],
@@ -140,7 +147,10 @@ def test_case_requires_review_when_one_slide_is_below_the_review_threshold(
     async def get_browser():
         return Browser()
 
-    async def screenshot_slide(*_args, **_kwargs):
+    capture_scales = []
+
+    async def screenshot_slide(*_args, **kwargs):
+        capture_scales.append(kwargs.get("device_scale_factor"))
         return image
 
     def save_image(_image, path):
@@ -178,6 +188,8 @@ def test_case_requires_review_when_one_slide_is_below_the_review_threshold(
     assert [slide["needsReview"] for slide in result["perSlide"]] == [True, False]
     assert result["quality"]["needsReview"] is True
     assert "warn:ssim_below_review_threshold" in result["quality"]["warnings"]
+    assert capture_scales == [server.PDF_RASTER_DPI / server.BROWSER_CSS_DPI] * 2
+    assert [slide["captureDeviceScaleFactor"] for slide in result["perSlide"]] == capture_scales
 
 
 def test_low_foreground_overlap_warning_requires_manual_review(tmp_path: Path, monkeypatch):

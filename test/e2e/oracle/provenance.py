@@ -137,6 +137,7 @@ def collect_evaluation_provenance(
     ground_truth_kind: str,
     browser_name: str,
     browser_version: str,
+    capture_profile: dict | None = None,
     font_profile_ref: str | None,
     renderer_revision: str | None = None,
     renderer_dirty: bool | None = None,
@@ -175,6 +176,7 @@ def collect_evaluation_provenance(
                 "name": browser_name,
                 "version": browser_version,
             },
+            "capture": dict(capture_profile) if capture_profile is not None else None,
             "fontProfile": font_profile,
         },
     }

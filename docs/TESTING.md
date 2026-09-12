@@ -502,7 +502,7 @@ Every `/api/evaluate/{case}` response includes `provenance` with:
 
 - source PPTX and ground-truth kind, size, and SHA-256;
 - renderer Git revision and tracked dirty state;
-- OS/Python details and the actual browser version;
+- OS/Python details, the actual browser version, and the raster capture profile;
 - optional font-profile manifest and font-file hashes.
 
 `scripts/run_all_shapes_eval.py` preserves this object in every `results[]` row. Compare or update
@@ -511,6 +511,13 @@ difference as an environment/corpus change and rerun before changing renderer co
 Regression comparison uses the resolved font-profile ID, ordered faces, descriptors, and font-file
 fingerprints. It retains the raw manifest fingerprint for audit but ignores formatting-only changes
 to that JSON file.
+
+PDF references are rasterized at `PPTX_E2E_PDF_DPI` (150 by default). During `/api/evaluate`,
+Playwright uses `deviceScaleFactor = PDF DPI / 96` so the browser and PDF are sampled at the same
+pixel density before SSIM and foreground metrics run. Direct PowerPoint PNG references retain a
+device scale factor of `1`; every per-slide row and the run provenance record the selected value.
+Changing the PDF DPI or capture scale therefore creates a different regression environment rather
+than an apparent renderer improvement.
 
 ### Manual Review
 

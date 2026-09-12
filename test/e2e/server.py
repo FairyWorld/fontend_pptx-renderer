@@ -75,6 +75,10 @@ VISUAL_EVAL_THRESHOLDS = {
     "ssim": 0.95,
     "color_hist_corr": 0.80,
 }
+BROWSER_CSS_DPI = 96
+PDF_RASTER_DPI = int(os.getenv("PPTX_E2E_PDF_DPI", "150"))
+if PDF_RASTER_DPI <= 0:
+    raise ValueError("PPTX_E2E_PDF_DPI must be a positive integer")
 # Warning threshold: shapes below this SSIM are flagged for human review
 # but do NOT auto-fail.  Catches subtle dark-on-dark internal detail bugs
 # (e.g. action button shrunken icons) that pixel metrics cannot reliably
@@ -296,7 +300,7 @@ PAGE_TIMEOUT_MS = 120_000
 SLIDE_CAPTURE_SELECTOR = "#slide-container .slide-wrapper > div"
 
 
-def pdf_page_to_image(pdf_path: Path, page_idx: int, dpi: int = 150) -> np.ndarray:
+def pdf_page_to_image(pdf_path: Path, page_idx: int, dpi: int = PDF_RASTER_DPI) -> np.ndarray:
     doc = fitz.open(str(pdf_path))
     page = doc[page_idx]
     pix = page.get_pixmap(dpi=dpi)
@@ -336,9 +340,34 @@ def _classify_oracle_page_mismatch(
     }
 
 
-async def screenshot_slide(browser, test_file: str, slide_idx: int, source: str | None = None) -> np.ndarray:
+def _capture_device_scale_factor(using_png_ground_truth: bool) -> float:
+    if using_png_ground_truth:
+        return 1.0
+    return PDF_RASTER_DPI / BROWSER_CSS_DPI
+
+
+def _capture_profile() -> dict[str, float | int]:
+    return {
+        "browserCssDpi": BROWSER_CSS_DPI,
+        "pdfRasterDpi": PDF_RASTER_DPI,
+        "pdfDeviceScaleFactor": _capture_device_scale_factor(False),
+        "pngDeviceScaleFactor": _capture_device_scale_factor(True),
+    }
+
+
+async def screenshot_slide(
+    browser,
+    test_file: str,
+    slide_idx: int,
+    source: str | None = None,
+    *,
+    device_scale_factor: float = 1.0,
+) -> np.ndarray:
     test_file = _validate_case_stem(test_file)
-    ctx = await browser.new_context(viewport={"width": 1920, "height": 1080})
+    ctx = await browser.new_context(
+        viewport={"width": 1920, "height": 1080},
+        device_scale_factor=device_scale_factor,
+    )
     page = await ctx.new_page()
     page.set_default_timeout(PAGE_TIMEOUT_MS)
     try:
@@ -568,6 +597,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
         ground_truth_kind=ground_truth_kind,
         browser_name=browser_channel or "chromium",
         browser_version=browser.version,
+        capture_profile=_capture_profile(),
         font_profile_ref=_configured_font_profile_ref(),
     )
 
@@ -601,7 +631,14 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
             else:
                 using_png_ground_truth = False
                 gt_img = await asyncio.to_thread(pdf_page_to_image, pdf_path, pdf_page_idx)
-            html_img = await screenshot_slide(browser, test_file, slide_idx, source)
+            capture_device_scale_factor = _capture_device_scale_factor(using_png_ground_truth)
+            html_img = await screenshot_slide(
+                browser,
+                test_file,
+                slide_idx,
+                source,
+                device_scale_factor=capture_device_scale_factor,
+            )
             visual = compute_visual_metrics(gt_img, html_img)
             fg = compute_foreground_shape_metrics(gt_img, html_img)
 
@@ -658,6 +695,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
                     "chamferScore": round(chamfer, 4),
                     "needsReview": True,
                     "hidden": False,
+                    "captureDeviceScaleFactor": capture_device_scale_factor,
                     "renderArtifacts": render_artifacts,
                     "oracleMismatch": oracle_mismatch,
                     "excludedFromAverage": True,
@@ -682,6 +720,7 @@ async def evaluate_file(test_file: str, source: str | None = Query(None)):
                 "chamferScore": round(chamfer, 4),
                 "needsReview": score < SSIM_WARNING_THRESHOLD,
                 "hidden": False,
+                "captureDeviceScaleFactor": capture_device_scale_factor,
                 "renderArtifacts": render_artifacts,
             })
         except Exception as e:

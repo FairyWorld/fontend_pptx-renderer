@@ -113,8 +113,9 @@ a strong average cannot hide a local mismatch. Review rows require an explicit c
 6. Reproducible evaluation provenance
 - Every `/api/evaluate/{case}` result fingerprints the source PPTX and PDF/PNG ground truth.
 - Reports also record the exact reference/HTML raster pair used for each visual metric row, the
-  renderer Git state, actual browser version, and the configured local font-profile
-  manifest/font hashes.
+  renderer Git state, actual browser version, PDF/browser capture density, and the configured local
+  font-profile manifest/font hashes. PDF-backed evaluation captures Chromium at `PDF DPI / 96`
+  (`150 / 96` by default); direct PNG oracles retain scale `1`.
 - `font-profile.example.json` documents the ignored local profile format without distributing
   font binaries.
 
@@ -416,8 +417,8 @@ PPTX_E2E_BROWSER_CHANNEL=chrome \
 ```
 
 The single-slide page registers the profile before layout. Evaluation provenance records the
-profile manifest, every face hash, the browser version, renderer revision, and source/ground-truth
-hashes. Only compare metric runs whose relevant provenance matches. Regression comparability uses
+profile manifest, every face hash, browser and raster-capture settings, renderer revision, and
+source/ground-truth hashes. Only compare metric runs whose relevant provenance matches. Regression comparability uses
 the resolved profile ID, ordered faces, descriptors, and font-file hashes; the manifest hash remains
 auditable but formatting-only JSON changes do not create a different browser environment.
 
