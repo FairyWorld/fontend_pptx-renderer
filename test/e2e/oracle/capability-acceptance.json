@@ -624,6 +624,143 @@
       "implementationFingerprint": "445480a490461b90d945bd40cf91dbbbb92fda83240a1044930f77fb6b4be184"
     },
     {
+      "acceptedAt": "2026-09-13T12:55:24.299675Z",
+      "acceptedRevision": "47574aa1d25dbe2dfc92dabcf0d2c1e693cce41b",
+      "capabilityId": "drawingml.table.common",
+      "caseIds": [
+        "oracle-pypptx-table-0001-default-grid",
+        "oracle-pypptx-table-0002-header-banded-rows",
+        "oracle-pypptx-table-0003-first-last-columns",
+        "oracle-pypptx-table-0004-horizontal-vertical-merges",
+        "oracle-pypptx-table-0005-variable-grid-sizes",
+        "oracle-pypptx-table-0006-cell-margins-vertical-anchors",
+        "oracle-pypptx-table-0007-cjk-mixed-text",
+        "oracle-pypptx-table-0008-cell-border-matrix"
+      ],
+      "caseInputFingerprints": [
+        "6b45b8be5e86537ca799fbe7e6e44b0503189be71e83fcdbe9847c1eecd94711",
+        "3c175f1f89335339c9fe38735e2ebe9327d2c4860b08fded74deef8074bdc958",
+        "bb02060bc21393c0f3809990d5069592642585d68e4a22f02ac73236d70ed671",
+        "1ab7f8d941227f97a68905848224480d7c2b9588a95fdd45cb942c939ffd07f3",
+        "985cfeb4834b46dd7c51684abd9d139aa2f61b67653e2f3494e4b7874a666d0d",
+        "ea8e48b7bc16f793bb39163c1665afc6cd3904b69da65356da258e87db3bfeaa",
+        "a88b6157961e2549ee85fefac2e0d4f73ecff7eda3c083c682b75bd8aa91caae",
+        "64b9e6d38aa937bc279c9144ae978e44f1b871b56014791a5a722666c0b9671f"
+      ],
+      "definitionFingerprint": "70c15adf6258ef92c53996101a528efa3488c72574215eb08216afff273f1c24",
+      "environment": {
+        "browser": {
+          "name": "chrome",
+          "version": "152.0.7977.83"
+        },
+        "capture": {
+          "browserCssDpi": 96,
+          "pdfDeviceScaleFactor": 1.5625,
+          "pdfRasterDpi": 150,
+          "pngDeviceScaleFactor": 1.0
+        },
+        "fontProfile": {
+          "faces": [
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "400"
+              },
+              "family": "Calibri",
+              "file": {
+                "sha256": "ea801e1f869b55464339058b1d4263d07cc074a18e20aa3ee1d07901423dee53",
+                "sizeBytes": 1324384
+              }
+            },
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "700"
+              },
+              "family": "Calibri",
+              "file": {
+                "sha256": "ac1cf97565de97cdc322228d875dc18c1131656c5138173e2c6d8ac7a37aa7f2",
+                "sizeBytes": 1290132
+              }
+            },
+            {
+              "descriptors": {
+                "style": "italic",
+                "weight": "400"
+              },
+              "family": "Calibri",
+              "file": {
+                "sha256": "38e28b619448710314a298dd66305a3b8f494a854f19d40aa18b9872e61911fe",
+                "sizeBytes": 1089300
+              }
+            },
+            {
+              "descriptors": {
+                "style": "italic",
+                "weight": "700"
+              },
+              "family": "Calibri",
+              "file": {
+                "sha256": "77117338878fefc82770d27303bcca90e900f2ef59a0a87d294b7744ec158b5b",
+                "sizeBytes": 1049272
+              }
+            },
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "400"
+              },
+              "family": "\u5fae\u8f6f\u96c5\u9ed1",
+              "file": {
+                "sha256": "3084f1f88369af6bf9989c909024164d953d1e38d08734f05f28ef24b2f9d577",
+                "sizeBytes": 19701556
+              }
+            },
+            {
+              "descriptors": {
+                "style": "normal",
+                "weight": "700"
+              },
+              "family": "\u5fae\u8f6f\u96c5\u9ed1",
+              "file": {
+                "sha256": "519309b7ab0479c4dc3ace5e291de5a8702175be5586e165bc810267bd4619a5",
+                "sizeBytes": 16880832
+              }
+            }
+          ],
+          "id": "local-powerpoint-office-core",
+          "manifest": {
+            "sha256": "70fed532afd6cfcfc0143e375173d2011f4197940b999d1c77d4f0e380d3316e",
+            "sizeBytes": 1115
+          }
+        },
+        "oracle": "powerpoint-macos",
+        "platform": "macOS-26.5.1-arm64-arm-64bit",
+        "python": "3.11.11"
+      },
+      "gates": [
+        "source",
+        "structural",
+        "unit",
+        "browser",
+        "native-powerpoint",
+        "manual-visual",
+        "regression",
+        "docs"
+      ],
+      "groundTruthFingerprints": [
+        "0d177a531db76ab1411252ba9488c0e1ac7ecaf41c855db475dd1e6a71154946",
+        "cddba1913ba33408e02322aa0671d119e2f0461469455cd59d25b65fa00c4ea2",
+        "add87e561ca458c1084dbbcd1641b658d87161ae30e80699fa2ae66b0d04f708",
+        "5fde56193d223a703d32dfb6cec65a7450067b9d50fb116b3890faa8d9175a81",
+        "f81c0d1a73d83e5e4d8ab26e7ebcd4dff68ef236c137b6b0d12e8b75844647a7",
+        "9bc3d1faedb554b26b2e16762203e2074b937dad9c4ae38081bd41b98d32728f",
+        "9465893b944b6ca22525b30f778d85680cbae4316626f495845e9e1d33f9cfc8",
+        "e71c25816d42d1e045146b1f730cdc03f8f5ce13ceeb538247883abde48d4348"
+      ],
+      "implementationFingerprint": "ac0db8ede5f39f9063b95e4b2c6f0d4e4cfaa82910b18acfb6eb41309f6d69f3"
+    },
+    {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
       "acceptedRevision": "85296d43f810b2531890a6b877fd786d14ef2a25",
       "capabilityId": "drawingml.text.body.wrap-overflow",
