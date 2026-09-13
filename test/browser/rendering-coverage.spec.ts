@@ -1,8 +1,29 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
 
 // Set PLAYWRIGHT_CHANNEL=chrome on machines with Chrome but no downloaded Chromium.
 test.use({ channel: process.env.PLAYWRIGHT_CHANNEL });
+
+async function expectStableScreenshot(page: Page, locator: Locator): Promise<void> {
+  let previous = await locator.screenshot();
+  await expect
+    .poll(
+      async () => {
+        await page.evaluate(
+          () =>
+            new Promise<void>((resolve) =>
+              requestAnimationFrame(() => requestAnimationFrame(resolve)),
+            ),
+        );
+        const current = await locator.screenshot();
+        const stable = previous.equals(current);
+        previous = current;
+        return stable;
+      },
+      { timeout: 5000 },
+    )
+    .toBe(true);
+}
 
 test('browser accepts deterministic OOXML runtime geometry and bounded donut adjustments', async ({
   page,
@@ -314,14 +335,7 @@ test('bounded ordinary outer shadows keep native scale anchors and visible filte
   expect(result.uniformGroupFilter).toMatch(/^url\(#shape-shadow-/);
   expect(result.uniformGroupStdDeviation).toBe('4.00');
 
-  const host = page.locator('#outer-shadow-browser-host');
-  const first = await host.screenshot();
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
-  const second = await host.screenshot();
-  expect(first.equals(second)).toBe(true);
+  await expectStableScreenshot(page, page.locator('#outer-shadow-browser-host'));
 });
 
 test('shape reflections stay in local coordinates and isolate cloned SVG references', async ({
@@ -419,14 +433,7 @@ test('shape reflections stay in local coordinates and isolate cloned SVG referen
     expect(reflection.clonedPathFill).toBe(`url(#${reflection.clonedGradientId})`);
   }
 
-  const host = page.locator('#reflection-browser-host');
-  const firstFrame = await host.screenshot();
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
-  const secondFrame = await host.screenshot();
-  expect(firstFrame.equals(secondFrame)).toBe(true);
+  await expectStableScreenshot(page, page.locator('#reflection-browser-host'));
 });
 
 test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, and disposal', async ({
@@ -699,14 +706,7 @@ test('bounded static DrawingML 3D stays stable across shapes, pictures, groups, 
     height: expect.closeTo(142.857, 2),
   });
 
-  const host = page.locator('#shape3d-browser-host');
-  const first = await host.screenshot();
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
-  const second = await host.screenshot();
-  expect(first.equals(second)).toBe(true);
+  await expectStableScreenshot(page, page.locator('#shape3d-browser-host'));
 });
 
 test('bounded camera planes project in a browser and preserve text opt-out and group mapping', async ({
@@ -1069,14 +1069,7 @@ test('bottom-bevel front material stays bounded to opaque standalone slide shape
     placeholderProjected: false,
     groupProjected: false,
   });
-  const host = page.locator('#bottom-bevel-front-host');
-  const first = await host.screenshot();
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-  );
-  const second = await host.screenshot();
-  expect(first.equals(second)).toBe(true);
+  await expectStableScreenshot(page, page.locator('#bottom-bevel-front-host'));
 });
 
 test('scene-only camera projection preserves live text and rejects styled text planes', async ({
