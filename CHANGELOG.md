@@ -17,7 +17,7 @@ remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
 - Added a pinned ECMA-376 preset-geometry toolchain that validates the source, evaluates the full
   guide-formula contract, emits deterministic SVG paths, and ships a generated runtime subset.
 - Added an evidence-driven capability loop with a tracked OOXML registry, bounded corpus inventory,
-  transparent ranking, generated work packets, and hash-bound native PowerPoint acceptance receipts.
+  transparent ranking, generated work packets, and revision-bound native PowerPoint reports.
 - Added native PowerPoint matrices and local visual gates for CJK text, common tables, 2D charts,
   bounded OMML formula rendering and fallbacks, text-color precedence, flowchart geometry, bounded static 3D,
   ordinary-shape shadows, and reflections.
@@ -39,7 +39,7 @@ remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
 - Hardened native-oracle execution, matched PDF/browser raster density, provenance, per-slide
   review, local fault-detection and Cartesian chart evidence, and representative-versus-validation
   corpus classification.
-- Added fail-closed impact-based verification planning with receipt-bound native artifacts, so edit
+- Added fail-closed impact-based verification planning with testcase-bound native artifacts, so edit
   loops run affected deterministic checks first and defer explicit browser/native evidence to the
   pre-commit or pre-merge gates.
 - Added `planningMode` so broad residual features remain observable without repeatedly entering the

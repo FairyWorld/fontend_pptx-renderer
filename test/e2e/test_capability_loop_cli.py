@@ -4,14 +4,7 @@ import sys
 from pathlib import Path
 from zipfile import ZipFile
 
-from oracle.capability_contract import (
-    capability_definition_fingerprint,
-    load_capability_registry,
-)
-from oracle.capability_evidence import (
-    compute_implementation_fingerprint,
-    compute_verification_fingerprint,
-)
+from oracle.capability_contract import load_capability_registry
 
 
 SCRIPT = Path(__file__).resolve().parent / "scripts" / "run_capability_loop.py"
@@ -53,8 +46,8 @@ def write_contract(repo: Path, *, render_mode: str = "fallback") -> tuple[Path, 
                         ],
                         "scope": {"presets": ["donut"]},
                         "fallback": "none" if render_mode == "native" else "Render flat geometry.",
-                        "implementationPaths": ["src/renderer/ShapeRenderer.ts"],
-                        "verificationPaths": [
+                        "affectedPaths": [
+                            "src/renderer/ShapeRenderer.ts",
                             "test/ShapeRenderer.test.ts",
                         ],
                         "requiredGates": required_gates,
@@ -182,6 +175,7 @@ def test_inventory_is_deterministic_and_rejects_unsafe_zip(tmp_path: Path):
         assert result.returncode == 0, result.stderr
     assert first.read_bytes() == second.read_bytes()
     classified = json.loads(first.read_text(encoding="utf-8"))
+    assert "registryFingerprint" not in classified
     assert classified["packages"][0]["corpusRole"] == "representative"
     assert classified["corpusClassification"]["representativeUniquePackageCount"] == 1
 
@@ -332,7 +326,11 @@ def test_rank_and_work_packet_keep_unreproduced_issue_out_of_demand(tmp_path: Pa
         ranking,
     )
     assert ranked.returncode == 0, ranked.stderr
-    row = json.loads(ledger.read_text(encoding="utf-8"))["rows"][0]
+    ledger_payload = json.loads(ledger.read_text(encoding="utf-8"))
+    ranking_payload = json.loads(ranking.read_text(encoding="utf-8"))
+    assert "registryFingerprint" not in ledger_payload
+    assert "registryFingerprint" not in ranking_payload
+    row = ledger_payload["rows"][0]
     assert row["observedUniquePackages"] == 1
     assert row["currentIssueCount"] == 0
 
@@ -372,23 +370,12 @@ def test_accept_writes_fresh_receipt_and_rejects_dirty_repo(tmp_path: Path):
     ).stdout.strip()
     registry = load_capability_registry(registry_path)
     capability = registry.capabilities[0]
-    implementation_fingerprint = compute_implementation_fingerprint(
-        repo,
-        capability.implementation_paths,
-    )
-    verification_fingerprint = compute_verification_fingerprint(
-        repo,
-        capability.verification_paths,
-    )
     report = {
         "schemaVersion": 2,
         "capabilityId": capability.id,
-        "definitionFingerprint": capability_definition_fingerprint(capability),
         "renderer": {
             "revision": revision,
             "dirty": False,
-            "implementationFingerprint": implementation_fingerprint,
-            "verificationFingerprint": verification_fingerprint,
         },
         "environment": {"oracle": "powerpoint-macos"},
         "gates": {gate: "passed" for gate in capability.required_gates},
@@ -460,13 +447,10 @@ def test_accept_replaces_the_previous_receipt_for_the_same_capability(tmp_path: 
                 "receipts": [
                     {
                         "capabilityId": capability.id,
-                        "definitionFingerprint": capability_definition_fingerprint(capability),
                         "acceptedRevision": "a" * 40,
-                        "implementationFingerprint": "b" * 64,
-                        "verificationFingerprint": "e" * 64,
                         "caseIds": ["oracle-shape-0001"],
-                        "caseInputFingerprints": ["c" * 64],
-                        "groundTruthFingerprints": ["d" * 64],
+                        "caseInputSha256": ["c" * 64],
+                        "groundTruthSha256": ["d" * 64],
                         "gates": list(capability.required_gates),
                         "environment": {"oracle": "powerpoint-macos"},
                         "acceptedAt": "2026-09-09T00:00:00Z",
@@ -488,26 +472,15 @@ def test_accept_replaces_the_previous_receipt_for_the_same_capability(tmp_path: 
         capture_output=True,
         text=True,
     ).stdout.strip()
-    implementation_fingerprint = compute_implementation_fingerprint(
-        repo,
-        capability.implementation_paths,
-    )
-    verification_fingerprint = compute_verification_fingerprint(
-        repo,
-        capability.verification_paths,
-    )
     verification = tmp_path / "verification.json"
     verification.write_text(
         json.dumps(
             {
                 "schemaVersion": 2,
                 "capabilityId": capability.id,
-                "definitionFingerprint": capability_definition_fingerprint(capability),
                 "renderer": {
                     "revision": revision,
                     "dirty": False,
-                    "implementationFingerprint": implementation_fingerprint,
-                    "verificationFingerprint": verification_fingerprint,
                 },
                 "environment": {"oracle": "powerpoint-macos"},
                 "gates": {gate: "passed" for gate in capability.required_gates},

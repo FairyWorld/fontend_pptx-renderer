@@ -117,22 +117,16 @@ def _is_documentation_contract_test(path: str) -> bool:
     )
 
 
-def _capability_fields(
-    capability: Any,
-) -> tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+def _capability_fields(capability: Any) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
     capability_id = str(_value(capability, "id", "id"))
-    implementation_paths = tuple(
+    affected_paths = tuple(
         str(path)
-        for path in _value(capability, "implementationPaths", "implementation_paths")
-    )
-    verification_paths = tuple(
-        str(path)
-        for path in (_value(capability, "verificationPaths", "verification_paths") or ())
+        for path in _value(capability, "affectedPaths", "affected_paths")
     )
     required_gates = tuple(
         str(gate) for gate in _value(capability, "requiredGates", "required_gates")
     )
-    return capability_id, implementation_paths, verification_paths, required_gates
+    return capability_id, affected_paths, required_gates
 
 
 def _commands_for_targeted_plan(
@@ -192,10 +186,10 @@ def build_verification_plan(
     latest_case_ids: Mapping[str, Sequence[str]],
     repository_paths: Iterable[str] = (),
     available_native_case_ids: Iterable[str] | None = None,
-    latest_case_fingerprints: Mapping[
+    latest_case_hashes: Mapping[
         str, Mapping[str, tuple[str, str]]
     ] | None = None,
-    available_native_case_fingerprints: Mapping[str, Any] | None = None,
+    available_native_case_hashes: Mapping[str, Any] | None = None,
     case_reports: Mapping[str, str] | None = None,
     python_executable: str | None = None,
 ) -> dict[str, Any]:
@@ -264,19 +258,16 @@ def build_verification_plan(
         return plan
 
     claimed_paths: set[str] = set()
-    impacted: list[
-        tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]
-    ] = []
+    impacted: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
     behavior_set = set(behavior_changes)
     for fields in capability_fields:
-        _, implementation_paths, verification_paths, _ = fields
-        capability_paths = (*implementation_paths, *verification_paths)
+        _, affected_paths, _ = fields
         matching_paths = {
             changed_path
             for changed_path in behavior_set
             if any(
-                fnmatch.fnmatchcase(changed_path, capability_path)
-                for capability_path in capability_paths
+                fnmatch.fnmatchcase(changed_path, affected_path)
+                for affected_path in affected_paths
             )
         }
         if matching_paths:
@@ -331,33 +322,32 @@ def build_verification_plan(
         full_reason = None
 
     impacted_ids = sorted(fields[0] for fields in impacted)
-    owned_paths: set[str] = set()
-    for _, implementation_patterns, verification_patterns, _ in impacted:
-        patterns = (*implementation_patterns, *verification_patterns)
+    affected_paths: set[str] = set()
+    for _, patterns, _ in impacted:
         for pattern in patterns:
             if _is_documentation(pattern):
                 continue
             if glob.has_magic(pattern):
-                owned_paths.update(
+                affected_paths.update(
                     path for path in available_paths if fnmatch.fnmatchcase(path, pattern)
                 )
             else:
-                owned_paths.add(pattern)
+                affected_paths.add(pattern)
     unit_tests = sorted(
         {
             path
-            for path in (*behavior_changes, *owned_paths, *self_tests)
+            for path in (*behavior_changes, *affected_paths, *self_tests)
             if _is_unit_test(path)
         }
     )
     python_tests = sorted(
         {
             path
-            for path in (*behavior_changes, *owned_paths, *self_tests)
+            for path in (*behavior_changes, *affected_paths, *self_tests)
             if _is_python_test(path)
         }
     )
-    required_gates = sorted({gate for _, _, _, gates in impacted for gate in gates})
+    required_gates = sorted({gate for _, _, gates in impacted for gate in gates})
     if force_full:
         required_gates = sorted(
             set(required_gates).union({"unit", "regression", "typecheck", "browser"})
@@ -374,7 +364,7 @@ def build_verification_plan(
     )
     native_capabilities_without_cases = sorted(
         capability_id
-        for capability_id, _, _, gates in impacted
+        for capability_id, _, gates in impacted
         if (
             "native-powerpoint" in gates or bool(LOCAL_VISUAL_GATES.intersection(gates))
         )
@@ -382,24 +372,24 @@ def build_verification_plan(
     )
 
     artifact_issues: list[dict[str, str]] = []
-    for capability_id, _, _, gates in impacted:
+    for capability_id, _, gates in impacted:
         if not (
             "native-powerpoint" in gates or bool(LOCAL_VISUAL_GATES.intersection(gates))
         ):
             continue
         for case_id in latest_case_ids.get(capability_id, ()):
             reason: str | None = None
-            if latest_case_fingerprints is not None:
-                expected = latest_case_fingerprints.get(capability_id, {}).get(case_id)
+            if latest_case_hashes is not None:
+                expected = latest_case_hashes.get(capability_id, {}).get(case_id)
                 candidates = _artifact_candidates(
-                    (available_native_case_fingerprints or {}).get(case_id)
+                    (available_native_case_hashes or {}).get(case_id)
                 )
                 if expected is None:
-                    reason = "receipt-fingerprint-missing"
+                    reason = "recorded-input-hash-missing"
                 elif not candidates:
                     reason = "missing-artifact"
                 elif tuple(expected) not in candidates:
-                    reason = "fingerprint-mismatch"
+                    reason = "input-hash-mismatch"
             elif available_native_cases is not None and case_id not in available_native_cases:
                 reason = "missing-artifact"
             if reason is not None:
@@ -426,7 +416,7 @@ def build_verification_plan(
             expected_cases = sorted(
                 {
                     case_id
-                    for capability_id, _, _, gates in impacted
+                    for capability_id, _, gates in impacted
                     if gate in gates
                     for case_id in latest_case_ids.get(capability_id, ())
                 }

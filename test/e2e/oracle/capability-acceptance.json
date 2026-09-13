@@ -7,10 +7,9 @@
       "caseIds": [
         "oracle-local-shape3d-0008-bottom-relaxed-inset-matrix"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "9df342d638c23b3940e36e134d7c8a9985fb4dd505e88871dc2f04ba08b5a354"
       ],
-      "definitionFingerprint": "ff792cbeaa1c6ff1772a56e4de7c5f5dd29fe0219e0243de60646162baf3a477",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -64,11 +63,9 @@
         "package-size",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "e93da7f47b75cb24bef82e1c025f5db9db53a37eb1c3bfdb03bb0fe4c427012e"
-      ],
-      "implementationFingerprint": "e1a77555567b7cdfcb1d8ca41de60522719ab405f923f8740e93137c3f748815",
-      "verificationFingerprint": "f5ff9b9565df2771ced561ff6366bcbfc192e2709a2ebbfe734115fd28316c9a"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -82,7 +79,7 @@
         "oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix",
         "oracle-pypptx-shape3d-0020-perspective-left-picture-group-matrix"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "23a154711dd9beb2d78c9033a5a6c77e31b826770cf32d851a232d7aa426778c",
         "6def7ec046ed633f1b32d94fabcc78286e9edef036d2150088a6431cca637ce2",
         "424bf37e7342738d61342e7dc10fe9c1298cdc4e46b7d0201b482b047a4f34cb",
@@ -90,7 +87,6 @@
         "4445bd83dee18ef4658376e9174c1ac79cf68fd40add59056d3f1a97b2506d7d",
         "7d1bed1c247bbf31a67b24576263a4e1b7f83dc2c2f26cb881424da8a7793813"
       ],
-      "definitionFingerprint": "24d4cb57072acfab69d55742ac8eb289a1c58718b3361bf26b446224c9bfe724",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -144,16 +140,14 @@
         "package-size",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "1bc3df21cabf2bf9c8bd044c055f47a552c4c6a2cd91875b60d17e53893d64fa",
         "31fb431f119affa9cb57d2471a37c3df90bbeca493aabfde81f508746ba30c32",
         "6ca1fa9e2e6ba102891e25790c03a00d7326ee787f498591adf814e91af72588",
         "fd9088ccb27742916eef21c12ea7b5a8634b186e8d3a7c62fa7c395a942ff378",
         "2e4674078d58e3d9575d49ac8b496a3a793d14812731bb8d0d14f8cf64a01d84",
         "80141194cb425fb1d5388e0f88bd46a96f7a2c8e20225d0a7396d114c012c711"
-      ],
-      "implementationFingerprint": "23e3d10ca3ae9bb8a12cd68c6f5fe0399974b6504c442e9dd47cf584d6847bb6",
-      "verificationFingerprint": "b5166b741b4fa5590f5167fb9c40116c1ca4b7aaf273001abc191633870766e7"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -175,7 +169,7 @@
         "oracle-pypptx-shape3d-0017-default-top-bevel-dimensions-matrix",
         "oracle-pypptx-shape3d-0018-donut-shadow-interpolation-matrix"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "74c293774148224d54e34c80472c7280e09c686636453b360f2714240825ee30",
         "29bec7b160ce0bbf9c34db115a8eadb8e966a86d314f33e0af51684437f2519d",
         "8c5f0ede21ee648bd5fb55596184d74e0835d9aaada4d60a2d6f97bfd21473de",
@@ -191,7 +185,6 @@
         "025909ceecdfb8a618a3df8a7e31aa98a3e2fa7d5417f994ef49dd83ee989ccd",
         "b402194906a5b20ffc49a79744b1e7c5028e42e7937bb2904d1362a7c3f41754"
       ],
-      "definitionFingerprint": "c4968496e296fca7260f031bf19a62b4ea16cef0761c76214e7eaf45b834c4dc",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -245,7 +238,7 @@
         "package-size",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "80539ecfd1d62ec467e58f99a97014d0c03c35c49cb89a4c44409caebae20ddc",
         "d07478481195114c6e63234721acb67f86f1420a7afc9586420e62c7d8d794df",
         "46188dcd382fb59092ecbb553817f51e7bee4af3512b663fe194d7d1f76a9be3",
@@ -260,9 +253,7 @@
         "487a6955c2627cf1d7497f6d6065fda665fa9eb1a3f633c670c4e9131f13db6e",
         "db363635fa1efad0083c8748afa04fc7731f2aed0c30a476e24d3b3beaaef8a9",
         "3a89794e3cf2bb35cd8afbd9180d46c45981766291cf819abe807518217e1449"
-      ],
-      "implementationFingerprint": "a2d63ec886e03124291bf07ed0444c05849115187f1d6942d04d72c4e854e44d",
-      "verificationFingerprint": "6c0d7f6166358e140e1196fd646d2156fa9b967da39ed7f59ce6c7e28474fabc"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -271,10 +262,9 @@
       "caseIds": [
         "oracle-pypptx-shape-effect-0001-outer-shadow-matrix"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "9947c52fb223adb426ed6f1df539ce10eece84fe423aabb8211db648aa2c72de"
       ],
-      "definitionFingerprint": "3ed0c3f6ee81c0b18a329c93561e2d3bcf9cb88a487639c71751bc322d806b9c",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -332,11 +322,9 @@
         "build",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "f78169460d82509b9b8c6d0cff5dd39cb6ca7bd16ad335b9a433163759b7a157"
-      ],
-      "implementationFingerprint": "14858687775d3c51cb1770221c612f01fcf5c27e1449c5ac8e22779730a8e957",
-      "verificationFingerprint": "76d47e07aed63e316949b115ad60d4d590e25dff6bd400163ae699ce5420c12d"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -345,10 +333,9 @@
       "caseIds": [
         "oracle-pypptx-shape-effect-0002-reflection-matrix"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "df26e3dc506f51991195da703480c424714d54e659b8b0b1cdc1d466730e916a"
       ],
-      "definitionFingerprint": "d53e1cb98056662d776523866e4c50c4daede27fcafe04f10e3b6399a84386d4",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -406,11 +393,9 @@
         "build",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "3189903be3a6be85ca63e1843fa98cd9094a604f871d72a116a4efa97ad6f247"
-      ],
-      "implementationFingerprint": "504b696c836fae8dbdb0f29a9b3510cbe8fb2fcc1ba00a38e04929ca7ed96afa",
-      "verificationFingerprint": "d80a382dd0b6fea61f21e5c813f439da85483dee740ba4a6244a3d8448043e54"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -420,11 +405,10 @@
         "oracle-pypptx-shape-adj-0009-donut-thin-ring",
         "oracle-pypptx-shape-adj-0010-donut-thick-ring"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "e70abcb8e7c064ab416a852eeaa074c708aa4f70643e2adf112241404c8c913a",
         "5d01fb2986f9e14d46c227a0777c247aeb181587fa52bc49b7630d148be64c94"
       ],
-      "definitionFingerprint": "e2af738ca62efff9c42ea0fd858e130e3b642272bfa1537150f19933449418c1",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -475,12 +459,10 @@
         "regression",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "a1165932ff8fb1e5a1c9cbd316ff137da3ec6e07e1f94564be7b641cf7a9d04b",
         "8e591a3aa5f98391611b1ebe70c9f1354c7099c2ff44c4613c09303ca6e61cd3"
-      ],
-      "implementationFingerprint": "a38a679621cd0c73d532947f87c0cbf82cd7e2a4ec33d3ee6365a9b705e7dd97",
-      "verificationFingerprint": "b5e9962895f84bf911eef053678b8cd06e2448c509644da49baab61275105971"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -516,7 +498,7 @@
         "oracle-pypptx-flowchart-0087-magnetic-drum",
         "oracle-pypptx-flowchart-0088-display"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "f08b31f73553c37aafeaa8661886ef5ba96e58d411d4f902cfbc200f36bfd4f4",
         "b59846625545a51accce7aac9ca080593a9d115aedba328edbd66f84cc823f5e",
         "2867107e25cba55ca562c399f3ab830c3c2ec506b39c7a7e9b3c92707191de62",
@@ -546,7 +528,6 @@
         "cc8a24e91d12a15f76149fe3caf680e4c1f96feba9a2da626b6374068c52128b",
         "a11864d901393675e743819bcb430361b6d01d3e4b985406c1e0b781cabb9233"
       ],
-      "definitionFingerprint": "73b9638a3e7bdee2f7ea7cef4fce1ff2b184b456be4d72e5050ddaf959cc2a72",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -597,7 +578,7 @@
         "regression",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "c1f1103c60773d7c6d1a6408fff597d979a75ec25ab14a5b80561a8079c6bf27",
         "8b47bcdfa0dfa305a163c5df247f0a91fdbf01fcb8cab7747cb5f6701aec530b",
         "41b850593012210d46128bfcaa617fb2dde4cfbe03b2a593d3da27955fb9455c",
@@ -626,9 +607,7 @@
         "187ed45e8d035c8d4bb78c52a89fc7aa99993607eab55a0ae111d05d3836de0e",
         "d38b31514d69f340c598573a70d73e08fac9023424e850bf4a9b902f276c7675",
         "997fe7af7fcc57c6c0d910af56a9dd8bc50d235b17b6cd3b3da53b02d71471e1"
-      ],
-      "implementationFingerprint": "3c8c1b34b4b0a0ffc1c1bcdb167b692af49bcfd776d9c33b936e6d568a7c3999",
-      "verificationFingerprint": "a6e68dbc4dca5168ece41f44506415a587cbcf8fdc02f51fd0d3b43b02f23bc2"
+      ]
     },
     {
       "acceptedAt": "2026-09-13T12:55:24.299675Z",
@@ -644,7 +623,7 @@
         "oracle-pypptx-table-0007-cjk-mixed-text",
         "oracle-pypptx-table-0008-cell-border-matrix"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "6b45b8be5e86537ca799fbe7e6e44b0503189be71e83fcdbe9847c1eecd94711",
         "3c175f1f89335339c9fe38735e2ebe9327d2c4860b08fded74deef8074bdc958",
         "bb02060bc21393c0f3809990d5069592642585d68e4a22f02ac73236d70ed671",
@@ -654,7 +633,6 @@
         "a88b6157961e2549ee85fefac2e0d4f73ecff7eda3c083c682b75bd8aa91caae",
         "64b9e6d38aa937bc279c9144ae978e44f1b871b56014791a5a722666c0b9671f"
       ],
-      "definitionFingerprint": "a3c22999bbb4b43a043e5a53617cc632606fcdfbd2a0dd0588962cfb34f684dc",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -755,7 +733,7 @@
         "regression",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "0d177a531db76ab1411252ba9488c0e1ac7ecaf41c855db475dd1e6a71154946",
         "cddba1913ba33408e02322aa0671d119e2f0461469455cd59d25b65fa00c4ea2",
         "add87e561ca458c1084dbbcd1641b658d87161ae30e80699fa2ae66b0d04f708",
@@ -764,9 +742,7 @@
         "9bc3d1faedb554b26b2e16762203e2074b937dad9c4ae38081bd41b98d32728f",
         "9465893b944b6ca22525b30f778d85680cbae4316626f495845e9e1d33f9cfc8",
         "e71c25816d42d1e045146b1f730cdc03f8f5ce13ceeb538247883abde48d4348"
-      ],
-      "implementationFingerprint": "b2ae9be8338f2fd9b44562c7dd54cf88162e3eefab767acab94252b83924a238",
-      "verificationFingerprint": "0449773c8e31539b51ac0fc324753d4a5653105384f1b1a7b33d8028e901bce5"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -783,7 +759,7 @@
         "oracle-pypptx-text-0054-cjk-sp-autofit-wide-compact",
         "oracle-pypptx-text-0055-cjk-sp-autofit-explicit-overflow"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "eadaa28bccc34400ef0b1e2b7f7516343d16c99285a69513a23d56aac8c2b9de",
         "2b25a0ec6f3b8c62c9510d3916faa50f37971c5f6315662dcd8b2dccf8e1ab12",
         "77872b05f106820f4584607fc3f6db7d508bdcdfc140955f176fe90aca1b0f3a",
@@ -794,7 +770,6 @@
         "866e1b336610912af2df317f758b86970ee52d82242e4d11fc0681aab0dd7381",
         "9589c1a44948cd558b3babfc51be26703341e1e7c9c0981d8b32e77bf0f69dfa"
       ],
-      "definitionFingerprint": "912dd3529ba441017d001d9af33d8b881ac0ac3e2e75aa3fa19ecc5155a4f742",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -845,7 +820,7 @@
         "regression",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "910d3b1ad2d1b3bd8833e44cedc465814895098d60594cca443cafe753a14b1f",
         "7f01c5a008a1d067ac1ad77051bdc74d8cffee3cff3ab9d74b2cea84374680ad",
         "dff23931c8d037e4d35ad76d1b6fc261a73ef0a03792ee50d0ac74eb52b49dad",
@@ -855,9 +830,7 @@
         "fd712bddeafe26ab8cb6a2851c41af3462feeabbeefc67745840ad7b322f05f6",
         "7c2b24e5737f3aa79c4ecaba2a192bca38b2c2ce9e6c042cc96dfa2bccd7829c",
         "61b36ab48767092cb35fab493af037d6d31f3b5996f0d82f7a4e1c4c4f79886f"
-      ],
-      "implementationFingerprint": "f81b52ad14f64f154bbc1c31cd24e96f91887242255372bb013d9009e0a75173",
-      "verificationFingerprint": "5d5247c6d9318cddad8ae3fe463b14be6c50cdb5b3632393f34794729ca08f3b"
+      ]
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -869,13 +842,12 @@
         "oracle-pypptx-text-0058-run-color-over-defrpr-tall",
         "oracle-pypptx-text-0059-fontref-fallback-no-defrpr"
       ],
-      "caseInputFingerprints": [
+      "caseInputSha256": [
         "c2cea67566a4d65db4d52b5ee3f4e89fd2f35628ac83855dd6fa1672c5bb5d29",
         "b6a8a0067c552bd5e94b7c9f351daeade7af2fcfbbee738b3d8c5bd1db82f054",
         "20cd883efc019e054dea8b6810f533e0b99f6a019759de80e70cf96a769f187e",
         "d1760a39298a56409f8f9ecf8062a67fc143b81d4bd4827606b112294b95a326"
       ],
-      "definitionFingerprint": "d8a13309098a5e1199daac38ded3412aa18d1477875590ab780049ab941d255d",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -926,14 +898,12 @@
         "regression",
         "docs"
       ],
-      "groundTruthFingerprints": [
+      "groundTruthSha256": [
         "2fd13216f3e0e156887f685accc1ffd5b9f20b4709e7dd0b653d835c37bb7b78",
         "ac61bea0351cf618514575607f97de01f9e2fb1729e59a251c8a04a3c53033ba",
         "8dbd857e5b23e3796b5a5f12cda4074de0e6b729e5e6ee0091f504ef47b02550",
         "19d220fde4155e42d8fb9cde939176baeff18ca79a00502f954348e6bf3d0557"
-      ],
-      "implementationFingerprint": "81d897921617f4bdac468b5270534543fe72ef8ca4aef415eb5955eb00c3ebee",
-      "verificationFingerprint": "c767df01678490b11eb6858aa9f2c53cd575e50c1ecdfc1e9e10e2ac2b86c0a0"
+      ]
     }
   ],
   "schemaVersion": 2

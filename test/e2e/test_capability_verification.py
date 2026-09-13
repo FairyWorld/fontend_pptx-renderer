@@ -7,10 +7,6 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pytest
 
 from oracle.capability_contract import load_capability_registry
-from oracle.capability_evidence import (
-    compute_implementation_fingerprint,
-    compute_verification_fingerprint,
-)
 from oracle.capability_verification import (
     CapabilityVerificationError,
     normalize_native_evaluation_reports,
@@ -20,9 +16,7 @@ from oracle.capability_verification import (
 def capability_fixture(tmp_path: Path):
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
-    (repo / "test").mkdir(parents=True)
     (repo / "src/renderer.ts").write_text("renderer", encoding="utf-8")
-    (repo / "test/verification.py").write_text("verification", encoding="utf-8")
     registry_path = repo / "capabilities.json"
     registry_path.write_text(
         json.dumps(
@@ -37,8 +31,7 @@ def capability_fixture(tmp_path: Path):
                         "selectors": [],
                         "scope": {"presets": ["donut"]},
                         "fallback": "Use the handwritten geometry.",
-                        "implementationPaths": ["src/renderer.ts"],
-                        "verificationPaths": ["test/verification.py"],
+                        "affectedPaths": ["src/renderer.ts"],
                         "requiredGates": [
                             "source",
                             "structural",
@@ -738,7 +731,7 @@ def reflection_report(
     }
 
 
-def test_normalizes_native_reports_into_promotion_evidence(tmp_path: Path):
+def test_normalizes_native_reports_for_the_current_revision(tmp_path: Path):
     repo, capability = capability_fixture(tmp_path)
     current = [native_report("donut-thin"), native_report("donut-thick")]
     baseline = [
@@ -758,14 +751,9 @@ def test_normalizes_native_reports_into_promotion_evidence(tmp_path: Path):
     assert verification["renderer"] == {
         "revision": "a" * 40,
         "dirty": False,
-        "implementationFingerprint": compute_implementation_fingerprint(
-            repo, capability.implementation_paths
-        ),
-        "verificationFingerprint": compute_verification_fingerprint(
-            repo, capability.verification_paths
-        ),
     }
     assert verification["schemaVersion"] == 2
+    assert "definitionFingerprint" not in verification
     assert set(verification["gates"].values()) == {"passed"}
     assert [case["caseId"] for case in verification["caseResults"]] == [
         "donut-thick",

@@ -26,13 +26,10 @@ from oracle.capability_contract import (  # noqa: E402
 )
 from oracle.capability_evidence import (  # noqa: E402
     build_promotion_receipt,
-    compute_implementation_fingerprint,
-    compute_verification_fingerprint,
     evaluate_evidence_state,
     sanitize_receipt_for_tracking,
 )
 from oracle.capability_inventory import (  # noqa: E402
-    compute_registry_fingerprint,
     inventory_to_dict,
     scan_corpus,
 )
@@ -115,21 +112,10 @@ def _contracts(args: argparse.Namespace):
 
 
 def command_validate(args: argparse.Namespace) -> int:
-    repo, _, _, registry, history = _contracts(args)
-    for capability in registry.capabilities:
-        compute_implementation_fingerprint(repo, capability.implementation_paths)
-        compute_verification_fingerprint(repo, capability.verification_paths)
-    latest_receipts = {receipt.capability_id: receipt for receipt in history.receipts}
-    for capability_id, receipt in latest_receipts.items():
-        capability = registry.by_id()[capability_id]
-        state = evaluate_evidence_state(capability, receipt, None, repo)
-        if state.name == "regressed":
-            raise CapabilityLoopError(
-                f"stale promotion receipt for {capability_id}: {', '.join(state.reasons)}"
-            )
+    _, _, _, registry, history = _contracts(args)
     print(
         f"validated {len(registry.capabilities)} capabilities and "
-        f"{len(history.receipts)} promotion receipts"
+        f"{len(history.receipts)} historical verification records"
     )
     return 0
 
@@ -206,9 +192,6 @@ def command_rank(args: argparse.Namespace) -> int:
     inventory = _load_json(inventory_path)
     if not isinstance(inventory, Mapping) or inventory.get("schemaVersion") != 1:
         raise CapabilityLoopError("inventory requires schemaVersion=1")
-    expected_registry_fingerprint = compute_registry_fingerprint(registry)
-    if inventory.get("registryFingerprint") != expected_registry_fingerprint:
-        raise CapabilityLoopError("inventory registry fingerprint is stale")
     issue_path = _path(args.issues, repo, args.issues) if args.issues else None
     issues = _issue_rows(issue_path)
     oracle_report = None
@@ -244,14 +227,12 @@ def command_rank(args: argparse.Namespace) -> int:
     ranked = rank_capabilities(rows)
     ledger_payload = {
         "schemaVersion": 1,
-        "registryFingerprint": expected_registry_fingerprint,
         "renderer": inventory.get("renderer"),
         "inventorySha256": _sha256(inventory_path),
         "rows": [ledger_row_to_dict(row) for row in rows],
     }
     ranking_payload = {
         "schemaVersion": 1,
-        "registryFingerprint": expected_registry_fingerprint,
         "ledgerInputSha256": hashlib.sha256(
             json.dumps(ledger_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest(),
@@ -281,8 +262,6 @@ def command_work_packet(args: argparse.Namespace) -> int:
     ledger = _load_json(ledger_path)
     if not isinstance(ledger, Mapping) or ledger.get("schemaVersion") != 1:
         raise CapabilityLoopError("ledger requires schemaVersion=1")
-    if ledger.get("registryFingerprint") != compute_registry_fingerprint(registry):
-        raise CapabilityLoopError("ledger registry fingerprint is stale")
     values = ledger.get("rows")
     if not isinstance(values, list):
         raise CapabilityLoopError("ledger rows must be a list")
@@ -423,13 +402,12 @@ def command_accept(args: argparse.Namespace) -> int:
     receipt = build_promotion_receipt(capability, verification, repo, accepted_at)
     if any(
         existing.capability_id == receipt.capability_id
-        and existing.implementation_fingerprint == receipt.implementation_fingerprint
-        and existing.verification_fingerprint == receipt.verification_fingerprint
-        and existing.case_input_fingerprints == receipt.case_input_fingerprints
-        and existing.ground_truth_fingerprints == receipt.ground_truth_fingerprints
+        and existing.accepted_revision == receipt.accepted_revision
+        and existing.case_input_sha256 == receipt.case_input_sha256
+        and existing.ground_truth_sha256 == receipt.ground_truth_sha256
         for existing in history.receipts
     ):
-        raise CapabilityLoopError("an equivalent promotion receipt already exists")
+        raise CapabilityLoopError("an equivalent verification record already exists")
     receipts = tuple(
         sorted(
             (
@@ -530,7 +508,9 @@ def build_parser() -> argparse.ArgumentParser:
     verify.add_argument("--out")
     verify.set_defaults(handler=command_verify)
 
-    accept = subparsers.add_parser("accept", help="write one fresh promotion receipt")
+    accept = subparsers.add_parser(
+        "accept", help="write one historical verification record"
+    )
     _add_common_contract_arguments(accept)
     accept.add_argument("--acceptance")
     accept.add_argument("--verification", required=True)

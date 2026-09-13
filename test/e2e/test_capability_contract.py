@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 
 from oracle.capability_contract import (
-    capability_definition_fingerprint,
     load_acceptance_history,
     load_capability_registry,
     validate_acceptance_history,
@@ -37,8 +36,7 @@ def capability(
         ],
         "scope": {"presets": ["rect"]},
         "fallback": fallback,
-        "implementationPaths": ["src/shapes/presets.ts"],
-        "verificationPaths": ["test/unit/shapes/presets.test.ts"],
+        "affectedPaths": ["src/shapes/presets.ts"],
         "requiredGates": required_gates or ["source", "unit", "browser", "docs"],
         "issueUrls": [],
     }
@@ -125,7 +123,7 @@ def test_registry_rejects_unknown_keys_and_unsafe_paths(tmp_path: Path):
         load_capability_registry(typo_path)
 
     unsafe_entry = capability()
-    unsafe_entry["implementationPaths"] = ["../outside.ts"]
+    unsafe_entry["affectedPaths"] = ["../outside.ts"]
     unsafe_path = write_json(
         tmp_path / "unsafe.json",
         {"schemaVersion": 2, "capabilities": [unsafe_entry]},
@@ -133,67 +131,8 @@ def test_registry_rejects_unknown_keys_and_unsafe_paths(tmp_path: Path):
     with pytest.raises(ValueError, match="repository-relative"):
         load_capability_registry(unsafe_path)
 
-    unsafe_verification_entry = capability()
-    unsafe_verification_entry["verificationPaths"] = ["../outside.test.ts"]
-    unsafe_verification_path = write_json(
-        tmp_path / "unsafe-verification.json",
-        {"schemaVersion": 2, "capabilities": [unsafe_verification_entry]},
-    )
-    with pytest.raises(ValueError, match="repository-relative"):
-        load_capability_registry(unsafe_verification_path)
 
-
-def test_verification_paths_are_immutable_and_change_definition_fingerprint(tmp_path: Path):
-    first = capability()
-    second = capability()
-    second["verificationPaths"] = ["test/unit/shapes/other.test.ts"]
-    first_capability = load_capability_registry(
-        write_json(
-            tmp_path / "first.json",
-            {"schemaVersion": 2, "capabilities": [first]},
-        )
-    ).capabilities[0]
-    second_capability = load_capability_registry(
-        write_json(
-            tmp_path / "second.json",
-            {"schemaVersion": 2, "capabilities": [second]},
-        )
-    ).capabilities[0]
-
-    assert first_capability.verification_paths == ("test/unit/shapes/presets.test.ts",)
-    assert capability_definition_fingerprint(first_capability) != (
-        capability_definition_fingerprint(second_capability)
-    )
-
-
-@pytest.mark.parametrize("field", ["implementationPaths", "verificationPaths"])
-def test_capability_fingerprints_reject_documentation_paths(tmp_path: Path, field: str):
-    entry = capability()
-    entry[field] = ["docs/TESTING.md"]
-
-    with pytest.raises(ValueError, match="documentation paths cannot be fingerprinted"):
-        load_capability_registry(
-            write_json(
-                tmp_path / "documentation-path.json",
-                {"schemaVersion": 2, "capabilities": [entry]},
-            )
-        )
-
-
-def test_capability_path_roles_cannot_overlap(tmp_path: Path):
-    entry = capability()
-    entry["verificationPaths"] = list(entry["implementationPaths"])
-
-    with pytest.raises(ValueError, match="path roles overlap"):
-        load_capability_registry(
-            write_json(
-                tmp_path / "overlapping-paths.json",
-                {"schemaVersion": 2, "capabilities": [entry]},
-            )
-        )
-
-
-def test_selector_parent_scope_is_parsed_immutably_and_changes_its_fingerprint(tmp_path: Path):
+def test_selector_parent_scope_is_parsed_immutably(tmp_path: Path):
     unscoped_entry = capability()
     scoped_entry = capability()
     scoped_entry["selectors"][0]["parent"] = {
@@ -216,9 +155,7 @@ def test_selector_parent_scope_is_parsed_immutably_and_changes_its_fingerprint(t
     selector = scoped_registry.capabilities[0].selectors[0]
     assert selector.parent_namespace == scoped_entry["selectors"][0]["parent"]["namespace"]
     assert selector.parent_local_names == ("spPr", "grpSpPr")
-    assert capability_definition_fingerprint(scoped_registry.capabilities[0]) != (
-        capability_definition_fingerprint(unscoped_registry.capabilities[0])
-    )
+    assert unscoped_registry.capabilities[0].selectors[0].parent_namespace is None
 
 
 def test_selector_parent_scope_rejects_incomplete_or_duplicate_names(tmp_path: Path):
@@ -246,7 +183,7 @@ def test_selector_parent_scope_rejects_incomplete_or_duplicate_names(tmp_path: P
         )
 
 
-def test_selector_ancestor_path_is_parsed_immutably_and_changes_its_fingerprint(
+def test_selector_ancestor_path_is_parsed_immutably(
     tmp_path: Path,
 ):
     unscoped_entry = capability()
@@ -287,9 +224,7 @@ def test_selector_ancestor_path_is_parsed_immutably_and_changes_its_fingerprint(
             ("spPr",),
         ),
     )
-    assert capability_definition_fingerprint(scoped_registry.capabilities[0]) != (
-        capability_definition_fingerprint(unscoped_registry.capabilities[0])
-    )
+    assert unscoped_registry.capabilities[0].selectors[0].ancestor_path == ()
 
 
 def test_selector_ancestor_path_rejects_empty_steps_and_parent_combination(tmp_path: Path):
@@ -334,13 +269,10 @@ def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Pat
             "receipts": [
                 {
                     "capabilityId": "drawingml.shape.geometry.unknown",
-                    "definitionFingerprint": "d" * 64,
                     "acceptedRevision": "a" * 40,
-                    "implementationFingerprint": "b" * 64,
-                    "verificationFingerprint": "e" * 64,
                     "caseIds": ["oracle-shape-0001"],
-                    "caseInputFingerprints": ["c" * 64],
-                    "groundTruthFingerprints": ["d" * 64],
+                    "caseInputSha256": ["c" * 64],
+                    "groundTruthSha256": ["d" * 64],
                     "gates": ["source", "unit"],
                     "environment": {"oracle": "powerpoint-macos"},
                     "acceptedAt": "2026-09-09T00:00:00Z",
@@ -358,13 +290,10 @@ def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Pat
             "receipts": [
                 {
                     "capabilityId": "drawingml.shape.geometry.rect",
-                    "definitionFingerprint": "d" * 64,
                     "acceptedRevision": "a" * 40,
-                    "implementationFingerprint": "not-a-sha256",
-                    "verificationFingerprint": "e" * 64,
                     "caseIds": ["oracle-shape-0001"],
-                    "caseInputFingerprints": ["c" * 64],
-                    "groundTruthFingerprints": ["d" * 64],
+                    "caseInputSha256": ["not-a-sha256"],
+                    "groundTruthSha256": ["d" * 64],
                     "gates": ["source", "unit"],
                     "environment": {"oracle": "powerpoint-macos"},
                     "acceptedAt": "2026-09-09T00:00:00Z",
@@ -372,20 +301,17 @@ def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Pat
             ],
         },
     )
-    with pytest.raises(ValueError, match="implementationFingerprint"):
+    with pytest.raises(ValueError, match="caseInputSha256"):
         load_acceptance_history(invalid_hash_path)
 
 
 def test_acceptance_history_keeps_only_one_receipt_per_capability(tmp_path: Path):
     receipt = {
         "capabilityId": "drawingml.shape.geometry.rect",
-        "definitionFingerprint": "a" * 64,
         "acceptedRevision": "b" * 40,
-        "implementationFingerprint": "c" * 64,
-        "verificationFingerprint": "f" * 64,
         "caseIds": ["oracle-shape-0001"],
-        "caseInputFingerprints": ["d" * 64],
-        "groundTruthFingerprints": ["e" * 64],
+        "caseInputSha256": ["d" * 64],
+        "groundTruthSha256": ["e" * 64],
         "gates": ["source", "unit"],
         "environment": {"oracle": "powerpoint-macos"},
         "acceptedAt": "2026-09-09T00:00:00Z",
@@ -429,15 +355,10 @@ def test_valid_registry_and_acceptance_history_are_immutable(tmp_path: Path):
                 "receipts": [
                     {
                         "capabilityId": entry["id"],
-                        "definitionFingerprint": capability_definition_fingerprint(
-                            registry.capabilities[0]
-                        ),
                         "acceptedRevision": "a" * 40,
-                        "implementationFingerprint": "b" * 64,
-                        "verificationFingerprint": "e" * 64,
                         "caseIds": ["oracle-shape-0001"],
-                        "caseInputFingerprints": ["c" * 64],
-                        "groundTruthFingerprints": ["d" * 64],
+                        "caseInputSha256": ["c" * 64],
+                        "groundTruthSha256": ["d" * 64],
                         "gates": entry["requiredGates"],
                         "environment": {"oracle": "powerpoint-macos"},
                         "acceptedAt": "2026-09-09T00:00:00Z",
@@ -455,10 +376,21 @@ def test_valid_registry_and_acceptance_history_are_immutable(tmp_path: Path):
 
 
 def test_tracked_capability_contract_is_valid():
-    registry = load_capability_registry(Path("oracle/capabilities.json"))
-    history = load_acceptance_history(Path("oracle/capability-acceptance.json"))
+    registry_path = Path("oracle/capabilities.json")
+    history_path = Path("oracle/capability-acceptance.json")
+    registry = load_capability_registry(registry_path)
+    history = load_acceptance_history(history_path)
 
     validate_acceptance_history(registry, history)
+    raw_registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    raw_history = json.loads(history_path.read_text(encoding="utf-8"))
+    assert all("affectedPaths" in item for item in raw_registry["capabilities"])
+    legacy_fields = {
+        "definitionFingerprint",
+        "implementationFingerprint",
+        "verificationFingerprint",
+    }
+    assert all(legacy_fields.isdisjoint(record) for record in raw_history["receipts"])
     assert len(registry.capabilities) == 21
     chart_2d = registry.by_id()["drawingml.chart.2d.common"]
     common_table = registry.by_id()["drawingml.table.common"]
@@ -473,10 +405,7 @@ def test_tracked_capability_contract_is_valid():
         "neutral-axis-grid",
         "neutral-or-solid-plot-background",
     )
-    assert "src/renderer/ChartRenderer.ts" in chart_2d.implementation_paths
-    assert "test/e2e/oracle/chart_metrics.py" in chart_2d.verification_paths
-    assert all(not path.lower().endswith(".md") for path in chart_2d.implementation_paths)
-    assert all(not path.lower().endswith(".md") for path in chart_2d.verification_paths)
+    assert "test/e2e/oracle/chart_metrics.py" in chart_2d.affected_paths
     assert common_table.render_mode == "native"
     assert formula.render_mode == "approximate"
     assert formula.scope["output"] == ("Presentation MathML",)
@@ -581,7 +510,7 @@ def test_tracked_capability_contract_is_valid():
     )
 
 
-def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path: Path):
+def test_historical_receipt_needs_revision_and_testcase_evidence_only(tmp_path: Path):
     registry = load_capability_registry(
         write_json(
             tmp_path / "capabilities.json",
@@ -605,13 +534,10 @@ def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path:
                 "receipts": [
                     {
                         "capabilityId": registry.capabilities[0].id,
-                        "definitionFingerprint": "e" * 64,
                         "acceptedRevision": "a" * 40,
-                        "implementationFingerprint": "b" * 64,
-                        "verificationFingerprint": "e" * 64,
                         "caseIds": ["oracle-shape-0001"],
-                        "caseInputFingerprints": ["c" * 64],
-                        "groundTruthFingerprints": ["d" * 64],
+                        "caseInputSha256": ["c" * 64],
+                        "groundTruthSha256": ["d" * 64],
                         "gates": ["unit", "native-powerpoint"],
                         "environment": {"oracle": "powerpoint-macos"},
                         "acceptedAt": "2026-09-09T00:00:00Z",
@@ -622,3 +548,4 @@ def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path:
     )
 
     validate_acceptance_history(registry, history)
+    assert history.receipts[0].accepted_revision == "a" * 40

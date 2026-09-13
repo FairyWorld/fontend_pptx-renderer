@@ -153,7 +153,7 @@ def _combined_ground_truth_sha256(case_dir: Path, pptx_path: Path) -> str | None
     return digest.hexdigest()
 
 
-def _native_case_fingerprints(
+def _native_case_hashes(
     repo: Path, case_ids: Sequence[str]
 ) -> dict[str, set[tuple[str, str]]]:
     testdata = repo / "test" / "e2e" / "testdata"
@@ -164,8 +164,8 @@ def _native_case_fingerprints(
             sources = ("windows-cases",)
         else:
             stem = case_id
-            # Historical receipts did not encode their corpus. Exact hashes prevent
-            # a same-stem case in the other corpus from satisfying the receipt.
+            # Historical records did not encode their corpus. Exact hashes prevent
+            # a same-stem case in the other corpus from satisfying the record.
             sources = ("cases", "windows-cases")
         for source_name in sources:
             case_dir = testdata / source_name / stem
@@ -189,19 +189,19 @@ def _latest_case_evidence(
 ]:
     history = load_acceptance_history(acceptance_path)
     latest_ids: dict[str, tuple[str, ...]] = {}
-    latest_fingerprints: dict[str, dict[str, tuple[str, str]]] = {}
+    latest_hashes: dict[str, dict[str, tuple[str, str]]] = {}
     for receipt in history.receipts:
         latest_ids[receipt.capability_id] = receipt.case_ids
-        latest_fingerprints[receipt.capability_id] = {
+        latest_hashes[receipt.capability_id] = {
             case_id: (source_hash, ground_truth_hash)
             for case_id, source_hash, ground_truth_hash in zip(
                 receipt.case_ids,
-                receipt.case_input_fingerprints,
-                receipt.ground_truth_fingerprints,
+                receipt.case_input_sha256,
+                receipt.ground_truth_sha256,
                 strict=True,
             )
         }
-    return latest_ids, latest_fingerprints
+    return latest_ids, latest_hashes
 
 
 def _command_parts(command: Mapping[str, Any]) -> tuple[list[str], Path, str]:
@@ -267,14 +267,14 @@ def _summary(plan: dict[str, object]) -> None:
         print(f"  - {case_id}")
     missing_artifacts = plan["nativeCasesMissingArtifacts"]
     if missing_artifacts:
-        print("Native cases missing exact receipt-bound artifacts:")
+        print("Native cases missing the recorded testcase artifacts:")
         for issue in plan["nativeCaseArtifactIssues"]:
             print(
                 f"  - {issue['caseId']} ({issue['capabilityId']}: {issue['reason']})"
             )
     missing_native_cases = plan["nativeCapabilitiesWithoutCases"]
     if missing_native_cases:
-        print("Native-gated capabilities without an accepted case set:")
+        print("Native-gated capabilities without a recorded case set:")
         for capability_id in missing_native_cases:
             print(f"  - {capability_id}")
     if plan["requiresBrowser"]:
@@ -335,7 +335,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(raw_args)
 
     registry = load_capability_registry(E2E_DIR / "oracle" / "capabilities.json")
-    latest_case_ids, latest_case_fingerprints = _latest_case_evidence(
+    latest_case_ids, latest_case_hashes = _latest_case_evidence(
         E2E_DIR / "oracle" / "capability-acceptance.json"
     )
     changed_paths = args.changed_path or _discover_changed_paths(PROJECT_ROOT, args.base, args.head)
@@ -365,21 +365,21 @@ def main(argv: Sequence[str] | None = None) -> int:
         "capabilities": registry.capabilities,
         "latest_case_ids": latest_case_ids,
         "repository_paths": _repository_paths(PROJECT_ROOT),
-        "latest_case_fingerprints": latest_case_fingerprints,
+        "latest_case_hashes": latest_case_hashes,
         "case_reports": case_reports,
         "python_executable": sys.executable,
     }
     plan = build_verification_plan(
         **plan_arguments,
-        available_native_case_fingerprints={},
+        available_native_case_hashes={},
     )
     if plan["nativeCaseIds"]:
-        native_case_fingerprints = _native_case_fingerprints(
+        native_case_hashes = _native_case_hashes(
             PROJECT_ROOT, plan["nativeCaseIds"]
         )
         plan = build_verification_plan(
             **plan_arguments,
-            available_native_case_fingerprints=native_case_fingerprints,
+            available_native_case_hashes=native_case_hashes,
         )
     _summary(plan)
 

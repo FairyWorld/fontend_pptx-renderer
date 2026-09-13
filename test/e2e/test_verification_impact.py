@@ -7,7 +7,7 @@ from pathlib import Path
 from oracle.verification_impact import build_verification_plan
 from scripts.verify_affected import (
     _discover_changed_paths,
-    _native_case_fingerprints,
+    _native_case_hashes,
     _run_commands,
 )
 
@@ -15,14 +15,12 @@ from scripts.verify_affected import (
 def _capability(
     capability_id: str,
     *,
-    implementation_paths: list[str],
-    verification_paths: list[str] | None = None,
+    affected_paths: list[str],
     required_gates: list[str],
 ) -> dict:
     return {
         "id": capability_id,
-        "implementationPaths": implementation_paths,
-        "verificationPaths": verification_paths or [],
+        "affectedPaths": affected_paths,
         "requiredGates": required_gates,
     }
 
@@ -37,8 +35,11 @@ def test_docs_only_change_skips_runtime_and_native_verification():
         capabilities=[
             _capability(
                 "drawingml.chart.2d.common",
-                implementation_paths=["src/renderer/ChartRenderer.ts"],
-                verification_paths=["test/unit/renderer/ChartRenderer.test.ts"],
+                affected_paths=[
+                    "README.md",
+                    "src/renderer/ChartRenderer.ts",
+                    "test/unit/renderer/ChartRenderer.test.ts",
+                ],
                 required_gates=["unit", "browser", "native-powerpoint", "docs"],
             )
         ],
@@ -98,8 +99,8 @@ def test_renderer_change_selects_only_claiming_capabilities_and_their_tests_and_
         capabilities=[
             _capability(
                 "drawingml.chart.2d.common",
-                implementation_paths=["src/renderer/ChartRenderer.ts"],
-                verification_paths=[
+                affected_paths=[
+                    "src/renderer/ChartRenderer.ts",
                     "test/unit/renderer/ChartRenderer.test.ts",
                     "test/e2e/test_chart_metrics.py",
                 ],
@@ -107,8 +108,8 @@ def test_renderer_change_selects_only_claiming_capabilities_and_their_tests_and_
             ),
             _capability(
                 "drawingml.shape.3d.camera-projected-plane",
-                implementation_paths=["src/renderer/Shape3DRenderer.ts"],
-                verification_paths=[
+                affected_paths=[
+                    "src/renderer/Shape3DRenderer.ts",
                     "test/unit/renderer/Shape3DRenderer.test.ts",
                 ],
                 required_gates=["unit", "browser", "native-powerpoint"],
@@ -135,33 +136,13 @@ def test_renderer_change_selects_only_claiming_capabilities_and_their_tests_and_
     ]
 
 
-def test_verification_change_selects_the_capability_and_runs_the_changed_test():
-    plan = build_verification_plan(
-        changed_paths=["test/unit/renderer/ChartRenderer.test.ts"],
-        capabilities=[
-            _capability(
-                "drawingml.chart.2d.common",
-                implementation_paths=["src/renderer/ChartRenderer.ts"],
-                verification_paths=["test/unit/renderer/ChartRenderer.test.ts"],
-                required_gates=["unit", "browser", "native-powerpoint"],
-            )
-        ],
-        latest_case_ids={"drawingml.chart.2d.common": ["oracle-chart-0001"]},
-    )
-
-    assert plan["mode"] == "targeted"
-    assert plan["impactedCapabilityIds"] == ["drawingml.chart.2d.common"]
-    assert plan["unitTestPaths"] == ["test/unit/renderer/ChartRenderer.test.ts"]
-    assert plan["nativeCaseIds"] == ["oracle-chart-0001"]
-
-
 def test_native_gate_without_accepted_cases_is_reported_instead_of_silently_skipped():
     plan = build_verification_plan(
         changed_paths=["src/renderer/ChartRenderer.ts"],
         capabilities=[
             _capability(
                 "drawingml.chart.3d.view",
-                implementation_paths=["src/renderer/ChartRenderer.ts"],
+                affected_paths=["src/renderer/ChartRenderer.ts"],
                 required_gates=["unit", "native-powerpoint"],
             )
         ],
@@ -179,7 +160,7 @@ def test_native_artifacts_and_local_metric_obligations_are_explicit():
         capabilities=[
             _capability(
                 "drawingml.shape.3d.camera-projected-plane",
-                implementation_paths=["src/renderer/Shape3DRenderer.ts"],
+                affected_paths=["src/renderer/Shape3DRenderer.ts"],
                 required_gates=["unit", "native-powerpoint", "camera-local"],
             )
         ],
@@ -201,7 +182,7 @@ def test_native_artifacts_and_local_metric_obligations_are_explicit():
     assert plan["localGateCommands"] == []
 
 
-def test_native_artifact_must_match_the_receipt_source_and_ground_truth_fingerprints():
+def test_native_artifact_must_match_the_receipt_source_and_ground_truth_sha256():
     capability_id = "drawingml.shape.geometry.adjustment.donut"
     case_id = "oracle-pypptx-shape-adj-0009-donut-thin-ring"
     expected = ("a" * 64, "b" * 64)
@@ -210,13 +191,13 @@ def test_native_artifact_must_match_the_receipt_source_and_ground_truth_fingerpr
         capabilities=[
             _capability(
                 capability_id,
-                implementation_paths=["src/shapes/presets.ts"],
+                affected_paths=["src/shapes/presets.ts"],
                 required_gates=["native-powerpoint"],
             )
         ],
         latest_case_ids={capability_id: [case_id]},
-        latest_case_fingerprints={capability_id: {case_id: expected}},
-        available_native_case_fingerprints={
+        latest_case_hashes={capability_id: {case_id: expected}},
+        available_native_case_hashes={
             case_id: {("c" * 64, "d" * 64)},
         },
     )
@@ -226,7 +207,7 @@ def test_native_artifact_must_match_the_receipt_source_and_ground_truth_fingerpr
         {
             "capabilityId": capability_id,
             "caseId": case_id,
-            "reason": "fingerprint-mismatch",
+            "reason": "input-hash-mismatch",
         }
     ]
 
@@ -237,7 +218,7 @@ def test_complete_local_metric_gate_lists_an_executable_repeatable_report_comman
         capabilities=[
             _capability(
                 "drawingml.shape.3d.camera-projected-plane",
-                implementation_paths=["src/renderer/Shape3DRenderer.ts"],
+                affected_paths=["src/renderer/Shape3DRenderer.ts"],
                 required_gates=["camera-local"],
             )
         ],
@@ -273,7 +254,7 @@ def test_local_metric_gate_without_case_report_is_not_presented_as_complete():
         capabilities=[
             _capability(
                 "drawingml.shape.3d.camera-projected-plane",
-                implementation_paths=["src/renderer/Shape3DRenderer.ts"],
+                affected_paths=["src/renderer/Shape3DRenderer.ts"],
                 required_gates=["camera-local"],
             )
         ],
@@ -340,7 +321,7 @@ def test_global_control_change_is_full_even_if_a_capability_claims_the_path():
         capabilities=[
             _capability(
                 "capability.a",
-                implementation_paths=["package.json"],
+                affected_paths=["package.json"],
                 required_gates=["native-powerpoint"],
             )
         ],
@@ -360,12 +341,12 @@ def test_full_mode_preserves_and_expands_native_and_local_obligations_for_global
     capabilities = [
         _capability(
             "drawingml.shape.3d.camera-projected-plane",
-            implementation_paths=["src/renderer/Shape3DRenderer.ts"],
+            affected_paths=["src/renderer/Shape3DRenderer.ts"],
             required_gates=["unit", "native-powerpoint", "camera-local"],
         ),
         _capability(
             "drawingml.chart.2d.common",
-            implementation_paths=["src/renderer/ChartRenderer.ts"],
+            affected_paths=["src/renderer/ChartRenderer.ts"],
             required_gates=["unit", "browser", "native-powerpoint"],
         ),
     ]
@@ -396,12 +377,12 @@ def test_capability_registry_change_impacts_every_capability_and_runs_contract_c
     capabilities = [
         _capability(
             "capability.a",
-            implementation_paths=["src/a.ts"],
+            affected_paths=["src/a.ts"],
             required_gates=["native-powerpoint"],
         ),
         _capability(
             "capability.b",
-            implementation_paths=["src/b.ts"],
+            affected_paths=["src/b.ts"],
             required_gates=["browser", "native-powerpoint"],
         ),
     ]
@@ -427,12 +408,12 @@ def test_shared_evaluation_server_change_expands_to_every_capability_and_native_
     capabilities = [
         _capability(
             "capability.a",
-            implementation_paths=["test/e2e/server.py"],
+            affected_paths=["test/e2e/server.py"],
             required_gates=["native-powerpoint"],
         ),
         _capability(
             "capability.b",
-            implementation_paths=["src/b.ts"],
+            affected_paths=["src/b.ts"],
             required_gates=["native-powerpoint", "camera-local"],
         ),
     ]
@@ -461,7 +442,7 @@ def test_unclaimed_provenance_change_cannot_skip_receipt_and_native_gates():
         capabilities=[
             _capability(
                 "capability.a",
-                implementation_paths=["src/a.ts"],
+                affected_paths=["src/a.ts"],
                 required_gates=["native-powerpoint"],
             )
         ],
@@ -496,7 +477,7 @@ def test_shared_implementation_path_deduplicates_tests_and_native_cases():
         capabilities=[
             _capability(
                 "capability.a",
-                implementation_paths=[
+                affected_paths=[
                     "src/renderer/ShapeRenderer.ts",
                     "test/unit/renderer/ShapeRenderer.test.ts",
                 ],
@@ -504,7 +485,7 @@ def test_shared_implementation_path_deduplicates_tests_and_native_cases():
             ),
             _capability(
                 "capability.b",
-                implementation_paths=[
+                affected_paths=[
                     "src/renderer/ShapeRenderer.ts",
                     "test/unit/renderer/ShapeRenderer.test.ts",
                 ],
@@ -521,13 +502,13 @@ def test_shared_implementation_path_deduplicates_tests_and_native_cases():
     assert plan["nativeCaseIds"] == ["case-a", "case-b", "case-shared"]
 
 
-def test_globbed_implementation_paths_match_changes_and_expand_tracked_tests():
+def test_globbed_affected_paths_match_changes_and_expand_tracked_tests():
     plan = build_verification_plan(
         changed_paths=["src/renderer/shape3d/CameraProjection.ts"],
         capabilities=[
             _capability(
                 "drawingml.shape.3d.top-bevel-contour",
-                implementation_paths=[
+                affected_paths=[
                     "src/renderer/shape3d/*.ts",
                     "test/unit/renderer/shape3d/*.test.ts",
                 ],
@@ -610,43 +591,43 @@ def _write_native_case(case_dir: Path, *, source_marker: bytes, ground_truth: by
 
 def test_native_case_discovery_keeps_same_stem_corpora_distinct_by_exact_hash(tmp_path: Path):
     stem = "same-stem"
-    default_fingerprint = _write_native_case(
+    default_hashes = _write_native_case(
         tmp_path / "test/e2e/testdata/cases" / stem,
         source_marker=b"<p:cSld/>",
         ground_truth=b"default ground truth",
     )
-    windows_fingerprint = _write_native_case(
+    windows_hashes = _write_native_case(
         tmp_path / "test/e2e/testdata/windows-cases" / stem,
         source_marker=b"<p:clrMapOvr/>",
         ground_truth=b"windows ground truth",
     )
 
-    discovered = _native_case_fingerprints(tmp_path, [stem, f"win__{stem}"])
+    discovered = _native_case_hashes(tmp_path, [stem, f"win__{stem}"])
 
-    assert discovered[stem] == {default_fingerprint, windows_fingerprint}
-    assert discovered[f"win__{stem}"] == {windows_fingerprint}
+    assert discovered[stem] == {default_hashes, windows_hashes}
+    assert discovered[f"win__{stem}"] == {windows_hashes}
 
     (tmp_path / "test/e2e/testdata/cases" / stem / "source.pptx").unlink()
-    windows_only = _native_case_fingerprints(tmp_path, [stem])
+    windows_only = _native_case_hashes(tmp_path, [stem])
     plan = build_verification_plan(
         changed_paths=["src/shapes/presets.ts"],
         capabilities=[
             _capability(
                 "capability.a",
-                implementation_paths=["src/shapes/presets.ts"],
+                affected_paths=["src/shapes/presets.ts"],
                 required_gates=["native-powerpoint"],
             )
         ],
         latest_case_ids={"capability.a": [stem]},
-        latest_case_fingerprints={"capability.a": {stem: default_fingerprint}},
-        available_native_case_fingerprints=windows_only,
+        latest_case_hashes={"capability.a": {stem: default_hashes}},
+        available_native_case_hashes=windows_only,
     )
 
     assert plan["nativeCaseArtifactIssues"] == [
         {
             "capabilityId": "capability.a",
             "caseId": stem,
-            "reason": "fingerprint-mismatch",
+            "reason": "input-hash-mismatch",
         }
     ]
 

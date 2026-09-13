@@ -12,12 +12,7 @@ from typing import Iterable, Sequence
 from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
-from oracle.capability_contract import (
-    CapabilityDefinition,
-    CapabilityRegistry,
-    XmlSelector,
-    capability_definition_fingerprint,
-)
+from oracle.capability_contract import CapabilityDefinition, CapabilityRegistry, XmlSelector
 
 
 INVENTORY_SCHEMA_VERSION = 1
@@ -69,7 +64,6 @@ class RejectedPackage:
 @dataclass(frozen=True)
 class InventoryReport:
     schema_version: int
-    registry_fingerprint: str
     raw_package_count: int
     unique_package_count: int
     packages: tuple[PackageObservation, ...]
@@ -87,16 +81,6 @@ def _sha256_file(path: Path) -> str:
         raise CapabilityInventoryError(
             f"cannot read PPTX package: {path.name}", code="package-read"
         ) from error
-    return digest.hexdigest()
-
-
-def compute_registry_fingerprint(registry: CapabilityRegistry) -> str:
-    digest = hashlib.sha256()
-    for capability in registry.capabilities:
-        digest.update(capability.id.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(capability_definition_fingerprint(capability).encode("ascii"))
-        digest.update(b"\0")
     return digest.hexdigest()
 
 
@@ -369,7 +353,6 @@ def scan_corpus(
     )
     return InventoryReport(
         schema_version=INVENTORY_SCHEMA_VERSION,
-        registry_fingerprint=compute_registry_fingerprint(registry),
         raw_package_count=raw_package_count,
         unique_package_count=len(packages),
         packages=packages,
@@ -464,7 +447,6 @@ def inventory_to_dict(
     representative_count = sum(role == "representative" for role in package_roles.values())
     return {
         "schemaVersion": report.schema_version,
-        "registryFingerprint": report.registry_fingerprint,
         "rawPackageCount": report.raw_package_count,
         "uniquePackageCount": report.unique_package_count,
         "rejectedPackageCount": report.rejected_package_count,

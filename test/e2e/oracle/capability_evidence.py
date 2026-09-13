@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import re
-import subprocess
 from dataclasses import dataclass
-from pathlib import Path, PurePosixPath
-from typing import Any, Iterable, Mapping
+from pathlib import Path
+from typing import Any, Mapping
 
-from oracle.capability_contract import (
-    CapabilityDefinition,
-    PromotionReceipt,
-    capability_definition_fingerprint,
-)
+from oracle.capability_contract import CapabilityDefinition, PromotionReceipt
+from oracle.provenance import detect_renderer_git_state
 
 
 _SHA256_LENGTH = 64
@@ -26,125 +21,6 @@ class CapabilityEvidenceError(ValueError):
 class EvidenceState:
     name: str
     reasons: tuple[str, ...]
-
-
-def _validate_relative_pattern(pattern: str, role: str) -> None:
-    if not pattern or "\x00" in pattern or "\\" in pattern:
-        raise CapabilityEvidenceError(f"{role} path must be repository-relative: {pattern}")
-    path = PurePosixPath(pattern)
-    if path.is_absolute() or ".." in path.parts:
-        raise CapabilityEvidenceError(f"{role} path must be repository-relative: {pattern}")
-
-
-def _expand_paths(repo: Path, patterns: Iterable[str], role: str) -> tuple[Path, ...]:
-    root = repo.resolve()
-    paths: dict[str, Path] = {}
-    for pattern in patterns:
-        _validate_relative_pattern(pattern, role)
-        matches = sorted(path for path in repo.glob(pattern) if path.is_file())
-        if not matches:
-            raise CapabilityEvidenceError(f"{role} path has no file matches: {pattern}")
-        for path in matches:
-            resolved = path.resolve()
-            try:
-                relative = resolved.relative_to(root).as_posix()
-            except ValueError as error:
-                raise CapabilityEvidenceError(
-                    f"{role} path resolves outside repository: {pattern}"
-                ) from error
-            paths[relative] = resolved
-    return tuple(paths[name] for name in sorted(paths))
-
-
-def _compute_fingerprint(repo: Path, patterns: Iterable[str], role: str) -> str:
-    repo = Path(repo)
-    root = repo.resolve()
-    digest = hashlib.sha256()
-    for path in _expand_paths(repo, patterns, role):
-        relative = path.relative_to(root).as_posix()
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        with path.open("rb") as stream:
-            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-                digest.update(chunk)
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
-def _compute_fingerprint_at_revision(
-    repo: Path,
-    patterns: Iterable[str],
-    revision: str,
-    role: str,
-) -> str:
-    repo = Path(repo)
-    revision_check = subprocess.run(
-        ["git", "cat-file", "-e", f"{revision}^{{commit}}"],
-        cwd=repo,
-        check=False,
-        capture_output=True,
-    )
-    if revision_check.returncode != 0:
-        raise CapabilityEvidenceError(f"Git revision cannot be read: {revision}")
-    tree = subprocess.run(
-        ["git", "ls-tree", "-rz", "--name-only", revision],
-        cwd=repo,
-        check=False,
-        capture_output=True,
-    )
-    if tree.returncode != 0:
-        raise CapabilityEvidenceError(f"Git revision cannot be read: {revision}")
-    repository_paths = tuple(
-        item.decode("utf-8") for item in tree.stdout.split(b"\0") if item
-    )
-    selected: set[str] = set()
-    for pattern in patterns:
-        _validate_relative_pattern(pattern, role)
-        matches = tuple(
-            path for path in repository_paths if PurePosixPath(path).match(pattern)
-        )
-        if not matches:
-            raise CapabilityEvidenceError(
-                f"{role} path has no file matches at Git revision {revision}: {pattern}"
-            )
-        selected.update(matches)
-    digest = hashlib.sha256()
-    for relative in sorted(selected):
-        blob = subprocess.run(
-            ["git", "show", f"{revision}:{relative}"],
-            cwd=repo,
-            check=False,
-            capture_output=True,
-        )
-        if blob.returncode != 0:
-            raise CapabilityEvidenceError(
-                f"{role} path cannot be read at Git revision {revision}: {relative}"
-            )
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(blob.stdout)
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
-def compute_implementation_fingerprint(repo: Path, patterns: Iterable[str]) -> str:
-    return _compute_fingerprint(repo, patterns, "implementation")
-
-
-def compute_implementation_fingerprint_at_revision(
-    repo: Path, patterns: Iterable[str], revision: str
-) -> str:
-    return _compute_fingerprint_at_revision(repo, patterns, revision, "implementation")
-
-
-def compute_verification_fingerprint(repo: Path, patterns: Iterable[str]) -> str:
-    return _compute_fingerprint(repo, patterns, "verification")
-
-
-def compute_verification_fingerprint_at_revision(
-    repo: Path, patterns: Iterable[str], revision: str
-) -> str:
-    return _compute_fingerprint_at_revision(repo, patterns, revision, "verification")
 
 
 def _is_sha256(value: Any) -> bool:
@@ -165,7 +41,7 @@ def _report_cases(report: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
     return tuple(item for item in value if isinstance(item, Mapping))
 
 
-def _case_fingerprints(
+def _case_hashes(
     cases: tuple[Mapping[str, Any], ...],
 ) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]] | None:
     case_ids: list[str] = []
@@ -193,27 +69,22 @@ def _case_fingerprints(
 def _verification_reasons(
     capability: CapabilityDefinition,
     report: Mapping[str, Any],
-    current_implementation_fingerprint: str,
-    current_verification_fingerprint: str,
+    expected_revision: str | None,
 ) -> tuple[str, ...]:
     reasons: list[str] = []
     if report.get("schemaVersion") != 2:
         return ("evidence:unsupported-schema",)
     if report.get("capabilityId") != capability.id:
         return ("evidence:capability-id-mismatch",)
-    if report.get("definitionFingerprint") != capability_definition_fingerprint(capability):
-        reasons.append("evidence:definition-fingerprint-drift")
 
     renderer = _report_mapping(report, "renderer")
-    if renderer.get("implementationFingerprint") != current_implementation_fingerprint:
-        reasons.append("evidence:implementation-fingerprint-drift")
-    if renderer.get("verificationFingerprint") != current_verification_fingerprint:
-        reasons.append("evidence:verification-fingerprint-drift")
     if renderer.get("dirty") is not False:
         reasons.append("evidence:dirty-worktree")
     revision = renderer.get("revision")
     if not isinstance(revision, str) or len(revision) < 40:
         reasons.append("evidence:missing-renderer-revision")
+    elif expected_revision is not None and revision != expected_revision:
+        reasons.append("evidence:renderer-revision-drift")
 
     gates = _report_mapping(report, "gates")
     for gate in capability.required_gates:
@@ -245,55 +116,32 @@ def evaluate_evidence_state(
     report: Mapping[str, Any] | None,
     repo: Path,
 ) -> EvidenceState:
-    current_implementation_fingerprint = compute_implementation_fingerprint(
-        repo, capability.implementation_paths
-    )
-    current_verification_fingerprint = compute_verification_fingerprint(
-        repo, capability.verification_paths
-    )
-    definition_fingerprint = capability_definition_fingerprint(capability)
-    if receipt is not None:
-        if receipt.capability_id != capability.id:
-            return EvidenceState("regressed", ("evidence:receipt-capability-id-mismatch",))
-        if receipt.definition_fingerprint != definition_fingerprint:
-            return EvidenceState("regressed", ("evidence:definition-fingerprint-drift",))
-        if receipt.implementation_fingerprint != current_implementation_fingerprint:
-            return EvidenceState("regressed", ("evidence:implementation-fingerprint-drift",))
-        if receipt.verification_fingerprint != current_verification_fingerprint:
-            return EvidenceState("regressed", ("evidence:verification-fingerprint-drift",))
+    if receipt is not None and receipt.capability_id != capability.id:
+        return EvidenceState("regressed", ("evidence:receipt-capability-id-mismatch",))
 
     if report is None:
         if receipt is not None:
-            return EvidenceState("verified", ())
+            return EvidenceState(
+                "historical",
+                ("evidence:historical-verification-record",),
+            )
         return EvidenceState("unknown", ("evidence:no-verification-report",))
 
     cases = _report_cases(report)
-    fingerprints = _case_fingerprints(cases)
-    if fingerprints is None:
+    if _case_hashes(cases) is None:
         return EvidenceState("reproducible", ("evidence:missing-input-hash",))
 
-    reasons = list(
-        _verification_reasons(
-            capability,
-            report,
-            current_implementation_fingerprint,
-            current_verification_fingerprint,
-        )
-    )
-    if receipt is not None:
-        case_ids, source_hashes, ground_truth_hashes = fingerprints
-        if receipt.case_ids != case_ids:
-            reasons.append("evidence:case-id-drift")
-        if receipt.case_input_fingerprints != source_hashes:
-            reasons.append("evidence:case-input-fingerprint-drift")
-        if receipt.ground_truth_fingerprints != ground_truth_hashes:
-            reasons.append("evidence:ground-truth-fingerprint-drift")
-        if reasons:
-            return EvidenceState("regressed", tuple(dict.fromkeys(reasons)))
-        return EvidenceState("verified", ())
-
-    reasons.append("evidence:missing-promotion-receipt")
-    return EvidenceState("candidate", tuple(dict.fromkeys(reasons)))
+    revision, dirty = detect_renderer_git_state(repo)
+    reasons = list(_verification_reasons(capability, report, revision))
+    if dirty is not False:
+        reasons.append("evidence:current-worktree-not-clean")
+    reasons = list(dict.fromkeys(reasons))
+    if reasons:
+        report_revision = _report_mapping(report, "renderer").get("revision")
+        if receipt is not None and receipt.accepted_revision == report_revision == revision:
+            return EvidenceState("regressed", tuple(reasons))
+        return EvidenceState("candidate", tuple(reasons))
+    return EvidenceState("verified", ())
 
 
 def build_promotion_receipt(
@@ -302,45 +150,36 @@ def build_promotion_receipt(
     repo: Path,
     accepted_at: str,
 ) -> PromotionReceipt:
-    current_implementation_fingerprint = compute_implementation_fingerprint(
-        repo, capability.implementation_paths
-    )
-    current_verification_fingerprint = compute_verification_fingerprint(
-        repo, capability.verification_paths
-    )
-    reasons = list(
-        _verification_reasons(
-            capability,
-            report,
-            current_implementation_fingerprint,
-            current_verification_fingerprint,
-        )
-    )
+    revision, dirty = detect_renderer_git_state(repo)
+    reasons = list(_verification_reasons(capability, report, revision))
+    if revision is None:
+        reasons.append("evidence:missing-current-revision")
+    if dirty is not False:
+        reasons.append("evidence:current-worktree-not-clean")
     cases = _report_cases(report)
-    fingerprints = _case_fingerprints(cases)
-    if fingerprints is None:
+    case_hashes = _case_hashes(cases)
+    if case_hashes is None:
         reasons.append("evidence:missing-input-hash")
     if reasons:
         raise CapabilityEvidenceError(
-            "cannot promote capability: " + ", ".join(dict.fromkeys(reasons))
+            "cannot record verification: " + ", ".join(dict.fromkeys(reasons))
         )
     renderer = _report_mapping(report, "renderer")
     revision = renderer["revision"]
-    case_ids, source_hashes, ground_truth_hashes = fingerprints
+    case_ids, source_hashes, ground_truth_hashes = case_hashes
     environment = report.get("environment")
     if not isinstance(environment, Mapping) or not environment:
-        raise CapabilityEvidenceError("cannot promote capability: evidence:missing-environment")
+        raise CapabilityEvidenceError(
+            "cannot record verification: evidence:missing-environment"
+        )
     gates = _report_mapping(report, "gates")
     passed_gates = tuple(gate for gate in capability.required_gates if gates.get(gate) == "passed")
     return PromotionReceipt(
         capability_id=capability.id,
-        definition_fingerprint=capability_definition_fingerprint(capability),
         accepted_revision=revision,
-        implementation_fingerprint=current_implementation_fingerprint,
-        verification_fingerprint=current_verification_fingerprint,
         case_ids=case_ids,
-        case_input_fingerprints=source_hashes,
-        ground_truth_fingerprints=ground_truth_hashes,
+        case_input_sha256=source_hashes,
+        ground_truth_sha256=ground_truth_hashes,
         gates=passed_gates,
         environment=dict(environment),
         accepted_at=accepted_at,
@@ -378,16 +217,13 @@ def _sanitize_value(value: Any, key: str = "") -> Any:
 def sanitize_receipt_for_tracking(receipt: PromotionReceipt) -> dict[str, Any]:
     environment = _sanitize_value(receipt.environment)
     if not isinstance(environment, dict) or not environment:
-        raise CapabilityEvidenceError("sanitized promotion environment must not be empty")
+        raise CapabilityEvidenceError("sanitized verification environment must not be empty")
     payload = {
         "capabilityId": receipt.capability_id,
-        "definitionFingerprint": receipt.definition_fingerprint,
         "acceptedRevision": receipt.accepted_revision,
-        "implementationFingerprint": receipt.implementation_fingerprint,
-        "verificationFingerprint": receipt.verification_fingerprint,
         "caseIds": list(receipt.case_ids),
-        "caseInputFingerprints": list(receipt.case_input_fingerprints),
-        "groundTruthFingerprints": list(receipt.ground_truth_fingerprints),
+        "caseInputSha256": list(receipt.case_input_sha256),
+        "groundTruthSha256": list(receipt.ground_truth_sha256),
         "gates": list(receipt.gates),
         "environment": environment,
         "acceptedAt": receipt.accepted_at,

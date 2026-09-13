@@ -29,7 +29,16 @@ FAILURE_ORDER = {
     "none": 4,
 }
 EVIDENCE_STATES = frozenset(
-    {"unknown", "observed", "reproducible", "candidate", "verified", "regressed", "blocked"}
+    {
+        "unknown",
+        "observed",
+        "reproducible",
+        "candidate",
+        "historical",
+        "verified",
+        "regressed",
+        "blocked",
+    }
 )
 
 
@@ -122,7 +131,7 @@ def rank_capabilities(rows: list[LedgerRow] | tuple[LedgerRow, ...]) -> tuple[Ra
         seen.add(row.capability_id)
         if row.planning_mode == "observation-only":
             continue
-        if row.evidence_state in {"unknown", "verified", "blocked"}:
+        if row.evidence_state in {"unknown", "historical", "verified", "blocked"}:
             continue
         ranked.append(_ranked(row))
     return tuple(sorted(ranked, key=lambda item: item.priority_key))

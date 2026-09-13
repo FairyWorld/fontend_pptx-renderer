@@ -13,17 +13,17 @@ results, but does not bypass or rewrite the Parse → Model → Render boundarie
 
 `test/e2e/oracle/capabilities.json` is the tracked support contract. Each stable capability ID
 declares namespace-aware OOXML selectors, a bounded scope, current render mode, planning mode,
-fallback, separate implementation and verification paths, and required gates. `capability-acceptance.json` stores
-one sanitized latest receipt per accepted capability; Git retains older revisions. Private
+fallback, affected implementation/test paths, and required gates. `capability-acceptance.json`
+stores one sanitized historical verification record per capability; Git retains older revisions. Private
 PPTX/PDF/PNG artifacts and generated inventory remain ignored.
 
 The loop has six domain modules and two thin CLIs:
 
-- `capability_contract.py` validates immutable registry and receipt types.
+- `capability_contract.py` validates immutable registry and historical-record types.
 - `capability_inventory.py` scans PPTX ZIP/XML within fixed entry and decoded-byte limits and
   deduplicates packages by SHA-256.
-- `capability_evidence.py` binds receipts to capability definitions, implementation and verification
-  file content, source PPTX, ground truth, gates, environment, and revision.
+- `capability_evidence.py` validates current-revision test reports and stores source PPTX, ground
+  truth, gates, environment, and revision evidence without hashing renderer source files.
 - `capability_verification.py` normalizes native evaluation API results, rejects mixed or dirty
   revisions, and derives native, manual-review, SSIM-regression, and capability-specific local
   metric gate outcomes. Local visual gates must match the per-slide reference/candidate hashes in
@@ -31,13 +31,13 @@ The loop has six domain modules and two thin CLIs:
 - `capability_ranking.py` applies a documented lexicographic priority and emits one bounded work
   packet.
 - `verification_impact.py` maps changed repository paths through exact or declared-glob capability
-  ownership to deterministic tests, browser/native requirements, and the latest accepted native
+  impact hints to deterministic tests, browser/native requirements, and the latest recorded native
   case sets. Documentation-only edits run documentation contracts without entering the visual
   plan; unclassified non-documentation paths fail closed to full TypeScript, Python, typecheck, and
   browser verification. Capability-registry and unclassified global runtime/control changes expand
   impact to every registered capability. Shared evaluation, provenance, evidence, and loop-control
-  changes do the same and add the capability receipt check. Native artifacts are matched to
-  receipt-bound source and ground-truth fingerprints rather than case names alone. The planner also
+  changes do the same and add the capability contract check. Native artifacts are matched to
+  recorded source and ground-truth hashes rather than case names alone. The planner also
   exposes missing native artifacts and the exact local metric commands still required.
 - `scripts/run_capability_loop.py` composes `validate`, `inventory`, `rank`, `work-packet`,
   `verify`, and `accept`; it does not edit GitHub issues or accept visual baselines.
@@ -47,12 +47,12 @@ The loop has six domain modules and two thin CLIs:
 
 Render mode, planning mode, and evidence state are independent. Render modes are `none`, `fallback`, `approximate`,
 `native`, and `excluded`; evidence moves through `unknown`, `observed`, `reproducible`, `candidate`,
-`verified`, `regressed`, or `blocked`. User-facing support requires both `native` and `verified` for
-the declared scope. Planning mode is `ranked` by default; `observation-only` keeps broad residual
+`historical`, `verified`, `regressed`, or `blocked`. User-facing support requires `native` scope plus a passing
+report for the current Git revision. Planning mode is `ranked` by default; `observation-only` keeps broad residual
 selectors visible in the ledger while excluding them from executable ranking and work packets. A
-relevant implementation, verification, or scope change invalidates the receipt. Markdown paths are
-excluded from both fingerprints and remain covered by the documentation gate. The edit-loop planner
-matches the union of each capability's `implementationPaths` and `verificationPaths`.
+historical verification record never establishes the state of a later revision. The edit-loop
+planner uses each capability's `affectedPaths` only to select tests; those paths are not an
+implementation signature or correctness proof.
 
 ## 1) Parse Layer
 

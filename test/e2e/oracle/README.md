@@ -4,11 +4,10 @@ This directory contains the local-macOS PowerPoint oracle pipeline used to drive
 
 ## Capability Loop
 
-The oracle has a tracked capability contract in `capabilities.json` and one sanitized latest
-promotion receipt per accepted capability in `capability-acceptance.json`. Git retains prior receipt
-history. The loop separates intended render mode,
-planning mode, and current evidence state. It only permits a public `supported` claim when a bounded
-capability is both `native` and freshly `verified`.
+The oracle has a tracked capability contract in `capabilities.json` and one sanitized historical
+verification record per capability in `capability-acceptance.json`. The loop separates intended
+render mode, planning mode, and current evidence state. A public `supported` claim requires a
+bounded `native` capability and a passing report for the current Git revision.
 
 ```bash
 # From the repository root
@@ -25,7 +24,7 @@ python3 test/e2e/scripts/run_capability_loop.py --help
 `capability_verification.py`, and `capability_ranking.py` contain the domain rules.
 `scripts/run_capability_loop.py` only composes them. Local outputs are written below
 `test/e2e/reports/capability-loop/` and remain ignored because
-they may refer to private case aliases. Tracked receipts keep stable case IDs and SHA-256 values,
+they may refer to private case aliases. Tracked records keep stable case IDs and input SHA-256 values,
 but remove absolute paths, usernames, free-form issue bodies, and private labels.
 
 Selectors can constrain a direct parent or an exact root-to-direct-parent suffix. The latter keeps
@@ -39,7 +38,7 @@ containing `oracle-` as validation fixtures and all other aliases as representat
 Custom scans may use either repeatable `--representative-alias` or `--validation-alias` globs; the
 two modes are mutually exclusive. Ranking counts byte-identical PPTX files once, gives a package
 representative status when any of its aliases is representative, and ranks representative demand
-before total validation volume. A dirty report, missing or changed inputs, stale relevant implementation files, skipped required cases,
+before total validation volume. A dirty report, missing or changed inputs, a different Git revision, skipped required cases,
 failed structural checks, or an unresolved manual-review row blocks promotion. Corpus scans isolate
 and report rejected packages instead of losing all other observations; use `--fail-on-rejected` for
 a strict nonzero exit after the report is written. Unknown, verified, and externally blocked rows
@@ -51,24 +50,23 @@ When a committed goal deliberately selects a lower-ranked cohort, pass `--select
 work packet records the override instead of silently hiding the global ordering.
 
 `verify_affected.py` is the fast development-loop entry point. It uses exact or declared-glob
-`implementationPaths` and `verificationPaths` matches to select affected capabilities, de-duplicates their tracked unit
-and Python tests, and reports the native case set from the latest receipt. It deliberately defers
+`affectedPaths` hints to select affected capabilities, de-duplicates their tracked unit and Python
+tests, and reports the native case set from the latest historical record. It deliberately defers
 browser and native runs for targeted plans so they execute once at pre-commit or pre-merge rather
-than after every edit. Markdown paths are excluded from both content fingerprints; Markdown-only
-changes run formatting plus documentation and distribution contract tests without invalidating the
-fast visual plan. Unclassified non-documentation paths
+than after every edit. Markdown-only changes run formatting plus documentation and distribution
+contract tests without invalidating the fast visual plan. Unclassified non-documentation paths
 fail closed to the full TypeScript, Python, typecheck, and browser plan. Registry or unclassified
 global runtime/control changes also retain every registered capability's native and local gates;
 shared evaluation, provenance, evidence, and loop-control changes additionally run
-`capability:check`. Local case artifacts must match the latest receipt's source and selected
-ground-truth fingerprints; case-name existence alone is insufficient. Missing accepted case sets
+`capability:check`. Local case artifacts must match the recorded source and selected
+ground-truth hashes; case-name existence alone is insufficient. Missing recorded case sets
 or exact local artifacts remain explicit gaps. Repeat `--case-report` with fresh per-case API
 reports to receive complete commands for required `bevel-local`, `camera-local`, `shadow-local`, and
 `reflection-local` gates.
 
 `verify` consumes raw `/api/evaluate` JSON reports from one clean committed renderer revision. It
 derives native-PowerPoint, manual-review, and regression status, including a matching baseline case
-set, identical input/runtime fingerprints from an earlier revision, and the 0.02 SSIM budget. The
+set, identical input/runtime provenance from an earlier revision, and the 0.02 SSIM budget. The
 bounded top-bevel capability additionally requires a `--bevel-report`; the camera-plane and bounded
 bottom-front capabilities require a `--camera-report`; bounded ordinary-shape outer shadows require
 a `--shadow-report`; bounded ordinary-shape reflections require a `--reflection-report`. Their

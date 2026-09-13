@@ -181,13 +181,14 @@ def test_oracle_readiness_then_dependency_depth_then_id_break_ties():
     assert [item.capability_id for item in ranked] == ["cap.a", "cap.b", "cap.c", "cap.d"]
 
 
-def test_unknown_verified_and_blocked_rows_are_watched_but_not_selected():
+def test_unknown_historical_verified_and_blocked_rows_are_watched_but_not_selected():
     ranked = rank_capabilities(
         [
             row("cap.a", evidence_state="unknown"),
             row("cap.b", evidence_state="verified"),
             row("cap.c", evidence_state="blocked"),
             row("cap.d", evidence_state="regressed"),
+            row("cap.e", evidence_state="historical"),
         ]
     )
 

@@ -9,14 +9,7 @@ from typing import Any, Iterable, Mapping, Sequence
 from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
-from oracle.capability_contract import (
-    CapabilityDefinition,
-    capability_definition_fingerprint,
-)
-from oracle.capability_evidence import (
-    compute_implementation_fingerprint,
-    compute_verification_fingerprint,
-)
+from oracle.capability_contract import CapabilityDefinition
 
 
 DERIVED_GATES = frozenset(
@@ -2496,16 +2489,9 @@ def normalize_native_evaluation_reports(
     return {
         "schemaVersion": 2,
         "capabilityId": capability.id,
-        "definitionFingerprint": capability_definition_fingerprint(capability),
         "renderer": {
             "revision": next(iter(revisions)),
             "dirty": False,
-            "implementationFingerprint": compute_implementation_fingerprint(
-                repo, capability.implementation_paths
-            ),
-            "verificationFingerprint": compute_verification_fingerprint(
-                repo, capability.verification_paths
-            ),
         },
         "environment": environment,
         "gates": gates,

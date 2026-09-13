@@ -39,9 +39,8 @@ presentations without treating the active window as the export target.
 ### Evidence-Driven Capability Loop
 
 `test/e2e/oracle/capabilities.json` records bounded support scopes and their required gates.
-`test/e2e/oracle/capability-acceptance.json` keeps the latest accepted receipt per capability,
-bound to the implementation, verification definition, PPTX input, PowerPoint ground truth,
-environment, and revision hashes.
+`test/e2e/oracle/capability-acceptance.json` keeps the latest historical verification record per
+capability, including the tested Git revision, case IDs, input hashes, and runtime environment.
 
 ```bash
 pnpm capability:check
@@ -51,8 +50,8 @@ pnpm verify:affected -- --base HEAD^
 ```
 
 Generated reports stay under the ignored `test/e2e/reports/` tree. A native support claim requires
-a current receipt and matching source, ground-truth, implementation, verification, browser, and
-font provenance.
+a passing report produced from the current Git revision and matching source, ground-truth, browser,
+and font provenance. Historical records do not prove later revisions.
 See [`docs/TESTING.md`](docs/TESTING.md) for the verification workflow.
 
 ## Install

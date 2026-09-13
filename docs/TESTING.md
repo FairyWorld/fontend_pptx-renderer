@@ -28,9 +28,9 @@ pnpm verify:plan -- --changed-path src/renderer/Shape3DRenderer.ts \
   --case-report test/e2e/reports/case-b.json
 ```
 
-The planner maps changed files through exact or declared-glob `implementationPaths` and
-`verificationPaths` in `capabilities.json`, de-duplicates their unit and Python tests, and lists the native PowerPoint case
-IDs already bound by the latest acceptance receipts. A targeted run executes only those
+The planner maps changed files through exact or declared-glob `affectedPaths` in
+`capabilities.json`, de-duplicates their unit and Python tests, and lists the native PowerPoint case
+IDs recorded by the latest historical verification records. A targeted run executes only those
 unit/Python checks plus TypeScript type checking when runtime TypeScript changed. Browser checks
 and native rendering stay visible as deferred pre-commit and pre-merge gates. Documentation-only
 changes run formatting plus all known documentation and distribution contract tests and do not
@@ -39,7 +39,7 @@ TypeScript, Python, typecheck, and browser plan. A capability-registry or unclas
 runtime/control change expands the native scope to every registered capability. Shared evaluation,
 provenance, evidence, and capability-loop control changes do the same and add `capability:check`.
 Native artifacts count as available only when their source and selected ground-truth SHA-256 values
-match the latest receipt exactly; same-stem cases from another local corpus cannot satisfy the
+match the recorded testcase inputs exactly; same-stem cases from another local corpus cannot satisfy the
 check. Missing case sets, mismatched artifacts, and required local visual gates without a complete
 repeatable `--case-report` set are reported explicitly instead of silently passing. Targeted Python
 commands run from `test/e2e`, where the suite's fixture and testdata paths are defined.
@@ -54,13 +54,12 @@ Use three verification tiers:
    few minutes.
 2. **Pre-commit:** add the planner-requested browser suite and evaluate only its listed native
    cases. Keep the dev servers alive across cases.
-3. **Pre-merge/release:** run the complete required suite, package gates, capability receipt check,
+3. **Pre-merge/release:** run the complete required suite, package gates, capability contract check,
    and any deliberately global native matrix.
 
-This changes when verification runs, not what constitutes acceptance. Cached or previously
-accepted evidence is reusable only while its capability implementation, verification inputs, source,
-ground truth, browser/capture profile, and font provenance still match. Markdown paths stay outside
-both content fingerprints and are checked by the documentation gate.
+This changes when verification runs, not what constitutes acceptance. A renderer result applies
+only to the Git revision it tested. Test inputs and baselines can be reused when their source,
+ground truth, browser/capture profile, and font provenance still match.
 
 ## Unit Tests
 
@@ -768,11 +767,12 @@ hashes, on-disk raster hashes, thresholds, and every local result match. `--pass
 separate checks that have already run and does not execute them. A `needsReview` case requires
 `--manual-verdict CASE_ID=passed` (or `accepted`).
 
-Promotion uses the `accept` command only after the capability registry says `renderMode=native` and
-the candidate implementation is committed. The command requires a clean tracked tree, matching
-HEAD and separate implementation/verification fingerprints, source and ground-truth SHA-256 values, every declared gate,
-no skipped/runtime-failed cases, and an accepted manual verdict for every review row. It writes a
-sanitized receipt atomically and never changes GitHub issues or visual baselines.
+`accept` records a completed verification after the capability registry says `renderMode=native`
+and the candidate implementation is committed. The command requires a clean tracked tree, matching
+HEAD, source and ground-truth SHA-256 values, every declared gate, no skipped/runtime-failed cases,
+and an accepted manual verdict for every review row. It writes a sanitized historical record
+atomically and never changes GitHub issues or visual baselines. That record does not prove later
+revisions.
 
 The bounded ordinary-shape outer-shadow lane uses one eight-slide case. After evaluating it on a
 clean committed revision, generate and bind its local report:

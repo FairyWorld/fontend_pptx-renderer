@@ -292,14 +292,14 @@ def test_scan_pptx_matches_exact_ancestor_path_without_counting_other_outer_shad
         ],
         "scope": {"source": "direct-shape-effect-list"},
         "fallback": "Render a bounded shadow approximation.",
-        "implementationPaths": ["src/renderer/ShapeRenderer.ts"],
+        "affectedPaths": ["src/renderer/ShapeRenderer.ts"],
         "requiredGates": ["source", "unit"],
         "issueUrls": [],
     }
     registry = load_capability_registry(
         write_json(
             tmp_path / "outer-shadow-capabilities.json",
-            {"schemaVersion": 1, "capabilities": [entry]},
+            {"schemaVersion": 2, "capabilities": [entry]},
         )
     )
     target = f"""
