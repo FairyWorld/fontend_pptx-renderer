@@ -43,7 +43,7 @@ remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.m
   loops run affected deterministic checks first and defer explicit browser/native evidence to the
   pre-commit or pre-merge gates.
 - Added `planningMode` so broad residual features remain observable without repeatedly entering the
-  implementation queue; animation timing is currently planning evidence only, not playback support.
+  implementation queue.
 
 ### Fixed
 

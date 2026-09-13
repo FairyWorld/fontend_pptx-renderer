@@ -13,8 +13,9 @@ results, but does not bypass or rewrite the Parse → Model → Render boundarie
 
 `test/e2e/oracle/capabilities.json` is the tracked support contract. Each stable capability ID
 declares namespace-aware OOXML selectors, a bounded scope, current render mode, planning mode,
-fallback, relevant implementation/test paths, and required gates. `capability-acceptance.json` stores only sanitized
-promotion receipts; private PPTX/PDF/PNG artifacts and generated inventory remain ignored.
+fallback, relevant implementation/test paths, and required gates. `capability-acceptance.json` stores
+one sanitized latest receipt per accepted capability; Git retains older revisions. Private
+PPTX/PDF/PNG artifacts and generated inventory remain ignored.
 
 The loop has six domain modules and two thin CLIs:
 
@@ -52,13 +53,6 @@ selectors visible in the ledger while excluding them from executable ranking and
 relevant implementation or scope change invalidates the receipt. The edit-loop planner treats
 Markdown-only work as non-rendering work, while the final receipt check still follows each
 capability's tracked `implementationPaths` exactly.
-
-Umbrella feature markers must be split before implementation. For animation, a slide-level
-`p:timing` match remains the observation-only residual, while the ranked
-`presentation.animation.entrance.fade` row identifies the narrower `presetClass=entr`,
-`presetID=10`, `presetSubtype=0` candidate. Descendant effect, target, trigger, duration and reset
-semantics are still enforced by the registry scope and oracle matrix rather than inferred from the
-element selector alone.
 
 ## 1) Parse Layer
 
@@ -183,7 +177,7 @@ manual-review condition.
 ## OOXML Geometry Compilation Boundary
 
 The handwritten `src/shapes/presets.ts` registry remains the compatibility geometry engine. The
-M0-M4 tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML geometry
+tooling under `scripts/ooxml-geometry/` pins and validates the ECMA-376 DrawingML geometry
 addendum, implements the complete guide-formula contract, compiles all unique definitions into
 renderer-independent plain data, and emits deterministic SVG paths. The generator also writes a
 tree-shakeable production subset to `src/shapes/generated/ooxmlPresetGeometrySubset.ts`.
@@ -215,7 +209,7 @@ silhouette, without adding detail or outline paths to the clip geometry. Picture
 preset-geometry adjustments so generated clipping uses the same bounded guide values as ordinary
 and grouped shapes.
 
-ECMA source differences are recorded through `source-reconciliation.json`. M1 rejects active
+ECMA source differences are recorded through `source-reconciliation.json`. The validator rejects active
 alternative definitions because it does not yet verify their bytes or native PowerPoint
 evidence. A later override gate must verify the local source bytes and hash, confirm the
 requested shape exists, and resolve native-oracle metadata before activation. Production

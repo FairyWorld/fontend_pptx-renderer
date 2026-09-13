@@ -429,7 +429,10 @@ def command_accept(args: argparse.Namespace) -> int:
         raise CapabilityLoopError("an equivalent promotion receipt already exists")
     receipts = tuple(
         sorted(
-            (*history.receipts, receipt),
+            (
+                *(item for item in history.receipts if item.capability_id != receipt.capability_id),
+                receipt,
+            ),
             key=lambda item: (item.capability_id, item.accepted_at),
         )
     )

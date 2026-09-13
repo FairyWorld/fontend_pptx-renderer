@@ -652,7 +652,7 @@ Do not use blind parameter tuning. When topology or shape semantics are wrong, d
 
 ### Spec-Compiled Geometry Source Gate
 
-The M0 geometry source contract is independent of local PowerPoint ground-truth files:
+The geometry source contract is independent of local PowerPoint ground-truth files:
 
 ```bash
 pnpm geometry:generate  # regenerate after an intentional source or contract change
@@ -679,7 +679,7 @@ for both ordinary shapes and picture clips. Then compare square, wide, and tall 
 relevant adjustment bounds against native PowerPoint ground truth. Group, flip, rotation,
 line-like, and multi-path cases require their own coverage when applicable.
 
-M0 rejects active source overrides. Before enabling one, add an offline check that reads the
+The validator rejects active source overrides. Before enabling one, add an offline check that reads the
 alternative source bytes, verifies their SHA-256 and requested shape, and resolves an
 existing native PowerPoint oracle record. Do not update a visual baseline merely to make a
 generated definition pass.
@@ -704,7 +704,7 @@ python3 test/e2e/scripts/run_capability_loop.py inventory \
   --corpus test/e2e/testdata/windows-cases \
   --validation-alias 'corpus-0/*oracle-*' \
   --validation-alias 'corpus-1/*oracle-*' \
-  --issues docs/agent-tmp/open-issues.json
+  --issues /path/to/open-issues.json
 ```
 
 The scanner reads ZIP members in memory without extracting them. It rejects path traversal, more
@@ -871,21 +871,6 @@ overlapping umbrella itself the next work packet.
 `drawingml.text.3d.scene` is also `observation-only`. Its current representative hit has an empty
 text body, so raw `a:bodyPr/a:scene3d` presence cannot be treated as visible renderer demand. A
 future text-3D implementation starts by registering a bounded visible-text cohort.
-
-PresentationML animation uses the same residual/candidate split. The broad
-`presentation.animation.timing` row records every slide with a timing tree but is
-`observation-only`. The ranked `presentation.animation.entrance.fade` candidate is intentionally
-limited to whole ordinary shapes, PowerPoint's entrance-fade preset tuple
-`presetClass=entr`/`presetID=10`/`presetSubtype=0`, a 500 ms duration, `fill=hold`, a visibility set
-to visible, and `clickEffect` or `withEffect`. Group, picture, paragraph-range, after-effect,
-non-fade and unsupported timing-tree rows are inverse cases, not supported variants.
-
-Animation acceptance needs temporal evidence; a final-state PDF is insufficient. Capture the
-native PowerPoint state before playback, at the 250 ms midpoint, after 500 ms completion, and after
-replay reset for each positive row. Bind those frames and the exact PPTX hash to the verification
-report, and use the excluded rows to prove that unsupported targets retain the static fallback.
-Until that matrix exists and the runtime is promoted, the registered candidate remains planned
-rather than a public support claim.
 
 Case 0020 supplies the native group evidence: square/wide/tall and nested source-crop positives are
 paired with scene-absent inverses. Group reflection composition remains browser/real-corpus

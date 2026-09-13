@@ -38,50 +38,20 @@ presentations without treating the active window as the export target.
 
 ### Evidence-Driven Capability Loop
 
-Renderer support is tracked by bounded OOXML capability rather than by a single aggregate score.
-The tracked registry at `test/e2e/oracle/capabilities.json` declares each feature's exact scope,
-current render mode, planning mode, fallback, relevant implementation files, and mandatory gates. Promotion
-receipts in `test/e2e/oracle/capability-acceptance.json` bind an accepted scope to its implementation,
-PPTX inputs, PowerPoint ground truth, environment, and revision hashes.
+`test/e2e/oracle/capabilities.json` records bounded support scopes and their required gates.
+`test/e2e/oracle/capability-acceptance.json` keeps the latest accepted receipt per capability,
+bound to the implementation, PPTX input, PowerPoint ground truth, environment, and revision hashes.
 
 ```bash
-pnpm capability:check      # validate tracked contracts and relevant file paths
-pnpm capability:inventory  # scan the local ignored corpus into an ignored evidence report
-pnpm verify:plan -- --base HEAD^      # show affected fast checks and deferred oracle cases
-pnpm verify:affected -- --base HEAD^  # run affected unit/Python/typecheck gates
-python3 test/e2e/scripts/run_capability_loop.py verify --help
+pnpm capability:check
+pnpm capability:inventory
+pnpm verify:plan -- --base HEAD^
+pnpm verify:affected -- --base HEAD^
 ```
 
-Inventory, ledger, ranking, work-packet, and verification reports stay under the ignored
-`test/e2e/reports/capability-loop/` directory. `native` describes the intended render behavior;
-the public `supported` claim additionally requires a fresh `verified` receipt. A report from a
-dirty tree, a changed capability scope, changed implementation files, changed input/ground-truth
-hashes, skipped cases, or an unresolved manual review cannot promote a capability.
-During implementation, `verify:affected` maps changed files to the capability registry and runs the
-small deterministic subset first. It lists browser and native PowerPoint work for the pre-commit
-or pre-merge gate; any unclassified non-documentation file fails closed to a full plan, while
-global runtime or capability-registry changes expand the native scope to every capability. Local
-oracle/evidence control changes also run the capability receipt check. Local artifacts satisfy a
-receipt only when their source and ground-truth hashes match exactly. See
-[`docs/TESTING.md`](docs/TESTING.md) for the three verification tiers.
-The default inventory treats case aliases containing `oracle-` as generated validation fixtures
-and all other aliases as representative documents, so adding an oracle cannot increase its own
-representative-demand score. For a custom mixed corpus, pass either repeatable
-`--representative-alias` globs or repeatable `--validation-alias` globs; the two modes are mutually
-exclusive. If byte-identical content has both roles, its representative alias takes precedence.
-Capabilities marked `planningMode: observation-only` stay visible in inventory and the ledger but
-cannot enter the executable ranking or produce a work packet. This is used for broad residual
-selectors whose matches overlap narrower, machine-verifiable capability scopes.
-PresentationML animation follows the same split: the broad `presentation.animation.timing` row is
-observation-only, while `presentation.animation.entrance.fade` is the ranked candidate for a
-bounded whole-shape, 500 ms entrance-fade matrix. Registering that candidate does not claim runtime
-playback support; native temporal evidence and a fresh promotion receipt remain required.
-The `verify` command converts raw `/api/evaluate` results into the promotion schema and derives
-native-PowerPoint, manual-review, regression, and capability-specific local gates from those
-results. A capability that requires `shadow-local` or `reflection-local` must also receive the
-hash-bound report emitted by `outer_shadow_metrics.py` or `reflection_metrics.py`, respectively.
-Other `--passed-gate` values record checks already run by the caller; the command does not execute
-or infer them.
+Generated reports stay under the ignored `test/e2e/reports/` tree. A native support claim requires
+a current receipt and matching source, ground-truth, implementation, browser, and font provenance.
+See [`docs/TESTING.md`](docs/TESTING.md) for the verification workflow.
 
 ## Install
 
@@ -604,320 +574,68 @@ import type {
 
 ## Rendering Capabilities
 
-### Shapes — Broad Preset Coverage + Custom Geometry
+### Shapes and geometry
 
-All commonly used OOXML `DrawingML` preset shapes, organized by category:
+The renderer covers the commonly used DrawingML preset families and numeric custom geometry,
+including multi-path shapes, connectors, arrows, callouts, action buttons, and flowcharts.
+The spec-compiled runtime currently contains 29 definitions: all 28 zero-adjustment flowcharts plus
+`donut`, whose OOXML default is `adj=25000` with a supported `0..50000` adjustment range. Other
+presets continue to use their handwritten implementations. Arbitrary symbolic guides in custom
+geometry are not yet supported.
 
-| Category          | Count | Highlights                                                     |
-| ----------------- | ----: | -------------------------------------------------------------- |
-| Basic & Geometric |    70 | Rectangles, ovals, polygons, stars, arcs, clouds, gears, etc.  |
-| Flowchart         |    30 | All standard flowchart shapes                                  |
-| Arrows            |    22 | Directional, bent, curved, striped, chevron                    |
-| Stars & Banners   |    17 | N-point stars, explosions, ribbons, scrolls                    |
-| Callouts          |    17 | Rectangular, rounded, oval, cloud, line callout variants       |
-| Connectors        |    12 | Straight, bent, curved (2-5 segments)                          |
-| Action Buttons    |     9 | Multi-path 3D with darken/lighten face modifiers               |
-| Math & Brackets   |    12 | Plus, minus, multiply, division, brackets, braces              |
-| **Multi-path 3D** |   33+ | Bevel, cube, can, ribbons — multi-layer SVG with 3D appearance |
+### Text
 
-Custom geometry (`<a:custGeom>`) supports numeric move, line, quadratic/cubic Bézier, arc,
-and close commands, including multiple paths and inferred source extents. The pinned OOXML
-compiler evaluates the complete preset-shape formula corpus into renderer-independent IR and SVG
-paths. A generated production subset now renders 29 definitions: all 28 zero-adjustment flowchart
-presets in shape IDs 61-88, plus `donut` with its OOXML `adj=25000` default and `0..50000` polar
-handle bounds. The flowcharts comprise 20 single-path and eight ordered three-path definitions;
-each flowchart is also covered by a three-slide native PowerPoint matrix spanning square explicit
-paint, wide theme-reference paint, and tall rendering through a non-identity group. The donut
-retains both outer and inner contours across square, wide, tall, grouped, and picture-clip rendering.
-Other presets retain the handwritten implementation until their own layering, adjustment, and
-oracle gates pass. Symbolic `gdLst` formulas in arbitrary `<a:custGeom>` content remain unsupported.
+Text rendering follows the master, layout, placeholder, shape, paragraph, and run cascade. It
+supports theme fonts, CJK text, bullets, hyperlinks, vertical text, superscript/subscript, Office
+percentage spacing, common wrap/overflow combinations, and selected `spAutoFit` growth. Font
+availability remains part of visual-test provenance.
 
-### Ordinary Shape Outer Shadows — Bounded Native Lane
+### Tables
 
-Direct `p:sp/p:spPr/a:effectLst/a:outerShdw` effects have a native-oracle-backed rendering lane for
-`rect`, `roundRect`, and `ellipse` shapes with an opaque resolved solid fill or simple gradient. The
-lane accepts standalone shapes and children of a single unrotated, unflipped group at the verified
-uniform 1.25 child scale. Shape rotation, flips, skew, 3D, additional effects, and effect DAGs remain on
-the existing approximation path.
+The common table path supports built-in and document table styles, first/last/banded options,
+variable row and column sizes, horizontal and vertical merges, cell margins and anchors, CJK/mixed
+text, conditional and merged borders, explicit border clearing, and direct cell overrides. The
+claim is bounded by an eight-case native PowerPoint matrix; uncommon producer quirks, diagonal
+borders, and arbitrary style combinations may still differ.
 
-Within that boundary, the native lane covers the matrix's explicit blur/distance values, default
-zero distance/direction, 45°/90°/135° directions, default/bottom, center, and top-right anchors, and
-92%/100%/102% uniform scale. Only the seven positive matrix rows are promoted; those individual
-values do not form an independently supported Cartesian product. A scaled shadow is rendered as a
-separate silhouette behind the source path and transformed around the exact
-OOXML anchor; the visible shape itself is not scaled. Zero-distance and scaled-silhouette blur use
-separate native-calibrated SVG Gaussian widths, while directional 100% shadows retain the general
-filter path. Ancestor group rotation/flip is propagated through the render context so an unsupported
-coordinate system cannot accidentally enter the native lane.
+### Charts
 
-The eight-slide `oracle-pypptx-shape-effect-0001-outer-shadow-matrix` covers the no-shadow inverse,
-default/zero-distance blur, offset and direction, wide/tall geometry, a gradient ellipse, 102%
-centered and 92% top-right scaling, a single unrotated group at uniform 1.25 scale, and scheme-color modifiers.
-The `shadow-local` gate measures the exterior darkness field, energy, overlap, direction, centroid,
-and an erasure mutation against native PowerPoint rasters; full-slide SSIM alone cannot promote the
-capability.
+[ECharts](https://echarts.apache.org/) renders bar/column, line, area, pie, doughnut, radar, scatter,
+bubble, stock/candlestick, supported combo charts, and secondary axes. Sparse and literal sources,
+explicit zeros, common labels, legends, markers, and number formats are supported. Chart rendering
+remains approximate because Office plot-area, axis, label, and legend layout can differ. OOXML 3D
+charts fall back to a 2D representation where possible.
 
-### Ordinary Shape Reflections — Bounded Native Lane
+### Equations
 
-Direct `p:sp/p:spPr/a:effectLst/a:reflection` effects have a native-oracle-backed lane for the six
-positive combinations in `oracle-pypptx-shape-effect-0002-reflection-matrix`. The matrix covers
-solid and simple-gradient `rect`, `roundRect`, `ellipse`, and `upArrow` shapes, square/wide/tall
-bounds, the common vertical-flip and bottom-left anchor tuple, bounded blur/alpha-fade/distance
-values, and one child of a single unrotated, unflipped group at uniform 1.25 scale. Values listed in
-different rows do not form a supported Cartesian product.
+A bounded OMML subset renders as browser-native Presentation MathML: runs, bar/no-bar/skewed/linear
+fractions, radicals, subscript/superscript, delimiters, n-ary operators, matrices, and functions.
+The direct path is selected only when the complete math subtree is recognized; otherwise the
+package-authored MCE fallback shape or graphic frame is used. Per-token rich formula styling and
+unknown OMML constructs remain outside the direct subset. No formula-specific runtime dependency is
+required.
 
-`ReflectionRenderer` creates an explicit shape-local clone instead of relying on
-`-webkit-box-reflect`. It applies the DrawingML affine scale, skew, alignment, direction, distance,
-blur, and alpha ramp in separate layers, rewrites cloned SVG IDs and references, and uses the
-ECMA-376 `CT_ReflectionEffect` defaults when optional attributes are absent. Keeping the clone in
-local coordinates prevents an absolutely positioned shape's slide offset from being applied twice.
+### Effects and static 3D
 
-The seven-slide matrix contains one no-reflection inverse and six positive rows. Its
-`reflection-local` gate derives regions from the exact source XML path, compares native and browser
-reflection energy, field overlap, cosine, error, and centroid, and must reject a deterministic
-reflection-region erasure. A separate live-text case remains discovery evidence because its local
-appearance still requires review and is outside this promoted shape-surface lane.
+Ordinary-shape outer shadows and reflections have native-validated lanes for the combinations in
+the tracked effect matrices. Other effect combinations use the existing approximation or flat
+fallback.
 
-### Static DrawingML 3D — Bounded Top Bevel, Camera Plane, and Bottom Front Material
+The static DrawingML 3D path parses scene, camera, lighting, bevel, contour, and material properties.
+Native-validated rendering covers selected top-bevel silhouettes, zero-depth camera planes, cropped
+pictures, live text, one custom-geometry family, one two-picture group, and selected edge-on bottom
+bevel material values. It uses SVG, Canvas, and projection math rather than a mesh engine. General
+extrusion, arbitrary cameras and lighting, arbitrary group scenes, 3D charts, and embedded Office 3D
+models are not supported.
 
-The renderer recognizes `a:scene3d` and `a:sp3d` on ordinary shapes, pictures, and groups and preserves the
-parsed observations in serialized model output. A native-oracle-backed static subset renders an
-orthographic circular top bevel and optional contour with silhouette-aware lighting:
+### SmartArt, media, groups, and compatible content
 
-- shape lane: opaque resolved solid-fill `donut`, `ellipse`, `rect`, and `roundRect`; ellipse
-  coverage spans square explicit paint, wide theme-reference paint, and tall rendering through a
-  non-identity group transform; donut coverage adds the `0..50000` adjustment bounds, the `25000`
-  default, a representative `32000` hole, and grouped/aspect-ratio variants. A separate nine-slide
-  interpolation matrix crosses aspect ratios `0.75`, `1.25`, and `2.0` with adjustment values
-  `10000`, default `25000`, and `40000`; omitted `bevelT@w`,
-  `bevelT@h`, and `bevelT@prst` use the DrawingML defaults of 76200 EMU per dimension and `circle`
-  for the native-verified rect/roundRect/ellipse rows;
-- picture lane: rectangular, stretch-filled pictures with no `a:srcRect`, or nonnegative source
-  crops whose remaining horizontal and vertical extents are both positive;
-- `orthographicFront`, no camera rotation, `twoPt:t` or `threePt:t` lighting, with either no light
-  rotation or the observed `twoPt:t` rotation `lat=0`, `lon=0`, `rev=120°`;
-- zero or omitted extrusion and `z`, no scene backdrop or extrusion color, an absent/zero contour or
-  a positive contour with a resolvable color, no bottom bevel or preset material, and no effect-list
-  entry other than a coexisting outer shadow.
-
-The renderer keeps the normal flat shape or picture whenever the complete tuple does not match.
-For a supported tuple it first paints a synchronous four-gradient vector fallback, then rasterizes
-the exact SVG silhouette into an alpha mask. An exact interior Euclidean distance field supplies
-continuous perimeter normals; a circular cross-section and the bounded light rig produce the final
-bevel texture. This makes rounded corners follow the source contour instead of inheriting rectangular
-face edges. Shape textures retain the resolved material hue, while picture textures remain relative
-black/white lighting so the source pixels stay visible. The supported implicit `twoPt:t` picture
-response uses its native-validated edge direction and a lower material intensity than opaque solid
-shapes; the bevel geometry remains shared. Solid highlights keep their common material mapping,
-while dark-face attenuation is interpolated across the native square, wide, and tall matrices.
-Square ellipse/donut rows use the native-fitted effective 330° light bearing; other verified
-three-point rows retain 350°, with a smooth near-square transition for those curved presets. Wide
-rect/ellipse rows keep the native-backed `0.415` dark-face response, while solid donuts additionally
-interpolate a native-backed broad shadow floor and a compressed directional shadow lobe across the
-tall, square, and wide matrices. The intermediate 3×3 native matrix verifies the interpolation
-between and beyond those profile anchors. This better matches PowerPoint's three-point material rim
-without moving the key highlight. `roundRect` retains its independently measured response.
-The native-backed grouped donut row evaluates its circular lighting texture in the child OOXML
-coordinate space and then applies the parent group's non-identity stretch, keeping the stretched
-ring from recomputing a wider, darker lobe. This behavior remains scoped to grouped donuts; the
-grouped rect and ellipse matrices retain their separately verified screen-space response.
-The native 6 pt square-rectangle row and the 10 pt tall-rectangle row also have bounded shadow
-anchors. The bevel-local gate checks peak amplitude, aggregate energy, and non-cancelling per-pixel
-local shadow excess. It also checks every salient 30° inner/outer donut contour sector against a
-`1.60` candidate/native ceiling, so an over-dark lobe cannot be hidden by an under-dark sector elsewhere.
-A six-slide matrix pairs each omitted/default encoding with an explicit equivalent, and the local
-gate requires both PowerPoint and renderer raster pairs to remain byte-identical.
-
-The asynchronous texture work is serialized per slide, capped at 262,144 pixels per texture, cached
-with the render context, and tied to slide abort and blob-URL cleanup. If Canvas, decoding, scale, or
-rendering is unavailable, the vector fallback remains visible. Text stays outside the SVG lighting
-overlay, picture outlines remain centered on the source bounds, and group transforms retain the
-existing coordinate mapping.
-
-The separate camera-plane lane has four native-verified zero-depth leaf modalities and one
-native-verified whole-group modality. Preset solid rectangles
-become SVG quadrilaterals. One standalone multi-contour custom-path family is projected directly as
-SVG. No-fill text planes and stretch-filled pictures retain their live DOM content and
-receive a CSS `matrix3d` homography, so text remains selectable and picture crop stays in the normal
-image pipeline. The group path lays out two direct live picture children first and then applies one
-homography to their shared child layer, preserving child composition and source crop.
-The solid matrix contains
-`orthographicFront` with absent rotation, `orthographicFront` with exactly `lat=20°`, `lon=30°`,
-`rev=0°`, and `perspectiveRelaxedModerately` with `fov=120°` and exactly
-`lat=18590633/60000°`, `lon=0°`, `rev=0°`. The live-text rows are
-`perspectiveContrastingRightFacing` with `fov=85°` and exactly `lat=0°`,
-`lon=19532225/60000°`, `rev=0°`, plus `perspectiveLeft` with `fov=120°`, absent explicit
-rotation, and the preset's implicit `lat=0°`, `lon=20°`, `rev=0°`. The picture row uses
-`perspectiveRight` with `fov=95°`, absent explicit rotation, and implicit `lat=0°`, `lon=-20°`,
-`rev=0°`. The group row uses `perspectiveLeft` with `fov=95°` and explicit
-`lat=0°`, `lon=25°`, `rev=0°`. All rows use an unrotated `threePt:t` light.
-
-Nineteen native slides cover the original six explicit-`a:sp3d` solid controls, scene-only solid,
-two live-text square/wide/tall matrices, and a four-slide picture matrix spanning absent,
-horizontal, vertical, and asymmetric source crops. Six additional native rows cross the bounded custom
-silhouette over square/wide/tall physical bounds with explicit `#2F75B5` and `#FFFFFF` paint. That
-custom lane requires one `1000×1000` path, an identity text rectangle, present but empty guide and
-handle lists, at least two closed contours made only from numeric `moveTo`, `lnTo`, `cubicBezTo`,
-and `close` commands, no path paint attributes, no `p:style`, and exact physical bounds of
-`403.2×403.2`, `768×307.2`, or `307.2×518.4` CSS pixels. An absent `a:sp3d` is treated as implicit zero
-depth only for those exact scene-only tuples. Solid shapes must have no visible text or stroke and use the
-verified explicit `#2F75B5` or theme `#4F81BD` rows. Live-text shapes must use explicit `a:noFill`,
-omit the line element and `p:style`, and declare local `bodyPr wrap="none"` with `a:spAutoFit`.
-The contrasting-right row requires `anchor="ctr"`; the perspective-left row requires the anchor to
-be absent so Office's top default applies. Vertical text and independent text bounds remain outside
-this lane. Picture rows require rectangular `a:stretch` without `a:fillRect`, style references,
-visible outlines, picture background fills, or direct blip effects; source crops must be finite,
-nonnegative, and leave positive visible width and height. The four promoted leaf modalities exclude local
-rotation/flip, backdrop, nonzero `z`, explicit effect lists, bevel, contour, extrusion color,
-material, and extrusion. Solid oracle rows retain their generated theme `effectRef=2` style;
-its resolved `outerShdw` is applied to the visible projected polygon with a filter region covering
-the projected four-corner bounds. Blur and distance follow the plane's measured horizontal
-projection scale; orthographic rows apply their native-calibrated `0.95` footprint factor. The
-camera-local gate requires at least `0.70` of measurable native shadow energy. Live-text rows omit
-the entire shape style.
-
-The eight-slide native group matrix crosses square, wide, tall, and a nested real-corpus-like
-source-crop row against scene-absent inverses. The target group must have explicit positive `a:ext` and
-`a:chExt`, exactly two direct embedded PNG pictures using rectangular stretch fill, optional finite
-nonnegative source crops, no target `a:sp3d` or effects, and no rotated, flipped, or 3D-scene
-ancestor. Coordinate-only ancestor groups are accepted. Its bounded `threePt:t` response applies a
-continuous log-aspect brightness correction plus a low-alpha white lighting layer. Native PowerPoint
-rasters, manual review, full-page regression, and crop-sensitive local metrics promote this exact
-group tuple. Reflected ancestors remain a separate diagnostic composition case; group reflection now
-clones the completed child subtree but is outside this verified group-camera lane.
-
-The separate bottom-bevel front-material lane covers a native-verified edge-on case without
-inventing depth. It requires a standalone, non-placeholder `rect` with an explicit opaque
-`#4472C4` fill and no visible outline; `orthographicFront`; `threePt:t` with no light rotation or
-exactly `lat=0`, `lon=0`, `rev=50°`; zero depth, contour, and `z`; a default-size 76200-EMU
-`relaxedInset` or `circle` `bevelB`; and either `dkEdge` or an absent material. The three verified
-aspect ratios are 2:1, 1:1, and 3.2:5.2. The renderer replaces only the flat SVG face with the
-native uniform response (`#4676CB` for `dkEdge`, `#4B7BD0` for absent material) and keeps live text
-outside that SVG group. Because PowerPoint shows no visible bottom rim in this view, the renderer
-does not draw one. Group, placeholder, layout, and master parents remain diagnostic flat fallbacks.
-A 5% alpha overlay remains on the ordinary transparent composition path: its exact native 3D versus
-flat control differs by at most one 8-bit RGB level, which is insufficient evidence for an opaque
-material replacement.
-
-This plane projection uses small independent SVG math rather than a mesh engine: longitude,
-latitude, and revolution rotations are followed by orthographic or perspective division. OOXML
-provides the camera properties; preset viewport scale and material response are pinned to native
-PowerPoint evidence. Custom cubics become rational under projective mapping, so the bounded custom
-lane adaptively flattens them in projected screen space with at most `0.25px` error while preserving
-closed contours and even-odd fill. A dedicated gate compares normalized four-corner geometry, three material
-color bands, gradient range, gradient direction, and source-required external shadow energy and
-direction for solid planes. Schema v7 keeps raw foreground IoU and bounds for live-text diagnosis,
-then gates on bidirectional foreground F1 and bounds after a resolution-normalized `0.25%` raster
-tolerance, plus grayscale ink-density retention. It inverse-projects picture planes to a fixed
-rectangle and gates their content with color similarity and tolerant edge F1, so a correct outer
-quadrilateral cannot hide a wrong crop. The `picture-group` modality applies the same
-corner, rectified-color, edge, and crop-mutation checks to the composed group surface. Schema v6
-reports remain accepted for the already verified modalities. The tolerance absorbs font and image rasterization
-differences while preserving semantic failures against the same hashed native rasters.
-Custom-path rows require tolerant foreground F1 `0.95`, bounds score `0.98`, foreground area ratio
-`0.90`, centroid score `0.99`, and color score `0.98`.
-For bottom-front rows it additionally requires mean RGB error across three interior bands to stay
-at or below `1.0`, then restores the source flat `#4472C4` fill and requires that mutation to fail.
-For every measurable shadow row, the report erases the candidate's exterior shadow and requires the
-shadow metric to reject that mutation. Every picture row likewise injects a 12% left crop and
-rescale after rectification and requires the content metric to reject it. Every custom row is
-vertically squashed to 20% height and must fail its silhouette gate. A gate therefore proves
-both that the current rendering passes and that its local assertions still detect the targeted
-failure modes.
-
-This support does not include camera values outside that exact plane matrix, nonzero extrusion,
-arbitrary light rotation, other bevel presets, tiled pictures, negative or degenerate source crops,
-custom geometry outside the exact numeric path profile or verified bounds,
-gradient/pattern/group/image-filled leaf shapes, arbitrary group scenes or child mixtures, other
-text-body/style combinations, or pixel-identical PowerPoint material simulation.
-Although the distance-field backend can follow arbitrary alpha silhouettes, the public support
-claim remains limited to native-verified `donut`/`ellipse`/`rect`/`roundRect` shapes and rectangular
-pictures. Star, freeform, rotation, and glow probes stay in an opt-in ignored discovery matrix until
-their own geometry-aware native gates pass. The eleven-slide bottom-bevel matrix now backs only the
-separately declared uniform-front-material capability above; all other bottom-bevel combinations
-remain discovery evidence. The original ellipse and donut probes remain preflight
-neighbors to their tracked multi-slide matrices.
-
-### Text — 7-Level Style Inheritance
-
-Full OOXML text cascade: master → layout → shape → paragraph → run. Supports theme fonts, numbered/symbol/picture bullets, multi-level indent, vertical text, superscript/subscript, hyperlinks, and per-shape text insets.
-
-Local text color follows DrawingML precedence: an explicit run fill overrides paragraph
-`defRPr`; paragraph `defRPr` overrides the shape `fontRef`; `fontRef` supplies the fallback only
-when neither local level declares a fill. Native PowerPoint cases cover `srgbClr`, `schemeClr`, the
-inverse fallback, and square, wide, and tall text boxes.
-
-### Charts via ECharts
-
-Powered by [ECharts](https://echarts.apache.org/). Supports Bar/Column (clustered, stacked, 100% stacked), Line/Area (standard, stacked, 100% stacked), Pie, multi-ring Doughnut, Radar, Scatter, Bubble, and Stock/Candlestick charts, with axis labels, legends, data labels, grid lines, chart color-style palettes, marker symbols, and custom number formats.
-
-A 21-case native PowerPoint matrix exercises these two-dimensional families and their common data
-variants. The runtime coverage is broad, while the capability remains explicitly `approximate`
-until the chart-family gates close the remaining plot-area, axis, label, and legend differences.
-Automatic Cartesian layout is calibrated for common compact columns, negative-value zero
-crossings, horizontal bars, and right-side line/area legends while preserving explicit plot
-layouts and top/bottom legend reservations.
-
-For the 12 single-chart column, bar, line, and area cases, the E2E API also reports a bounded
-`cartesianChart` signal. It resolves presentation order and the chart frame from OOXML, then
-compares native and browser plot rectangles, chromatic series geometry and color, and localized
-plot/axis/legend regions. A series-mask erasure sanity check guards the metric wiring. The signal
-is diagnostic and does not replace the full-slide gate or source/model series assertions.
-Combination charts, grouped or unresolved chart frames, charts with more than eight series,
-neutral-only series, unsupported chromatic backgrounds, and charts without a stable neutral
-axis/grid field are reported as not evaluable by this metric.
-
-The renderer registers only the ECharts charts, components, features, and Canvas renderer
-that it uses. Bundler consumers keep ECharts external; the standalone browser entry
-contains this same tree-shakeable runtime.
-
-OOXML 3D chart elements such as `bar3DChart`, `line3DChart`, `pie3DChart`, `area3DChart`, and `surface3DChart` are parsed as graceful 2D fallbacks where possible. Their perspective, depth walls, and surface meshes are not rendered as native 3D.
-
-### Fill, Stroke & Color
-
-- **Fills**: solid, linear/radial/rectangular gradient, 52+ pattern fills, image (stretch/tile)
-- **Strokes**: 8 dash styles, 5 arrowhead types, compound lines, line joins
-- **Colors**: OOXML pipeline — `schemeClr` → `colorMap` remap → theme lookup → modifiers (lumMod, lumOff, tint, shade, alpha, satMod, etc.). All 6 color spaces supported. Effective maps follow slide → layout → master overrides, including explicit identity mappings and master resets; chart-local maps remain isolated from the parent slide.
-
-Supported chart combinations include combo charts and secondary axes. Sparse scatter/bubble caches preserve missing coordinates and explicit zeros, with gap/span/zero handling; literal data sources and explicit negative-bar inversion flags are honored. Negative percent-stacked normalization is not newly guaranteed by these checks.
-
-### SmartArt, Tables, Images & More
-
-- **SmartArt**: renders available PowerPoint diagram fallback data; individual layout fidelity varies. EMF-embedded PDF previews can be rendered with optional [pdfjs-dist](https://mozilla.github.io/pdf.js/) configuration.
-- **Tables**: OOXML table styles, first/last/banded options, variable rows and columns, horizontal/vertical merges, cell margins and vertical anchors, CJK/mixed text, merged-cell inside/outer borders, conditional corner styles, explicit no-fill border clearing, and direct-cell overrides. A dedicated eight-case native PowerPoint matrix bounds this claim.
-- **Images**: raster/SVG previews with crop and geometry clipping; grayscale, duotone, luminance, and biLevel effects on clipped pictures. Embedded audio/video playback uses browser-supported codecs, with posters/placeholders when playback data is unavailable.
-- **Groups**: coordinate remapping with recursive child rendering; diagram-specific compensation requires matching diagram layout provenance
-- **Backgrounds**: slide → layout → master inheritance chain
-
-### Compatible Content and Text Inheritance
-
-`mc:AlternateContent` selects one compatible `Choice` (including the supported SVG picture extension), otherwise its `Fallback`, across ordinary slide/template/group content and OLE picture previews. Unknown extension namespaces do not become supported merely because they occur in a `Choice`. Eager and lazy rendering retain selected branch order.
-
-PowerPoint equations use an `a14:m` extension inside a text paragraph and normally carry an MCE
-fallback shape or graphic frame. The renderer now parses a bounded OMML subset and emits browser-native
-Presentation MathML for runs, bar/no-bar/skewed/linear fractions, radicals, subscript/superscript,
-delimiters, n-ary operators, matrices, and functions. It selects the `a14` choice only when the whole
-math subtree is recognized; unknown constructs retain the package-authored fallback, without marking
-the rest of the `a14` namespace as supported. The first implementation uses one inherited formula
-run style; per-token rich styling remains outside this scope. An eight-case native PowerPoint matrix
-covers the direct path, and low foreground overlap forces manual review even when sparse full-slide
-SSIM is high. No formula-specific runtime library is required.
-
-Placeholder inheritance follows the matched layout placeholder into its master category, preserves explicit zero transforms/insets, and resolves omitted body properties and mutually exclusive autofit choices. Explicit no-autofit clipping and whitespace behavior are checked in real browser containers. These combinations do not establish native equivalence for every text/autofit variant.
-
-Percentage line spacing and paragraph before/after spacing follow Office line-unit semantics;
-ordinary text boxes trim spacing outside the first and last visible paragraphs. A 16-case CJK
-native matrix covers wrapping, autofit, line/paragraph spacing, adjacent runs, parent-shape layout,
-and square/wide/tall `spAutoFit` text-box growth, while font availability remains part of the
-evaluation provenance.
-
-For a square-wrapped standalone horizontal text box with top/default anchoring and no explicit
-overflow override, `spAutoFit` can grow the shape at its authored font size. The verified growth
-cohort includes multiple visible paragraphs and single-paragraph runs with an explicit font size
-whose unwrapped width is materially larger than the original box. The wrapper and its shape SVG
-grow together without reflowing absolutely positioned siblings. Explicit overflow axes remain
-authoritative; other wrapping modes, center/bottom anchors, vertical text, inherited compact
-labels, diagram text bounds, and non-text-box shapes retain their bounded measurement paths.
+- **SmartArt**: renders available diagram fallback data; layout fidelity varies.
+- **Images**: raster and SVG previews, crop and geometry clipping, common image effects, and browser-supported audio/video.
+- **OLE/EMF previews**: uses package-provided bitmap or embedded-PDF previews when available; PDF previews require optional `pdfjs-dist`.
+- **Groups**: recursively remaps child coordinates and preserves supported transforms.
+- **Compatible content**: selects one supported `mc:Choice`, otherwise its `mc:Fallback`, while preserving branch order.
+- **Backgrounds and color**: resolves slide/layout/master backgrounds, theme colors, color maps, and common modifiers.
 
 ## Architecture
 
@@ -1037,27 +755,12 @@ Dev pages at `http://127.0.0.1:5173`:
 
 ## What's Not Yet Supported
 
-Ordinary-shape outer shadows outside the bounded direct-effect matrix above retain the existing
-SVG/CSS approximation. This includes other parameter values, text-bearing or stroked shapes, custom
-geometry, nonuniform or nested group scale, skew, rotated/flipped shape or ancestor coordinates,
-3D, effect DAGs, and compound effect lists.
-Ordinary-shape reflections outside their six declared positive rows retain the explicit cloned-layer
-approximation. Live text without a visible shape surface, pictures, group-level reflection effects,
-other alignment/direction/fade/scale/skew tuples, nested or nonuniform groups, rotation/flip, 3D,
-effect DAGs, and compound effect lists remain outside the verified reflection scope.
-DrawingML shape/picture 3D outside the bounded circular top-bevel, zero-depth camera-plane, and
-edge-on bottom-bevel front-material tuples above retains the flat 2D fallback. This includes other
-perspective or rotated cameras, nonzero extrusion, other bottom or non-circular bevels, other preset
-materials, unsupported lighting, tiled pictures,
-custom geometry outside the exact camera-path profile, and unsupported paint, text, stroke,
-transform, or effect combinations. Group scenes outside the exact native-verified two-picture tuple
-above remain flat. True 3D chart perspective/depth/surface meshes, Office 2017 embedded 3D
-models, animation playback/transitions, OMML constructs and per-token formula styles outside the
-bounded direct subset, full EMF/WMF vector rendering, executing/editing embedded OLE objects, and
-slide notes rendering are outside the verified native scope. Available OLE picture previews and
-unsupported-equation fallback shapes can render; they are not OLE engines. EMF bitmap and embedded-PDF previews
-remain supported (PDF previews require PDF.js); arbitrary EMF/WMF vector records remain excluded.
-Exact current boundaries live in the capability registry described above.
+The renderer does not provide general DrawingML extrusion, true 3D charts, embedded Office 3D
+models, animation playback or transitions, a complete OMML engine, arbitrary EMF/WMF vector
+rendering, executable/editable OLE objects, or slide-note rendering. Unsupported 3D and effect
+combinations retain a flat or approximate rendering path. Package-provided OLE, equation, and EMF
+previews may still render when a compatible fallback is available. Exact bounded scopes are recorded
+in `test/e2e/oracle/capabilities.json`.
 
 ## FAQ
 

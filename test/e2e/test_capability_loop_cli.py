@@ -441,6 +441,101 @@ def test_accept_writes_fresh_receipt_and_rejects_dirty_repo(tmp_path: Path):
     assert json.loads(acceptance.read_text(encoding="utf-8"))["receipts"] == []
 
 
+def test_accept_replaces_the_previous_receipt_for_the_same_capability(tmp_path: Path):
+    repo, registry_path, acceptance = create_repo(tmp_path, render_mode="native")
+    registry = load_capability_registry(registry_path)
+    capability = registry.capabilities[0]
+    acceptance.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "receipts": [
+                    {
+                        "capabilityId": capability.id,
+                        "definitionFingerprint": capability_definition_fingerprint(capability),
+                        "acceptedRevision": "a" * 40,
+                        "implementationFingerprint": "b" * 64,
+                        "caseIds": ["oracle-shape-0001"],
+                        "caseInputFingerprints": ["c" * 64],
+                        "groundTruthFingerprints": ["d" * 64],
+                        "gates": list(capability.required_gates),
+                        "environment": {"oracle": "powerpoint-macos"},
+                        "acceptedAt": "2026-09-09T00:00:00Z",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=repo, check=True)
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    implementation_fingerprint = compute_implementation_fingerprint(
+        repo,
+        capability.implementation_paths,
+    )
+    verification = tmp_path / "verification.json"
+    verification.write_text(
+        json.dumps(
+            {
+                "schemaVersion": 1,
+                "capabilityId": capability.id,
+                "definitionFingerprint": capability_definition_fingerprint(capability),
+                "renderer": {
+                    "revision": revision,
+                    "dirty": False,
+                    "implementationFingerprint": implementation_fingerprint,
+                },
+                "environment": {"oracle": "powerpoint-macos"},
+                "gates": {gate: "passed" for gate in capability.required_gates},
+                "caseResults": [
+                    {
+                        "caseId": "oracle-shape-0001",
+                        "sourceSha256": "e" * 64,
+                        "groundTruthSha256": "f" * 64,
+                        "skipped": False,
+                        "passed": True,
+                        "needsReview": False,
+                        "manualVerdict": "not-required",
+                        "runtimeErrors": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    accepted = run_cli(
+        "accept",
+        "--repo-root",
+        repo,
+        "--registry",
+        registry_path,
+        "--acceptance",
+        acceptance,
+        "--verification",
+        verification,
+        "--capability",
+        capability.id,
+        "--accepted-at",
+        "2026-09-09T01:02:03Z",
+    )
+
+    assert accepted.returncode == 0, accepted.stderr
+    receipts = json.loads(acceptance.read_text(encoding="utf-8"))["receipts"]
+    assert len(receipts) == 1
+    assert receipts[0]["acceptedRevision"] == revision
+
+
 def test_verify_normalizes_api_output_at_the_current_clean_revision(tmp_path: Path):
     repo, registry_path, _acceptance = create_repo(tmp_path, render_mode="native")
     subprocess.run(["git", "init", "-q"], cwd=repo, check=True)

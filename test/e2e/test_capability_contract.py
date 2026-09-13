@@ -314,6 +314,38 @@ def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Pat
         load_acceptance_history(invalid_hash_path)
 
 
+def test_acceptance_history_keeps_only_one_receipt_per_capability(tmp_path: Path):
+    receipt = {
+        "capabilityId": "drawingml.shape.geometry.rect",
+        "definitionFingerprint": "a" * 64,
+        "acceptedRevision": "b" * 40,
+        "implementationFingerprint": "c" * 64,
+        "caseIds": ["oracle-shape-0001"],
+        "caseInputFingerprints": ["d" * 64],
+        "groundTruthFingerprints": ["e" * 64],
+        "gates": ["source", "unit"],
+        "environment": {"oracle": "powerpoint-macos"},
+        "acceptedAt": "2026-09-09T00:00:00Z",
+    }
+    duplicate_capability_path = write_json(
+        tmp_path / "duplicate-capability-acceptance.json",
+        {
+            "schemaVersion": 1,
+            "receipts": [
+                receipt,
+                {
+                    **receipt,
+                    "acceptedRevision": "f" * 40,
+                    "acceptedAt": "2026-09-09T01:00:00Z",
+                },
+            ],
+        },
+    )
+
+    with pytest.raises(ValueError, match="one receipt per capability"):
+        load_acceptance_history(duplicate_capability_path)
+
+
 def test_valid_registry_and_acceptance_history_are_immutable(tmp_path: Path):
     entry = capability(
         render_mode="native",

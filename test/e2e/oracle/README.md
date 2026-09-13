@@ -4,8 +4,9 @@ This directory contains the local-macOS PowerPoint oracle pipeline used to drive
 
 ## Capability Loop
 
-The oracle now has a tracked capability contract in `capabilities.json` and sanitized historical
-promotion receipts in `capability-acceptance.json`. The loop separates intended render mode,
+The oracle has a tracked capability contract in `capabilities.json` and one sanitized latest
+promotion receipt per accepted capability in `capability-acceptance.json`. Git retains prior receipt
+history. The loop separates intended render mode,
 planning mode, and current evidence state. It only permits a public `supported` claim when a bounded
 capability is both `native` and freshly `verified`.
 
@@ -46,11 +47,6 @@ remain in the ledger for observation but are not selected as the next implementa
 The default `planningMode` is `ranked`. Broad residual selectors must use `observation-only`; their
 counts remain visible in the ledger, but they cannot enter the executable ranking or produce a work
 packet. A new bounded capability must be registered before work on one of those residuals begins.
-The first bounded animation row is `presentation.animation.entrance.fade`: whole ordinary shapes,
-the exact entrance-fade preset tuple, 500 ms, `fill=hold`, and `clickEffect`/`withEffect`. Its work
-packet includes native samples at initial, midpoint, completion and replay-reset states plus group,
-picture, paragraph-range, after-effect and non-fade inverses. A static PDF cannot satisfy this
-temporal oracle.
 When a committed goal deliberately selects a lower-ranked cohort, pass `--selection-reason`; the
 work packet records the override instead of silently hiding the global ordering.
 

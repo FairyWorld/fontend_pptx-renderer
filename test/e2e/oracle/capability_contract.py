@@ -535,6 +535,9 @@ def load_acceptance_history(path: Path) -> AcceptanceHistory:
         raise ValueError("acceptance receipts must be sorted by capabilityId and acceptedAt")
     if len(ordering) != len(set(ordering)):
         raise ValueError("acceptance history contains a duplicate receipt")
+    capability_ids = [receipt.capability_id for receipt in receipts]
+    if len(capability_ids) != len(set(capability_ids)):
+        raise ValueError("acceptance history must contain only one receipt per capability")
     return AcceptanceHistory(schema_version=SCHEMA_VERSION, receipts=receipts)
 
 
