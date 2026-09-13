@@ -392,32 +392,41 @@ async def screenshot_slide(
     device_scale_factor: float = 1.0,
 ) -> np.ndarray:
     test_file = _validate_case_stem(test_file)
-    ctx = await browser.new_context(
-        viewport={"width": 1920, "height": 1080},
-        device_scale_factor=device_scale_factor,
-    )
-    page = await ctx.new_page()
-    page.set_default_timeout(PAGE_TIMEOUT_MS)
-    try:
-        url = _render_slide_url(test_file, slide_idx, source)
-        await page.goto(url)
-        await page.wait_for_function(
-            "() => window.__renderDone === true || window.__renderError !== undefined",
-            timeout=PAGE_TIMEOUT_MS,
+    for attempt in range(2):
+        ctx = await browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            device_scale_factor=device_scale_factor,
         )
-        error = await page.evaluate("() => window.__renderError")
-        if error:
-            raise RuntimeError(f"Render failed for {test_file} slide {slide_idx}: {error}")
-        # Capture rendered slide only; avoid container padding/shadows that pollute SSIM.
-        target = page.locator(SLIDE_CAPTURE_SELECTOR)
-        if await target.count() == 0:
-            target = page.locator("#slide-container")
-        screenshot_bytes = await target.first.screenshot()
-        img = Image.open(io.BytesIO(screenshot_bytes))
-        return np.array(img.convert("RGB"))
-    finally:
-        await page.close()
-        await ctx.close()
+        page = await ctx.new_page()
+        page.set_default_timeout(PAGE_TIMEOUT_MS)
+        try:
+            url = _render_slide_url(test_file, slide_idx, source)
+            await page.goto(url)
+            await page.wait_for_function(
+                "() => window.__renderDone === true || window.__renderError !== undefined",
+                timeout=PAGE_TIMEOUT_MS,
+            )
+            error = await page.evaluate("() => window.__renderError")
+            if error:
+                raise RuntimeError(
+                    f"Render failed for {test_file} slide {slide_idx}: {error}"
+                )
+            # Capture rendered slide only; avoid container padding/shadows that pollute SSIM.
+            target = page.locator(SLIDE_CAPTURE_SELECTOR)
+            if await target.count() == 0:
+                target = page.locator("#slide-container")
+            screenshot_bytes = await target.first.screenshot()
+            img = Image.open(io.BytesIO(screenshot_bytes))
+            return np.array(img.convert("RGB"))
+        except RuntimeError as error:
+            retryable = "Visual output did not stabilize within" in str(error)
+            if attempt > 0 or not retryable:
+                raise
+        finally:
+            await page.close()
+            await ctx.close()
+
+    raise RuntimeError(f"Render failed for {test_file} slide {slide_idx}")
 
 
 def compute_ssim(img1: np.ndarray, img2: np.ndarray) -> float:

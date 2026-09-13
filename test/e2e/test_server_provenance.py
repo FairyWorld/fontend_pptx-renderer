@@ -3,15 +3,80 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import importlib.util
+import io
 from pathlib import Path
 
 import numpy as np
 import pytest
+from PIL import Image
 
 import server
 
 
 RUN_ALL_PATH = Path(__file__).resolve().parent / "scripts" / "run_all_shapes_eval.py"
+
+
+class _ScreenshotLocator:
+    @property
+    def first(self):
+        return self
+
+    async def count(self):
+        return 1
+
+    async def screenshot(self):
+        buffer = io.BytesIO()
+        Image.new("RGB", (4, 3), "white").save(buffer, format="PNG")
+        return buffer.getvalue()
+
+
+class _ScreenshotPage:
+    def __init__(self, render_error: str | None):
+        self.render_error = render_error
+        self.closed = False
+
+    def set_default_timeout(self, _timeout):
+        pass
+
+    async def goto(self, _url):
+        pass
+
+    async def wait_for_function(self, _expression, timeout):
+        assert timeout == server.PAGE_TIMEOUT_MS
+
+    async def evaluate(self, _expression):
+        return self.render_error
+
+    def locator(self, _selector):
+        return _ScreenshotLocator()
+
+    async def close(self):
+        self.closed = True
+
+
+class _ScreenshotContext:
+    def __init__(self, page: _ScreenshotPage):
+        self.page = page
+        self.closed = False
+
+    async def new_page(self):
+        return self.page
+
+    async def close(self):
+        self.closed = True
+
+
+class _ScreenshotBrowser:
+    def __init__(self, errors: list[str | None]):
+        self.contexts = [
+            _ScreenshotContext(_ScreenshotPage(render_error)) for render_error in errors
+        ]
+        self.created = 0
+
+    async def new_context(self, **_kwargs):
+        context = self.contexts[self.created]
+        self.created += 1
+        return context
 
 
 def test_render_artifacts_bind_reference_and_candidate_screenshots(tmp_path, monkeypatch):
@@ -36,6 +101,40 @@ def test_render_artifacts_bind_reference_and_candidate_screenshots(tmp_path, mon
             "sha256": hashlib.sha256(b"renderer").hexdigest(),
         },
     }
+
+
+def test_screenshot_retries_one_transient_visual_stability_timeout():
+    browser = _ScreenshotBrowser(
+        ["Visual output did not stabilize within 5000ms", None]
+    )
+
+    image = asyncio.run(server.screenshot_slide(browser, "sample", 0))
+
+    assert image.shape == (3, 4, 3)
+    assert browser.created == 2
+    assert all(context.closed and context.page.closed for context in browser.contexts)
+
+
+def test_screenshot_does_not_retry_other_render_errors():
+    browser = _ScreenshotBrowser(["broken formula"])
+
+    with pytest.raises(RuntimeError, match="broken formula"):
+        asyncio.run(server.screenshot_slide(browser, "sample", 0))
+
+    assert browser.created == 1
+    assert browser.contexts[0].closed is True
+    assert browser.contexts[0].page.closed is True
+
+
+def test_screenshot_still_fails_after_two_visual_stability_timeouts():
+    message = "Visual output did not stabilize within 5000ms"
+    browser = _ScreenshotBrowser([message, message])
+
+    with pytest.raises(RuntimeError, match="did not stabilize"):
+        asyncio.run(server.screenshot_slide(browser, "sample", 0))
+
+    assert browser.created == 2
+    assert all(context.closed and context.page.closed for context in browser.contexts)
 
 
 def _load_run_all_module():

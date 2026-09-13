@@ -48,6 +48,10 @@ check. Missing case sets, mismatched artifacts, and required local visual gates 
 repeatable `--case-report` set are reported explicitly instead of silently passing. Targeted Python
 commands run from `test/e2e`, where the suite's fixture and testdata paths are defined.
 
+The E2E API retries one screenshot in a fresh browser context only when the render page reports a
+visual-stability timeout. Other errors fail immediately, and a second stability timeout remains a
+runtime failure.
+
 The package commands use `scripts/run-python.mjs`, preferring `PYTHON`, then the platform-specific
 E2E virtual environment, then an installed Python 3 launcher. This keeps the same entry points
 usable on macOS, Linux, and Windows.
