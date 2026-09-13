@@ -158,3 +158,66 @@ for (const invert of [
     if (!invert.includes('val="0"')) expect(result.stroke).toBe('#000000');
   });
 }
+
+test('horizontal negative bars keep category labels outside the zero-crossing plot', async ({
+  page,
+}) => {
+  await page.goto('/test/browser/blank.html');
+  const result = await page.evaluate(async () => {
+    const { parseXml } = await import('/src/parser/XmlParser.ts');
+    const { parseChartXml } = await import('/src/renderer/ChartRenderer.ts');
+    const { echarts } = await import('/src/renderer/chart/echartsRuntime.ts');
+    const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
+    const xml = `<c:chartSpace
+      xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+      xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+      <c:chart><c:autoTitleDeleted val="1"/><c:plotArea>
+        <c:barChart><c:barDir val="bar"/><c:grouping val="clustered"/><c:varyColors val="0"/>
+          <c:ser><c:idx val="0"/><c:order val="0"/><c:invertIfNegative val="0"/>
+            <c:cat><c:strLit><c:ptCount val="2"/><c:pt idx="0"><c:v>Loss</c:v></c:pt><c:pt idx="1"><c:v>Gain</c:v></c:pt></c:strLit></c:cat>
+            <c:val><c:numLit><c:ptCount val="2"/><c:pt idx="0"><c:v>-3</c:v></c:pt><c:pt idx="1"><c:v>5</c:v></c:pt></c:numLit></c:val>
+          </c:ser><c:axId val="10"/><c:axId val="20"/>
+        </c:barChart>
+        <c:catAx><c:axId val="10"/><c:axPos val="l"/><c:tickLblPos val="nextTo"/><c:crossAx val="20"/><c:crosses val="autoZero"/></c:catAx>
+        <c:valAx><c:axId val="20"/><c:scaling><c:min val="-4"/><c:max val="6"/></c:scaling><c:axPos val="b"/><c:crossAx val="10"/><c:crosses val="autoZero"/></c:valAx>
+      </c:plotArea></c:chart>
+    </c:chartSpace>`;
+    const option = parseChartXml(parseXml(xml), createMockRenderContext(), undefined, {
+      w: 640,
+      h: 360,
+    }).option;
+    const host = document.createElement('div');
+    Object.assign(host.style, { width: '640px', height: '360px' });
+    document.body.append(host);
+    const chart = echarts.init(host, undefined, { renderer: 'canvas' });
+    chart.setOption({ ...option, animation: false });
+    chart.getZr().flush();
+    const grid = (chart.getModel().getComponent('grid', 0) as any).coordinateSystem.getRect();
+    const zeroX = chart.convertToPixel({ xAxisIndex: 0 }, 0) as number;
+    const labels = chart
+      .getZr()
+      .storage.getDisplayList()
+      .filter((element: any) => ['Loss', 'Gain'].includes(String(element.style?.text ?? '')))
+      .map((element: any) => {
+        const rect = element.getPaintRect();
+        return { left: rect.x, right: rect.x + rect.width };
+      });
+    chart.dispose();
+    return {
+      gridLeft: grid.x,
+      zeroX,
+      labels,
+      configuredMargin: (option.yAxis as any).axisLabel?.margin,
+    };
+  });
+
+  expect(result.labels).toHaveLength(2);
+  // ECharts paints the glyph box a few pixels beyond the grid edge. The
+  // labels must remain by that edge, with a clear gap to the interior zero axis.
+  expect(Math.max(...result.labels.map((label) => label.right))).toBeLessThanOrEqual(
+    result.gridLeft + 8,
+  );
+  expect(Math.max(...result.labels.map((label) => label.right))).toBeLessThan(result.zeroX - 40);
+  expect(result.zeroX).toBeGreaterThan(result.gridLeft + 40);
+  expect(result.configuredMargin).toBeUndefined();
+});

@@ -7330,6 +7330,26 @@ describe('ChartRenderer', () => {
       expect((option.grid as any).containLabel).toBe(false);
     });
 
+    it('keeps horizontal-bar category labels at the plot edge when the value axis crosses zero', () => {
+      const option: echarts.EChartsOption = {
+        grid: { left: 48, right: 12, top: 12, bottom: 24 },
+        xAxis: { type: 'value', min: -20, max: 80 },
+        yAxis: {
+          type: 'category',
+          axisLine: { onZero: true },
+          axisLabel: { fontSize: 12 },
+          data: ['Loss', 'Gain'],
+        },
+        series: [{ type: 'bar', data: [-20, 80] }],
+      };
+
+      applyZeroCrossingAxisLabelLayout(option, { w: 400, h: 300 });
+
+      expect((option.yAxis as any).axisLabel.margin).toBeUndefined();
+      expect((option.grid as any).containLabel).toBeUndefined();
+      expect((option.grid as any).left).toBe(48);
+    });
+
     it('does not apply zero-crossing layout to non-crossing or zero-span axes', () => {
       const nonCrossing: echarts.EChartsOption = {
         grid: { top: 'bad', bottom: 'bad' },

@@ -2316,15 +2316,15 @@ export function applyZeroCrossingAxisLabelLayout(
     option.yAxis as MutableAxisOption | MutableAxisOption[],
   );
   const gridHeight = plotSpanPx(grid, chartSize.h, 'top', 'bottom');
-  const gridWidth = plotSpanPx(grid, chartSize.w, 'left', 'right');
   let applied = false;
 
   xAxes.forEach((xAxis, index) => {
     applied = applyCategoryLabelZeroOffset(xAxis, yAxes[index] ?? yAxes[0], gridHeight) || applied;
   });
-  yAxes.forEach((yAxis, index) => {
-    applied = applyCategoryLabelZeroOffset(yAxis, xAxes[index] ?? xAxes[0], gridWidth) || applied;
-  });
+
+  // ECharts keeps horizontal-bar category labels at the plot edge even when
+  // their y-axis line crosses zero. Applying the x-axis compensation here
+  // would move those labels into negative bars and their data labels.
 
   if (applied && grid) {
     grid.containLabel = false;

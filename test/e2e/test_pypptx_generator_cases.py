@@ -108,10 +108,11 @@ def test_cjk_text_layout_matrix_is_registered():
         "oracle-pypptx-text-0057-defrpr-scheme-over-fontref-wide",
         "oracle-pypptx-text-0058-run-color-over-defrpr-tall",
         "oracle-pypptx-text-0059-fontref-fallback-no-defrpr",
+        "oracle-pypptx-text-0060-styled-soft-break-matrix",
     }
 
     assert expected_names.issubset(text_names)
-    assert len(text_names) == 60
+    assert len(text_names) == 61
 
 
 def test_cjk_text_layout_matrix_serializes_autofit_and_spacing_ooxml(tmp_path: Path):
@@ -272,6 +273,78 @@ def test_defrpr_color_precedence_matrix_serializes_exact_ooxml(tmp_path: Path):
     )
     assert not inverse.xpath(".//a:pPr/a:defRPr/a:solidFill", namespaces=ns)
     assert not inverse.xpath(".//a:r/a:rPr/a:solidFill", namespaces=ns)
+
+
+def test_styled_soft_break_case_serializes_break_and_visible_run_properties(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-text-0060-styled-soft-break-matrix"
+    )
+    pptx_path = tmp_path / "source.pptx"
+
+    generator._generate_pptx(case, pptx_path)
+
+    ns = {
+        "p": "http://schemas.openxmlformats.org/presentationml/2006/main",
+        "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    }
+    with ZipFile(pptx_path) as zf:
+        root = etree.fromstring(zf.read("ppt/slides/slide1.xml"))
+
+    paragraphs = root.xpath(".//p:sp/p:txBody/a:p", namespaces=ns)
+    assert len(paragraphs) == 2
+    for paragraph in paragraphs:
+        assert paragraph.xpath(
+            "boolean(./a:br/a:rPr[@sz='3000']/a:latin[@typeface='Arial'])",
+            namespaces=ns,
+        )
+        assert paragraph.xpath(
+            "boolean(./a:r/a:rPr[@sz='1000']/a:latin[@typeface='Courier New'])",
+            namespaces=ns,
+        )
+    assert paragraphs[1].xpath(
+        "boolean(./a:pPr/a:buChar[@char='•'])",
+        namespaces=ns,
+    )
+    assert paragraphs[1].xpath(
+        "boolean(./a:br/a:rPr/a:solidFill/a:srgbClr[@val='C00000'])",
+        namespaces=ns,
+    )
+    assert paragraphs[1].xpath(
+        "boolean(./a:r/a:rPr/a:solidFill/a:srgbClr[@val='0070C0'])",
+        namespaces=ns,
+    )
+
+
+def test_horizontal_negative_literal_chart_case_serializes_target_matrix(tmp_path: Path):
+    generator = _load_generator_module()
+    case = next(
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"] == "oracle-pypptx-chart-0022-bar-negative-literal-zero-crossing"
+    )
+    pptx_path = tmp_path / "source.pptx"
+
+    generator._generate_pptx(case, pptx_path)
+
+    ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart"}
+    with ZipFile(pptx_path) as zf:
+        chart_part = next(name for name in zf.namelist() if name.startswith("ppt/charts/chart"))
+        root = etree.fromstring(zf.read(chart_part))
+
+    assert root.xpath("boolean(.//c:barChart/c:barDir[@val='bar'])", namespaces=ns)
+    assert root.xpath("boolean(.//c:ser/c:cat/c:strLit)", namespaces=ns)
+    assert root.xpath("boolean(.//c:ser/c:val/c:numLit)", namespaces=ns)
+    assert not root.xpath(".//c:ser/c:cat/c:strRef", namespaces=ns)
+    assert not root.xpath(".//c:ser/c:val/c:numRef", namespaces=ns)
+    assert root.xpath(
+        "boolean(.//c:ser/c:invertIfNegative[@val='0'])",
+        namespaces=ns,
+    )
+    assert float(root.xpath("string(.//c:valAx/c:scaling/c:min/@val)", namespaces=ns)) == -4
+    assert float(root.xpath("string(.//c:valAx/c:scaling/c:max/@val)", namespaces=ns)) == 6
 
 
 def test_case_pattern_selection_supports_exact_and_glob_filters():

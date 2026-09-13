@@ -2204,6 +2204,79 @@ describe('TextRenderer — renderTextBody', () => {
   });
 
   describe('endParaRPr trailing line height', () => {
+    it('preserves soft-break run metrics without replacing the visible paragraph strut', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode(
+              '<pPr><lnSpc><spcPct val="100000"/></lnSpc></pPr>',
+            ),
+            runs: [
+              {
+                text: '\n',
+                properties: xmlNode(
+                  '<rPr sz="3000"><latin typeface="Arial"/></rPr>',
+                ),
+              },
+              {
+                text: 'Visible',
+                properties: xmlNode(
+                  '<rPr sz="1000"><latin typeface="Courier New"/></rPr>',
+                ),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const container = renderToContainer(body);
+      const paragraph = container.firstElementChild as HTMLElement;
+      const breakElement = paragraph.querySelector('br')?.parentElement as HTMLElement | null;
+
+      expect(paragraph.style.fontSize).toBe('10pt');
+      expect(breakElement?.tagName).toBe('SPAN');
+      expect(breakElement?.style.fontSize).toBe('30pt');
+      expect(breakElement?.style.fontFamily).toContain('Arial');
+      expect(
+        Array.from(paragraph.querySelectorAll('span')).find(
+          (element) => element.textContent === 'Visible',
+        )?.style.fontFamily,
+      ).toContain('Courier New');
+    });
+
+    it('ignores a leading soft break when resolving bullet color from visible text', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            properties: xmlNode('<pPr><buChar char="•"/></pPr>'),
+            runs: [
+              {
+                text: '\n',
+                properties: xmlNode(
+                  '<rPr><solidFill><srgbClr val="FF0000"/></solidFill></rPr>',
+                ),
+              },
+              {
+                text: 'Visible',
+                properties: xmlNode(
+                  '<rPr><solidFill><srgbClr val="0000FF"/></solidFill></rPr>',
+                ),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+
+      const container = renderToContainer(body);
+      const bullet = Array.from(container.querySelectorAll('span')).find((element) =>
+        element.textContent?.startsWith('•'),
+      );
+
+      expect(bullet?.style.color).toBe('rgb(0, 0, 255)');
+    });
+
     it('trailing <br> before endParaRPr at 72pt creates a line with matching font size', () => {
       // Simulates: "Hello" + <br/> + endParaRPr sz=7200 (72pt)
       // The trailing <br> should produce a line whose height matches 72pt

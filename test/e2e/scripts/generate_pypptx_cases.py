@@ -1163,6 +1163,56 @@ def _build_text_cases() -> list[CaseDef]:
         ),
     )
 
+    def _build_styled_soft_break_matrix(prs):
+        _, _, text_frame = _add_cjk_textbox(
+            prs,
+            width=9.5,
+            height=5.0,
+            left=1.8,
+            top=1.1,
+        )
+        _configure_text_body(text_frame, wrap="square", autofit="noAutofit", anchor="t")
+
+        for index, paragraph in enumerate(
+            (text_frame.paragraphs[0], text_frame.add_paragraph())
+        ):
+            paragraph._p.remove(paragraph._p.get_or_add_endParaRPr())
+            p_pr = paragraph._p.get_or_add_pPr()
+            line_spacing = etree.SubElement(p_pr, qn("a:lnSpc"))
+            etree.SubElement(line_spacing, qn("a:spcPct"), val="100000")
+            if index == 1:
+                etree.SubElement(p_pr, qn("a:buChar"), char="•")
+
+            line_break = etree.SubElement(paragraph._p, qn("a:br"))
+            break_props = etree.SubElement(line_break, qn("a:rPr"), sz="3000", lang="en-US")
+            if index == 1:
+                _replace_text_solid_fill(break_props, "srgbClr", "C00000")
+            etree.SubElement(break_props, qn("a:latin"), typeface="Arial")
+
+            run = paragraph.add_run()
+            run.text = "Visible 10pt text after a 30pt styled soft break"
+            run.font.name = "Courier New"
+            run.font.size = Pt(10)
+            run_props = run._r.get_or_add_rPr()
+            run_props.set("lang", "en-US")
+            if index == 1:
+                _replace_text_solid_fill(run_props, "srgbClr", "0070C0")
+
+    _add(
+        "styled-soft-break-matrix",
+        _build_styled_soft_break_matrix,
+        coverage={
+            "oracle": "native-powerpoint",
+            "features": [
+                "text.soft-break.rPr",
+                "text.soft-break.font-size",
+                "text.soft-break.font-family",
+                "text.bullet.color-from-visible-run",
+                "paragraph.line-spacing.spcPct=100000",
+            ],
+        },
+    )
+
     return cases
 
 
@@ -4349,17 +4399,66 @@ def _build_composite_cases() -> list[CaseDef]:
 # P4: Chart data variants (2D types only — ECharts renderable)
 # ---------------------------------------------------------------------------
 
+
+def _patch_horizontal_negative_literal_chart_case(pptx_path: Path) -> None:
+    """Replace chart references with literals and keep negative inversion explicitly disabled."""
+    entries, data_by_name = _read_pptx_entries(pptx_path)
+    chart_parts = sorted(name for name in data_by_name if name.startswith("ppt/charts/chart"))
+    if len(chart_parts) != 1:
+        raise RuntimeError(f"expected one chart part, found {len(chart_parts)}")
+
+    chart_part = chart_parts[0]
+    root = etree.fromstring(data_by_name[chart_part])
+    ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart"}
+    series = root.xpath(".//c:barChart/c:ser", namespaces=ns)
+    if len(series) != 1:
+        raise RuntimeError(f"expected one bar series, found {len(series)}")
+
+    ser = series[0]
+    for container_name, ref_name, cache_name, literal_name in (
+        ("cat", "strRef", "strCache", "strLit"),
+        ("val", "numRef", "numCache", "numLit"),
+    ):
+        container = ser.find(qn(f"c:{container_name}"))
+        reference = container.find(qn(f"c:{ref_name}")) if container is not None else None
+        cache = reference.find(qn(f"c:{cache_name}")) if reference is not None else None
+        if container is None or reference is None or cache is None:
+            raise RuntimeError(f"missing c:{container_name}/c:{ref_name}/c:{cache_name}")
+        literal = etree.Element(qn(f"c:{literal_name}"))
+        for child in list(cache):
+            cache.remove(child)
+            literal.append(child)
+        container.replace(reference, literal)
+
+    existing_invert = ser.find(qn("c:invertIfNegative"))
+    if existing_invert is not None:
+        ser.remove(existing_invert)
+    invert = etree.Element(qn("c:invertIfNegative"), val="0")
+    category = ser.find(qn("c:cat"))
+    ser.insert(ser.index(category) if category is not None else len(ser), invert)
+
+    _replace_pptx_entries(
+        pptx_path,
+        entries,
+        {chart_part: etree.tostring(root, encoding="UTF-8", xml_declaration=True)},
+    )
+
 def _build_chart_cases() -> list[CaseDef]:
     cases: list[CaseDef] = []
     seq = 0
 
-    def _add(slug: str, build_fn):
+    def _add(slug: str, build_fn, postprocess_fn=None, coverage=None):
         nonlocal seq
         seq += 1
-        cases.append({
+        case = {
             "name": f"oracle-pypptx-chart-{seq:04d}-{slug}",
             "build_fn": build_fn,
-        })
+        }
+        if postprocess_fn is not None:
+            case["postprocess_fn"] = postprocess_fn
+        if coverage is not None:
+            case["coverage"] = coverage
+        cases.append(case)
 
     # --- Column/Bar variants ---
     def _build_col_multi_series(prs):
@@ -4567,6 +4666,40 @@ def _build_chart_cases() -> list[CaseDef]:
         cd.add_series("Monthly Trend", vals)
         sld.shapes.add_chart(XL_CHART_TYPE.LINE_MARKERS, _emu(0.5), _emu(0.5), _emu(11), _emu(6), cd)
     _add("line-24-month-trend", _build_line_large)
+
+    def _build_bar_negative_literal(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        data = CategoryChartData()
+        data.categories = ["Loss", "Gain"]
+        data.add_series("Result", (-3, 5))
+        chart = slide.shapes.add_chart(
+            XL_CHART_TYPE.BAR_CLUSTERED,
+            _emu(1),
+            _emu(0.5),
+            _emu(10),
+            _emu(6),
+            data,
+        ).chart
+        chart.has_legend = False
+        chart.value_axis.minimum_scale = -4
+        chart.value_axis.maximum_scale = 6
+
+    _add(
+        "bar-negative-literal-zero-crossing",
+        _build_bar_negative_literal,
+        _patch_horizontal_negative_literal_chart_case,
+        coverage={
+            "oracle": "native-powerpoint",
+            "features": [
+                "chart.bar.horizontal",
+                "chart.series.strLit",
+                "chart.series.numLit",
+                "chart.invertIfNegative=false",
+                "chart.value-axis.crosses-zero",
+                "chart.category-labels.plot-edge",
+            ],
+        },
+    )
 
     return cases
 
