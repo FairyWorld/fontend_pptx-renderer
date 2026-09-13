@@ -53,9 +53,13 @@ work packet records the override instead of silently hiding the global ordering.
 `affectedPaths` hints to select affected capabilities, de-duplicates their tracked unit and Python
 tests, and reports the native case set from the latest historical record. It deliberately defers
 browser and native runs for targeted plans so they execute once at pre-commit or pre-merge rather
-than after every edit. Markdown-only changes run formatting plus documentation and distribution
-contract tests without invalidating the fast visual plan. Unclassified non-documentation paths
-fail closed to the full TypeScript, Python, typecheck, and browser plan. Registry or unclassified
+than after every edit. Direct unit, Python, and browser test edits run their own gate without
+expanding the production native scope; the shared python-pptx generator runs its focused generator
+suite, while changed tracked case definitions still select their declared capability. Markdown-only
+changes run formatting plus documentation and distribution contract tests. A `package.json` change
+that modifies only the version runs build, package, publint, and size gates without invalidating
+native evidence; any other package change remains global. Unclassified non-documentation paths fail
+closed to the full TypeScript, Python, typecheck, and browser plan. Registry or unclassified
 global runtime/control changes also retain every registered capability's native and local gates;
 shared evaluation, provenance, evidence, and loop-control changes additionally run
 `capability:check`. Local case artifacts must match the recorded source and selected

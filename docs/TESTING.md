@@ -32,10 +32,14 @@ The planner maps changed files through exact or declared-glob `affectedPaths` in
 `capabilities.json`, de-duplicates their unit and Python tests, and lists the native PowerPoint case
 IDs recorded by the latest historical verification records. A targeted run executes only those
 unit/Python checks plus TypeScript type checking when runtime TypeScript changed. Browser checks
-and native rendering stay visible as deferred pre-commit and pre-merge gates. Documentation-only
-changes run formatting plus all known documentation and distribution contract tests and do not
-request a visual rerender. Any unclassified non-documentation path fails closed to the full
-TypeScript, Python, typecheck, and browser plan. A capability-registry or unclassified global
+and native rendering stay visible as deferred pre-commit and pre-merge gates. Direct unit, Python,
+and browser test edits run their own gate without expanding the production native scope; the shared
+python-pptx generator runs its focused suite, while changed tracked case definitions still select
+their declared capability. Documentation-only changes run formatting plus documentation and
+distribution contract tests. A `package.json` change that modifies only the version runs build,
+package, publint, and size gates without requesting native rerenders; any other package change
+remains global. Any unclassified non-documentation path fails closed to the full TypeScript,
+Python, typecheck, and browser plan. A capability-registry or unclassified global
 runtime/control change expands the native scope to every registered capability. Shared evaluation,
 provenance, evidence, and capability-loop control changes do the same and add `capability:check`.
 Native artifacts count as available only when their source and selected ground-truth SHA-256 values

@@ -7,6 +7,7 @@ from pathlib import Path
 from oracle.verification_impact import build_verification_plan
 from scripts.verify_affected import (
     _discover_changed_paths,
+    _is_release_metadata_package_change,
     _native_case_hashes,
     _run_commands,
 )
@@ -335,6 +336,108 @@ def test_global_control_change_is_full_even_if_a_capability_claims_the_path():
     assert _cmd(
         "python-for-test", "-m", "pytest", ".", "-q", cwd="test/e2e"
     ) in plan["commands"]
+
+
+def test_version_only_package_change_uses_package_gates_without_native_expansion():
+    plan = build_verification_plan(
+        changed_paths=["package.json"],
+        release_metadata_paths=["package.json"],
+        capabilities=[
+            _capability(
+                "capability.a",
+                affected_paths=["package.json"],
+                required_gates=["native-powerpoint"],
+            )
+        ],
+        latest_case_ids={"capability.a": ["case-a"]},
+    )
+
+    assert plan["mode"] == "release-metadata"
+    assert plan["releaseMetadataPaths"] == ["package.json"]
+    assert plan["impactedCapabilityIds"] == []
+    assert plan["nativeCaseIds"] == []
+    assert plan["requiresNative"] is False
+    assert plan["commands"] == [
+        _cmd("pnpm", "exec", "prettier", "--check", "package.json"),
+        _cmd("pnpm", "build"),
+        _cmd("pnpm", "test:package"),
+        _cmd("pnpm", "publint"),
+        _cmd("pnpm", "size"),
+    ]
+
+
+def test_browser_test_change_requires_browser_without_expanding_native_scope():
+    plan = build_verification_plan(
+        changed_paths=["test/browser/rendering-coverage.spec.ts"],
+        capabilities=[
+            _capability(
+                "capability.a",
+                affected_paths=["test/browser/rendering-coverage.spec.ts"],
+                required_gates=["browser", "native-powerpoint"],
+            ),
+            _capability(
+                "capability.b",
+                affected_paths=["test/browser/rendering-coverage.spec.ts"],
+                required_gates=["browser", "native-powerpoint"],
+            ),
+        ],
+        latest_case_ids={"capability.a": ["case-a"], "capability.b": ["case-b"]},
+    )
+
+    assert plan["mode"] == "targeted"
+    assert plan["impactedCapabilityIds"] == []
+    assert plan["requiresBrowser"] is True
+    assert plan["requiresNative"] is False
+    assert plan["nativeCaseIds"] == []
+    assert plan["unclassifiedPaths"] == []
+
+
+def test_shared_case_generator_runs_its_test_without_expanding_every_capability():
+    plan = build_verification_plan(
+        changed_paths=["test/e2e/scripts/generate_pypptx_cases.py"],
+        capabilities=[
+            _capability(
+                "capability.a",
+                affected_paths=["test/e2e/scripts/generate_pypptx_cases.py"],
+                required_gates=["native-powerpoint"],
+            ),
+            _capability(
+                "capability.b",
+                affected_paths=["test/e2e/scripts/generate_pypptx_cases.py"],
+                required_gates=["native-powerpoint"],
+            ),
+        ],
+        latest_case_ids={"capability.a": ["case-a"], "capability.b": ["case-b"]},
+        repository_paths=["test/e2e/test_pypptx_generator_cases.py"],
+        python_executable="python-for-test",
+    )
+
+    assert plan["mode"] == "targeted"
+    assert plan["impactedCapabilityIds"] == []
+    assert plan["pythonTestPaths"] == ["test/e2e/test_pypptx_generator_cases.py"]
+    assert plan["nativeCaseIds"] == []
+    assert plan["commands"] == [
+        _cmd(
+            "python-for-test",
+            "-m",
+            "pytest",
+            "test_pypptx_generator_cases.py",
+            "-q",
+            cwd="test/e2e",
+        )
+    ]
+
+
+def test_package_release_metadata_classifier_rejects_dependency_or_script_changes():
+    before = b'{"name":"pkg","version":"1.2.4","knip":{"ignoreBinaries":["python3"]},"dependencies":{"a":"1"}}\n'
+    version_only = b'{"name":"pkg","version":"1.3.0","dependencies":{"a":"1"}}\n'
+    dependency_change = b'{"name":"pkg","version":"1.3.0","dependencies":{"a":"2"}}\n'
+    script_change = b'{"name":"pkg","version":"1.3.0","dependencies":{"a":"1"},"scripts":{"test":"false"}}\n'
+
+    assert _is_release_metadata_package_change(before, version_only) is True
+    assert _is_release_metadata_package_change(before, dependency_change) is False
+    assert _is_release_metadata_package_change(before, script_change) is False
+    assert _is_release_metadata_package_change(before, before) is False
 
 
 def test_full_mode_preserves_and_expands_native_and_local_obligations_for_global_runtime_changes():

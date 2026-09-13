@@ -52,6 +52,85 @@ def _git_paths(repo: Path, args: Sequence[str]) -> list[str]:
     ]
 
 
+def _git_blob(repo: Path, revision: str, path: str) -> bytes | None:
+    result = subprocess.run(
+        ["git", "show", f"{revision}:{path}"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def _is_release_metadata_package_change(before: bytes, after: bytes) -> bool:
+    try:
+        before_payload = json.loads(before)
+        after_payload = json.loads(after)
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return False
+    if not isinstance(before_payload, dict) or not isinstance(after_payload, dict):
+        return False
+    changed_keys = {
+        key
+        for key in set(before_payload).union(after_payload)
+        if before_payload.get(key) != after_payload.get(key)
+    }
+    before_version = before_payload.get("version")
+    after_version = after_payload.get("version")
+    return (
+        isinstance(before_version, str)
+        and isinstance(after_version, str)
+        and before_version != after_version
+        and changed_keys.issubset({"version", "knip"})
+    )
+
+
+def _detect_release_metadata_paths(
+    repo: Path,
+    base: str | None,
+    head: str,
+    changed_paths: Sequence[str],
+) -> list[str]:
+    if "package.json" not in changed_paths:
+        return []
+
+    if base:
+        merge_base = subprocess.run(
+            ["git", "merge-base", base, head],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if merge_base.returncode != 0 or not merge_base.stdout.strip():
+            return []
+        before = _git_blob(repo, merge_base.stdout.strip(), "package.json")
+        after = _git_blob(repo, head, "package.json")
+    else:
+        working_change = subprocess.run(
+            ["git", "status", "--porcelain", "--", "package.json"],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if working_change.returncode != 0:
+            return []
+        if working_change.stdout.strip():
+            before = _git_blob(repo, head, "package.json")
+            try:
+                after = (repo / "package.json").read_bytes()
+            except OSError:
+                return []
+        else:
+            before = _git_blob(repo, f"{head}^", "package.json")
+            after = _git_blob(repo, head, "package.json")
+
+    if before is None or after is None:
+        return []
+    return ["package.json"] if _is_release_metadata_package_change(before, after) else []
+
+
 def _discover_changed_paths(repo: Path, base: str | None, head: str) -> list[str]:
     if base:
         return _git_paths(
@@ -258,6 +337,11 @@ def _summary(plan: dict[str, object]) -> None:
     print(f"Impacted capabilities: {len(impacted)}")
     for capability_id in impacted:
         print(f"  - {capability_id}")
+    release_metadata = plan["releaseMetadataPaths"]
+    if release_metadata:
+        print("Release metadata paths:")
+        for path in release_metadata:
+            print(f"  - {path}")
     print(f"Planned commands: {len(plan['commands'])}")
     for command in plan["commands"]:
         print(f"  $ {_format_command(command)}")
@@ -339,6 +423,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         E2E_DIR / "oracle" / "capability-acceptance.json"
     )
     changed_paths = args.changed_path or _discover_changed_paths(PROJECT_ROOT, args.base, args.head)
+    release_metadata_paths = (
+        []
+        if args.changed_path
+        else _detect_release_metadata_paths(
+            PROJECT_ROOT,
+            args.base,
+            args.head,
+            changed_paths,
+        )
+    )
     case_reports: dict[str, str] = {}
     for case_report_value in args.case_report:
         report_path = Path(case_report_value)
@@ -368,6 +462,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "latest_case_hashes": latest_case_hashes,
         "case_reports": case_reports,
         "python_executable": sys.executable,
+        "release_metadata_paths": release_metadata_paths,
     }
     plan = build_verification_plan(
         **plan_arguments,

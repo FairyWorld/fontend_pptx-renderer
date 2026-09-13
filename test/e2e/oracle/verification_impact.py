@@ -25,6 +25,7 @@ LOCAL_GATE_SCRIPTS = {
 SELF_TEST_MAP = {
     "test/e2e/oracle/verification_impact.py": "test/e2e/test_verification_impact.py",
     "test/e2e/scripts/verify_affected.py": "test/e2e/test_verification_impact.py",
+    "test/e2e/scripts/generate_pypptx_cases.py": "test/e2e/test_pypptx_generator_cases.py",
 }
 DOCUMENTATION_CONTRACT_TESTS = frozenset(
     {"test/unit/build/browserDistribution.test.ts"}
@@ -107,6 +108,10 @@ def _is_unit_test(path: str) -> bool:
 
 def _is_python_test(path: str) -> bool:
     return path.startswith("test/e2e/test_") and path.endswith(".py")
+
+
+def _is_browser_test(path: str) -> bool:
+    return path.startswith("test/browser/") and path.endswith((".test.ts", ".spec.ts"))
 
 
 def _is_documentation_contract_test(path: str) -> bool:
@@ -192,6 +197,7 @@ def build_verification_plan(
     available_native_case_hashes: Mapping[str, Any] | None = None,
     case_reports: Mapping[str, str] | None = None,
     python_executable: str | None = None,
+    release_metadata_paths: Iterable[str] = (),
 ) -> dict[str, Any]:
     """Build a fail-closed verification plan for the current change.
 
@@ -200,6 +206,13 @@ def build_verification_plan(
     """
 
     changed = _normalized_paths(changed_paths)
+    release_metadata = _normalized_paths(release_metadata_paths)
+    unknown_release_metadata = sorted(set(release_metadata).difference(changed))
+    if unknown_release_metadata:
+        raise ValueError(
+            "release metadata must also be a changed path: "
+            + ", ".join(unknown_release_metadata)
+        )
     available_paths = _normalized_paths(repository_paths)
     python_command = python_executable or sys.executable
     available_native_cases = (
@@ -214,6 +227,7 @@ def build_verification_plan(
             "mode": mode,
             "fullReason": None,
             "changedPaths": changed,
+            "releaseMetadataPaths": release_metadata,
             "impactedCapabilityIds": [],
             "unitTestPaths": [],
             "pythonTestPaths": [],
@@ -250,13 +264,41 @@ def build_verification_plan(
             documentation_commands.append(
                 _command("pnpm", "exec", "vitest", "run", *documentation_tests)
             )
-    behavior_changes = [path for path in changed if not _is_documentation(path)]
+
+    release_commands: list[dict[str, Any]] = []
+    if release_metadata:
+        release_commands = [
+            _command("pnpm", "exec", "prettier", "--check", *release_metadata),
+            _command("pnpm", "build"),
+            _command("pnpm", "test:package"),
+            _command("pnpm", "publint"),
+            _command("pnpm", "size"),
+        ]
+
+    behavior_changes = [
+        path
+        for path in changed
+        if not _is_documentation(path) and path not in release_metadata
+    ]
     if not behavior_changes:
-        plan = empty_plan("docs-only", commands=documentation_commands)
+        mode = "release-metadata" if release_metadata else "docs-only"
+        plan = empty_plan(mode, commands=[*documentation_commands, *release_commands])
         plan["unitTestPaths"] = documentation_tests
-        plan["requiredGates"] = ["docs"]
+        if documentation_paths:
+            plan["requiredGates"].append("docs")
+        if release_metadata:
+            plan["requiredGates"].append("package")
         return plan
 
+    direct_tests = {
+        path
+        for path in behavior_changes
+        if _is_unit_test(path) or _is_python_test(path) or _is_browser_test(path)
+    }
+    self_test_sources = set(SELF_TEST_MAP).intersection(behavior_changes)
+    capability_signal_paths = set(behavior_changes).difference(
+        direct_tests, self_test_sources
+    )
     claimed_paths: set[str] = set()
     impacted: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
     behavior_set = set(behavior_changes)
@@ -264,7 +306,7 @@ def build_verification_plan(
         _, affected_paths, _ = fields
         matching_paths = {
             changed_path
-            for changed_path in behavior_set
+            for changed_path in capability_signal_paths
             if any(
                 fnmatch.fnmatchcase(changed_path, affected_path)
                 for affected_path in affected_paths
@@ -274,10 +316,6 @@ def build_verification_plan(
             impacted.append(fields)
             claimed_paths.update(matching_paths)
 
-    direct_tests = {
-        path for path in behavior_changes if _is_unit_test(path) or _is_python_test(path)
-    }
-    self_test_sources = set(SELF_TEST_MAP).intersection(behavior_changes)
     self_tests = {SELF_TEST_MAP[path] for path in self_test_sources}
     classified_paths = claimed_paths | direct_tests | self_test_sources
     unclassified = sorted(path for path in behavior_changes if path not in classified_paths)
@@ -348,6 +386,8 @@ def build_verification_plan(
         }
     )
     required_gates = sorted({gate for _, _, gates in impacted for gate in gates})
+    if any(_is_browser_test(path) for path in direct_tests):
+        required_gates = sorted(set(required_gates).union({"browser"}))
     if force_full:
         required_gates = sorted(
             set(required_gates).union({"unit", "regression", "typecheck", "browser"})
@@ -458,6 +498,7 @@ def build_verification_plan(
             ),
             _command("pnpm", "typecheck"),
             _command("pnpm", "test:browser"),
+            *release_commands,
         ]
         if registry_changed or acceptance_changed or evidence_control_changed:
             commands.append(_command("pnpm", "capability:check"))
@@ -472,6 +513,7 @@ def build_verification_plan(
                 changed_paths=behavior_changes,
                 python_executable=python_command,
             ),
+            *release_commands,
         ]
         mode = "targeted"
         requires_browser = "browser" in required_gates
@@ -487,6 +529,7 @@ def build_verification_plan(
         "mode": mode,
         "fullReason": full_reason,
         "changedPaths": changed,
+        "releaseMetadataPaths": release_metadata,
         "impactedCapabilityIds": impacted_ids,
         "unitTestPaths": sorted(set(unit_tests).union(documentation_tests)),
         "pythonTestPaths": ["test/e2e"] if force_full else python_tests,
