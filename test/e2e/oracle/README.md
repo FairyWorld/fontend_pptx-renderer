@@ -51,11 +51,12 @@ When a committed goal deliberately selects a lower-ranked cohort, pass `--select
 work packet records the override instead of silently hiding the global ordering.
 
 `verify_affected.py` is the fast development-loop entry point. It uses exact or declared-glob
-`implementationPaths` matches to select affected capabilities, de-duplicates their tracked unit
+`implementationPaths` and `verificationPaths` matches to select affected capabilities, de-duplicates their tracked unit
 and Python tests, and reports the native case set from the latest receipt. It deliberately defers
 browser and native runs for targeted plans so they execute once at pre-commit or pre-merge rather
-than after every edit. Markdown-only changes run formatting plus documentation and distribution
-contract tests without invalidating the fast visual plan. Unclassified non-documentation paths
+than after every edit. Markdown paths are excluded from both content fingerprints; Markdown-only
+changes run formatting plus documentation and distribution contract tests without invalidating the
+fast visual plan. Unclassified non-documentation paths
 fail closed to the full TypeScript, Python, typecheck, and browser plan. Registry or unclassified
 global runtime/control changes also retain every registered capability's native and local gates;
 shared evaluation, provenance, evidence, and loop-control changes additionally run

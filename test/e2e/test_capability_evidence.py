@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -9,8 +10,12 @@ from oracle.capability_contract import (
     load_capability_registry,
 )
 from oracle.capability_evidence import (
+    CapabilityEvidenceError,
     build_promotion_receipt,
     compute_implementation_fingerprint,
+    compute_implementation_fingerprint_at_revision,
+    compute_verification_fingerprint,
+    compute_verification_fingerprint_at_revision,
     evaluate_evidence_state,
     sanitize_receipt_for_tracking,
 )
@@ -31,7 +36,7 @@ def build_repo_fixture(tmp_path: Path, files: dict[str, str]) -> Path:
 
 def load_capability(tmp_path: Path):
     payload = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "capabilities": [
             {
                 "id": "drawingml.shape.geometry.rect",
@@ -41,8 +46,8 @@ def load_capability(tmp_path: Path):
                 "selectors": [],
                 "scope": {"presets": ["rect"]},
                 "fallback": "none",
-                "implementationPaths": [
-                    "src/renderer/ShapeRenderer.ts",
+                "implementationPaths": ["src/renderer/ShapeRenderer.ts"],
+                "verificationPaths": [
                     "test/unit/renderer/ShapeRenderer.test.ts",
                 ],
                 "requiredGates": [
@@ -63,15 +68,20 @@ def load_capability(tmp_path: Path):
     return load_capability_registry(path).capabilities[0]
 
 
-def fresh_native_report(capability, implementation_fingerprint: str) -> dict:
+def fresh_native_report(
+    capability,
+    implementation_fingerprint: str,
+    verification_fingerprint: str,
+) -> dict:
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "capabilityId": capability.id,
         "definitionFingerprint": capability_definition_fingerprint(capability),
         "renderer": {
             "revision": "a" * 40,
             "dirty": False,
             "implementationFingerprint": implementation_fingerprint,
+            "verificationFingerprint": verification_fingerprint,
         },
         "environment": {
             "oracle": "powerpoint-macos",
@@ -93,12 +103,17 @@ def fresh_native_report(capability, implementation_fingerprint: str) -> dict:
     }
 
 
-def accepted_receipt(capability, implementation_fingerprint: str) -> PromotionReceipt:
+def accepted_receipt(
+    capability,
+    implementation_fingerprint: str,
+    verification_fingerprint: str,
+) -> PromotionReceipt:
     return PromotionReceipt(
         capability_id=capability.id,
         definition_fingerprint=capability_definition_fingerprint(capability),
         accepted_revision="a" * 40,
         implementation_fingerprint=implementation_fingerprint,
+        verification_fingerprint=verification_fingerprint,
         case_ids=("oracle-shape-0001",),
         case_input_fingerprints=(SOURCE_HASH,),
         ground_truth_fingerprints=(GROUND_TRUTH_HASH,),
@@ -119,17 +134,22 @@ def evidence_fixture(tmp_path: Path):
             "docs/README.md": "unrelated",
         },
     )
-    fingerprint = compute_implementation_fingerprint(repo, capability.implementation_paths)
-    return capability, repo, fingerprint
+    implementation_fingerprint = compute_implementation_fingerprint(
+        repo, capability.implementation_paths
+    )
+    verification_fingerprint = compute_verification_fingerprint(
+        repo, capability.verification_paths
+    )
+    return capability, repo, implementation_fingerprint, verification_fingerprint
 
 
 def test_matching_receipt_and_fresh_evidence_yield_verified(evidence_fixture):
-    capability, repo, fingerprint = evidence_fixture
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
 
     state = evaluate_evidence_state(
         capability,
-        accepted_receipt(capability, fingerprint),
-        fresh_native_report(capability, fingerprint),
+        accepted_receipt(capability, implementation_fingerprint, verification_fingerprint),
+        fresh_native_report(capability, implementation_fingerprint, verification_fingerprint),
         repo,
     )
 
@@ -138,9 +158,9 @@ def test_matching_receipt_and_fresh_evidence_yield_verified(evidence_fixture):
 
 
 def test_relevant_file_change_invalidates_accepted_receipt(evidence_fixture):
-    capability, repo, fingerprint = evidence_fixture
-    receipt = accepted_receipt(capability, fingerprint)
-    report = fresh_native_report(capability, fingerprint)
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    receipt = accepted_receipt(capability, implementation_fingerprint, verification_fingerprint)
+    report = fresh_native_report(capability, implementation_fingerprint, verification_fingerprint)
     (repo / "src/renderer/ShapeRenderer.ts").write_text("changed", encoding="utf-8")
 
     state = evaluate_evidence_state(capability, receipt, report, repo)
@@ -149,10 +169,64 @@ def test_relevant_file_change_invalidates_accepted_receipt(evidence_fixture):
     assert state.reasons == ("evidence:implementation-fingerprint-drift",)
 
 
+def test_verification_file_change_invalidates_accepted_receipt(evidence_fixture):
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    receipt = accepted_receipt(capability, implementation_fingerprint, verification_fingerprint)
+    report = fresh_native_report(capability, implementation_fingerprint, verification_fingerprint)
+    (repo / "test/unit/renderer/ShapeRenderer.test.ts").write_text(
+        "changed test", encoding="utf-8"
+    )
+
+    state = evaluate_evidence_state(capability, receipt, report, repo)
+
+    assert state.name == "regressed"
+    assert state.reasons == ("evidence:verification-fingerprint-drift",)
+
+
+def test_revision_fingerprints_compare_the_same_path_sets_and_fail_closed(
+    evidence_fixture,
+):
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=repo, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=repo, check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=repo, check=True)
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    assert compute_implementation_fingerprint_at_revision(
+        repo, capability.implementation_paths, revision
+    ) == implementation_fingerprint
+    assert compute_verification_fingerprint_at_revision(
+        repo, capability.verification_paths, revision
+    ) == verification_fingerprint
+
+    (repo / "test/unit/renderer/ShapeRenderer.test.ts").write_text(
+        "changed", encoding="utf-8"
+    )
+    assert compute_implementation_fingerprint_at_revision(
+        repo, capability.implementation_paths, revision
+    ) == compute_implementation_fingerprint(repo, capability.implementation_paths)
+    assert compute_verification_fingerprint_at_revision(
+        repo, capability.verification_paths, revision
+    ) != compute_verification_fingerprint(repo, capability.verification_paths)
+
+    with pytest.raises(CapabilityEvidenceError, match="Git revision cannot be read"):
+        compute_verification_fingerprint_at_revision(
+            repo, capability.verification_paths, "0" * 40
+        )
+
+
 def test_unrelated_file_change_keeps_receipt_fresh(evidence_fixture):
-    capability, repo, fingerprint = evidence_fixture
-    receipt = accepted_receipt(capability, fingerprint)
-    report = fresh_native_report(capability, fingerprint)
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    receipt = accepted_receipt(capability, implementation_fingerprint, verification_fingerprint)
+    report = fresh_native_report(capability, implementation_fingerprint, verification_fingerprint)
     (repo / "docs/README.md").write_text("changed", encoding="utf-8")
 
     state = evaluate_evidence_state(capability, receipt, report, repo)
@@ -161,8 +235,8 @@ def test_unrelated_file_change_keeps_receipt_fresh(evidence_fixture):
 
 
 def test_dirty_report_cannot_be_promoted(evidence_fixture):
-    capability, repo, fingerprint = evidence_fixture
-    report = fresh_native_report(capability, fingerprint)
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    report = fresh_native_report(capability, implementation_fingerprint, verification_fingerprint)
     report["renderer"]["dirty"] = True
 
     state = evaluate_evidence_state(capability, None, report, repo)
@@ -172,8 +246,8 @@ def test_dirty_report_cannot_be_promoted(evidence_fixture):
 
 
 def test_missing_input_hash_stops_at_reproducible(evidence_fixture):
-    capability, repo, fingerprint = evidence_fixture
-    report = fresh_native_report(capability, fingerprint)
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    report = fresh_native_report(capability, implementation_fingerprint, verification_fingerprint)
     report["caseResults"][0].pop("sourceSha256")
 
     state = evaluate_evidence_state(capability, None, report, repo)
@@ -203,8 +277,8 @@ def test_missing_input_hash_stops_at_reproducible(evidence_fixture):
     ],
 )
 def test_required_verification_failures_prevent_promotion(evidence_fixture, mutate, reason):
-    capability, repo, fingerprint = evidence_fixture
-    report = fresh_native_report(capability, fingerprint)
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    report = fresh_native_report(capability, implementation_fingerprint, verification_fingerprint)
     mutate(report)
 
     state = evaluate_evidence_state(capability, None, report, repo)
@@ -214,8 +288,8 @@ def test_required_verification_failures_prevent_promotion(evidence_fixture, muta
 
 
 def test_build_and_sanitize_promotion_receipt(evidence_fixture):
-    capability, repo, fingerprint = evidence_fixture
-    report = fresh_native_report(capability, fingerprint)
+    capability, repo, implementation_fingerprint, verification_fingerprint = evidence_fixture
+    report = fresh_native_report(capability, implementation_fingerprint, verification_fingerprint)
     report["environment"]["privateCasePath"] = "/Users/example/private/source.pptx"
     report["environment"]["username"] = "example"
     report["environment"]["windowsPath"] = "C:\\Users\\example\\source.pptx"
@@ -223,7 +297,9 @@ def test_build_and_sanitize_promotion_receipt(evidence_fixture):
     receipt = build_promotion_receipt(capability, report, repo, "2026-09-09T01:02:03Z")
     tracked = sanitize_receipt_for_tracking(receipt)
 
-    assert receipt.implementation_fingerprint == fingerprint
+    assert receipt.implementation_fingerprint == implementation_fingerprint
+    assert receipt.verification_fingerprint == verification_fingerprint
+    assert tracked["verificationFingerprint"] == verification_fingerprint
     assert tracked["caseIds"] == ["oracle-shape-0001"]
     assert tracked["caseInputFingerprints"] == [SOURCE_HASH]
     assert tracked["groundTruthFingerprints"] == [GROUND_TRUTH_HASH]

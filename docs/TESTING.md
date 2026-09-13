@@ -28,8 +28,8 @@ pnpm verify:plan -- --changed-path src/renderer/Shape3DRenderer.ts \
   --case-report test/e2e/reports/case-b.json
 ```
 
-The planner maps changed files through exact or declared-glob `implementationPaths` in
-`capabilities.json`, de-duplicates their unit and Python tests, and lists the native PowerPoint case
+The planner maps changed files through exact or declared-glob `implementationPaths` and
+`verificationPaths` in `capabilities.json`, de-duplicates their unit and Python tests, and lists the native PowerPoint case
 IDs already bound by the latest acceptance receipts. A targeted run executes only those
 unit/Python checks plus TypeScript type checking when runtime TypeScript changed. Browser checks
 and native rendering stay visible as deferred pre-commit and pre-merge gates. Documentation-only
@@ -58,8 +58,9 @@ Use three verification tiers:
    and any deliberately global native matrix.
 
 This changes when verification runs, not what constitutes acceptance. Cached or previously
-accepted evidence is reusable only while its capability implementation, source, ground truth,
-browser/capture profile, and font provenance still match.
+accepted evidence is reusable only while its capability implementation, verification inputs, source,
+ground truth, browser/capture profile, and font provenance still match. Markdown paths stay outside
+both content fingerprints and are checked by the documentation gate.
 
 ## Unit Tests
 
@@ -769,7 +770,7 @@ separate checks that have already run and does not execute them. A `needsReview`
 
 Promotion uses the `accept` command only after the capability registry says `renderMode=native` and
 the candidate implementation is committed. The command requires a clean tracked tree, matching
-HEAD and relevant-file fingerprints, source and ground-truth SHA-256 values, every declared gate,
+HEAD and separate implementation/verification fingerprints, source and ground-truth SHA-256 values, every declared gate,
 no skipped/runtime-failed cases, and an accepted manual verdict for every review row. It writes a
 sanitized receipt atomically and never changes GitHub issues or visual baselines.
 

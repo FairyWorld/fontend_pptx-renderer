@@ -27,6 +27,7 @@ from oracle.capability_contract import (  # noqa: E402
 from oracle.capability_evidence import (  # noqa: E402
     build_promotion_receipt,
     compute_implementation_fingerprint,
+    compute_verification_fingerprint,
     evaluate_evidence_state,
     sanitize_receipt_for_tracking,
 )
@@ -117,6 +118,7 @@ def command_validate(args: argparse.Namespace) -> int:
     repo, _, _, registry, history = _contracts(args)
     for capability in registry.capabilities:
         compute_implementation_fingerprint(repo, capability.implementation_paths)
+        compute_verification_fingerprint(repo, capability.verification_paths)
     latest_receipts = {receipt.capability_id: receipt for receipt in history.receipts}
     for capability_id, receipt in latest_receipts.items():
         capability = registry.by_id()[capability_id]
@@ -422,6 +424,7 @@ def command_accept(args: argparse.Namespace) -> int:
     if any(
         existing.capability_id == receipt.capability_id
         and existing.implementation_fingerprint == receipt.implementation_fingerprint
+        and existing.verification_fingerprint == receipt.verification_fingerprint
         and existing.case_input_fingerprints == receipt.case_input_fingerprints
         and existing.ground_truth_fingerprints == receipt.ground_truth_fingerprints
         for existing in history.receipts
@@ -436,10 +439,10 @@ def command_accept(args: argparse.Namespace) -> int:
             key=lambda item: (item.capability_id, item.accepted_at),
         )
     )
-    candidate_history = AcceptanceHistory(schema_version=1, receipts=receipts)
+    candidate_history = AcceptanceHistory(schema_version=2, receipts=receipts)
     validate_acceptance_history(registry, candidate_history)
     payload = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "receipts": [sanitize_receipt_for_tracking(item) for item in receipts],
     }
     temporary = acceptance_path.with_name(f".{acceptance_path.name}.{os.getpid()}.candidate")

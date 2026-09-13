@@ -7,7 +7,10 @@ from zipfile import ZIP_DEFLATED, ZipFile
 import pytest
 
 from oracle.capability_contract import load_capability_registry
-from oracle.capability_evidence import compute_implementation_fingerprint
+from oracle.capability_evidence import (
+    compute_implementation_fingerprint,
+    compute_verification_fingerprint,
+)
 from oracle.capability_verification import (
     CapabilityVerificationError,
     normalize_native_evaluation_reports,
@@ -17,12 +20,14 @@ from oracle.capability_verification import (
 def capability_fixture(tmp_path: Path):
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
+    (repo / "test").mkdir(parents=True)
     (repo / "src/renderer.ts").write_text("renderer", encoding="utf-8")
+    (repo / "test/verification.py").write_text("verification", encoding="utf-8")
     registry_path = repo / "capabilities.json"
     registry_path.write_text(
         json.dumps(
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "capabilities": [
                     {
                         "id": "drawingml.shape.geometry.adjustment.donut",
@@ -33,6 +38,7 @@ def capability_fixture(tmp_path: Path):
                         "scope": {"presets": ["donut"]},
                         "fallback": "Use the handwritten geometry.",
                         "implementationPaths": ["src/renderer.ts"],
+                        "verificationPaths": ["test/verification.py"],
                         "requiredGates": [
                             "source",
                             "structural",
@@ -755,7 +761,11 @@ def test_normalizes_native_reports_into_promotion_evidence(tmp_path: Path):
         "implementationFingerprint": compute_implementation_fingerprint(
             repo, capability.implementation_paths
         ),
+        "verificationFingerprint": compute_verification_fingerprint(
+            repo, capability.verification_paths
+        ),
     }
+    assert verification["schemaVersion"] == 2
     assert set(verification["gates"].values()) == {"passed"}
     assert [case["caseId"] for case in verification["caseResults"]] == [
         "donut-thick",

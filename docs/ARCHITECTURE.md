@@ -13,7 +13,7 @@ results, but does not bypass or rewrite the Parse → Model → Render boundarie
 
 `test/e2e/oracle/capabilities.json` is the tracked support contract. Each stable capability ID
 declares namespace-aware OOXML selectors, a bounded scope, current render mode, planning mode,
-fallback, relevant implementation/test paths, and required gates. `capability-acceptance.json` stores
+fallback, separate implementation and verification paths, and required gates. `capability-acceptance.json` stores
 one sanitized latest receipt per accepted capability; Git retains older revisions. Private
 PPTX/PDF/PNG artifacts and generated inventory remain ignored.
 
@@ -22,8 +22,8 @@ The loop has six domain modules and two thin CLIs:
 - `capability_contract.py` validates immutable registry and receipt types.
 - `capability_inventory.py` scans PPTX ZIP/XML within fixed entry and decoded-byte limits and
   deduplicates packages by SHA-256.
-- `capability_evidence.py` binds receipts to capability definitions, relevant file content, source
-  PPTX, ground truth, gates, environment, and revision.
+- `capability_evidence.py` binds receipts to capability definitions, implementation and verification
+  file content, source PPTX, ground truth, gates, environment, and revision.
 - `capability_verification.py` normalizes native evaluation API results, rejects mixed or dirty
   revisions, and derives native, manual-review, SSIM-regression, and capability-specific local
   metric gate outcomes. Local visual gates must match the per-slide reference/candidate hashes in
@@ -50,9 +50,9 @@ Render mode, planning mode, and evidence state are independent. Render modes are
 `verified`, `regressed`, or `blocked`. User-facing support requires both `native` and `verified` for
 the declared scope. Planning mode is `ranked` by default; `observation-only` keeps broad residual
 selectors visible in the ledger while excluding them from executable ranking and work packets. A
-relevant implementation or scope change invalidates the receipt. The edit-loop planner treats
-Markdown-only work as non-rendering work, while the final receipt check still follows each
-capability's tracked `implementationPaths` exactly.
+relevant implementation, verification, or scope change invalidates the receipt. Markdown paths are
+excluded from both fingerprints and remain covered by the documentation gate. The edit-loop planner
+matches the union of each capability's `implementationPaths` and `verificationPaths`.
 
 ## 1) Parse Layer
 

@@ -11,7 +11,7 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 RENDER_MODES = frozenset({"none", "fallback", "approximate", "native", "excluded"})
 PLANNING_MODES = frozenset({"ranked", "observation-only"})
 IMPACTS = frozenset(
@@ -77,6 +77,7 @@ class CapabilityDefinition:
     scope: Mapping[str, Any]
     fallback: str
     implementation_paths: tuple[str, ...]
+    verification_paths: tuple[str, ...]
     required_gates: tuple[str, ...]
     issue_urls: tuple[str, ...]
     planning_mode: str
@@ -97,6 +98,7 @@ class PromotionReceipt:
     definition_fingerprint: str
     accepted_revision: str
     implementation_fingerprint: str
+    verification_fingerprint: str
     case_ids: tuple[str, ...]
     case_input_fingerprints: tuple[str, ...]
     ground_truth_fingerprints: tuple[str, ...]
@@ -283,6 +285,7 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
             "scope",
             "fallback",
             "implementationPaths",
+            "verificationPaths",
             "requiredGates",
             "issueUrls",
         },
@@ -332,6 +335,30 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
         _repository_relative_path(path, f"capability {capability_id} implementation path")
         for path in paths
     )
+    verification_paths_raw = _unique_strings(
+        value["verificationPaths"],
+        f"capability {capability_id} verificationPaths",
+        allow_empty=True,
+    )
+    verification_paths = tuple(
+        _repository_relative_path(path, f"capability {capability_id} verification path")
+        for path in verification_paths_raw
+    )
+    documentation_paths = tuple(
+        path
+        for path in (*implementation_paths, *verification_paths)
+        if path.lower().endswith(".md")
+    )
+    if documentation_paths:
+        raise ValueError(
+            f"capability {capability_id} documentation paths cannot be fingerprinted: "
+            + ", ".join(documentation_paths)
+        )
+    overlapping_paths = sorted(set(implementation_paths).intersection(verification_paths))
+    if overlapping_paths:
+        raise ValueError(
+            f"capability {capability_id} path roles overlap: " + ", ".join(overlapping_paths)
+        )
     required_gates = _unique_strings(
         value["requiredGates"],
         f"capability {capability_id} requiredGates",
@@ -361,6 +388,7 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
         scope=scope,
         fallback=fallback,
         implementation_paths=implementation_paths,
+        verification_paths=verification_paths,
         required_gates=required_gates,
         issue_urls=issue_urls,
         planning_mode=planning_mode,
@@ -393,6 +421,7 @@ def capability_definition_fingerprint(capability: CapabilityDefinition) -> str:
         "id": capability.id,
         "impact": capability.impact,
         "implementationPaths": list(capability.implementation_paths),
+        "verificationPaths": list(capability.verification_paths),
         "issueUrls": list(capability.issue_urls),
         "renderMode": capability.render_mode,
         "requiredGates": list(capability.required_gates),
@@ -458,6 +487,7 @@ def _parse_receipt(value: Any, index: int) -> PromotionReceipt:
             "definitionFingerprint",
             "acceptedRevision",
             "implementationFingerprint",
+            "verificationFingerprint",
             "caseIds",
             "caseInputFingerprints",
             "groundTruthFingerprints",
@@ -481,6 +511,11 @@ def _parse_receipt(value: Any, index: int) -> PromotionReceipt:
     )
     if not _SHA256.fullmatch(implementation_fingerprint):
         raise ValueError(f"{label} implementationFingerprint must be a lowercase SHA-256")
+    verification_fingerprint = _nonempty_string(
+        value["verificationFingerprint"], f"{label} verificationFingerprint"
+    )
+    if not _SHA256.fullmatch(verification_fingerprint):
+        raise ValueError(f"{label} verificationFingerprint must be a lowercase SHA-256")
     case_ids = _unique_strings(value["caseIds"], f"{label} caseIds")
     case_hashes = _unique_strings(
         value["caseInputFingerprints"], f"{label} caseInputFingerprints"
@@ -513,6 +548,7 @@ def _parse_receipt(value: Any, index: int) -> PromotionReceipt:
         definition_fingerprint=definition_fingerprint,
         accepted_revision=accepted_revision,
         implementation_fingerprint=implementation_fingerprint,
+        verification_fingerprint=verification_fingerprint,
         case_ids=case_ids,
         case_input_fingerprints=case_hashes,
         ground_truth_fingerprints=ground_truth_hashes,

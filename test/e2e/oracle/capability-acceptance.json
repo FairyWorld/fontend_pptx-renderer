@@ -10,7 +10,7 @@
       "caseInputFingerprints": [
         "9df342d638c23b3940e36e134d7c8a9985fb4dd505e88871dc2f04ba08b5a354"
       ],
-      "definitionFingerprint": "1f9bbbe400753ff0ec4261790326e6344059dbbd4eb7b726d0c9eccd7781065d",
+      "definitionFingerprint": "ff792cbeaa1c6ff1772a56e4de7c5f5dd29fe0219e0243de60646162baf3a477",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -67,7 +67,8 @@
       "groundTruthFingerprints": [
         "e93da7f47b75cb24bef82e1c025f5db9db53a37eb1c3bfdb03bb0fe4c427012e"
       ],
-      "implementationFingerprint": "ba3e5ebef5705f1d0193e28aa9c61dcc985a769aabeaa853aa5023a9dae88ebf"
+      "implementationFingerprint": "e1a77555567b7cdfcb1d8ca41de60522719ab405f923f8740e93137c3f748815",
+      "verificationFingerprint": "f5ff9b9565df2771ced561ff6366bcbfc192e2709a2ebbfe734115fd28316c9a"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -89,7 +90,7 @@
         "4445bd83dee18ef4658376e9174c1ac79cf68fd40add59056d3f1a97b2506d7d",
         "7d1bed1c247bbf31a67b24576263a4e1b7f83dc2c2f26cb881424da8a7793813"
       ],
-      "definitionFingerprint": "a4961b3768c56815631e22cc469bd3efd376c518ade696f87a8d5d79ca84fe4e",
+      "definitionFingerprint": "24d4cb57072acfab69d55742ac8eb289a1c58718b3361bf26b446224c9bfe724",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -151,7 +152,8 @@
         "2e4674078d58e3d9575d49ac8b496a3a793d14812731bb8d0d14f8cf64a01d84",
         "80141194cb425fb1d5388e0f88bd46a96f7a2c8e20225d0a7396d114c012c711"
       ],
-      "implementationFingerprint": "1eb184081d476c5cdd628dd1785befbba159d0476cc60b4369c600240be12c42"
+      "implementationFingerprint": "23e3d10ca3ae9bb8a12cd68c6f5fe0399974b6504c442e9dd47cf584d6847bb6",
+      "verificationFingerprint": "b5166b741b4fa5590f5167fb9c40116c1ca4b7aaf273001abc191633870766e7"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -189,7 +191,7 @@
         "025909ceecdfb8a618a3df8a7e31aa98a3e2fa7d5417f994ef49dd83ee989ccd",
         "b402194906a5b20ffc49a79744b1e7c5028e42e7937bb2904d1362a7c3f41754"
       ],
-      "definitionFingerprint": "65161a241461f954a7aeb56c123f9dc02177f7a2b8931903df81c46edf8870d5",
+      "definitionFingerprint": "c4968496e296fca7260f031bf19a62b4ea16cef0761c76214e7eaf45b834c4dc",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -259,7 +261,8 @@
         "db363635fa1efad0083c8748afa04fc7731f2aed0c30a476e24d3b3beaaef8a9",
         "3a89794e3cf2bb35cd8afbd9180d46c45981766291cf819abe807518217e1449"
       ],
-      "implementationFingerprint": "60532d0593d948811774e4f2ea2e57c1332dc9187f164437f28122400ad0d929"
+      "implementationFingerprint": "a2d63ec886e03124291bf07ed0444c05849115187f1d6942d04d72c4e854e44d",
+      "verificationFingerprint": "6c0d7f6166358e140e1196fd646d2156fa9b967da39ed7f59ce6c7e28474fabc"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -271,7 +274,7 @@
       "caseInputFingerprints": [
         "9947c52fb223adb426ed6f1df539ce10eece84fe423aabb8211db648aa2c72de"
       ],
-      "definitionFingerprint": "b800e1ae5ff4948eb454c1cd41543282fb4d2771c84b3f20676da50be186d775",
+      "definitionFingerprint": "3ed0c3f6ee81c0b18a329c93561e2d3bcf9cb88a487639c71751bc322d806b9c",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -332,7 +335,8 @@
       "groundTruthFingerprints": [
         "f78169460d82509b9b8c6d0cff5dd39cb6ca7bd16ad335b9a433163759b7a157"
       ],
-      "implementationFingerprint": "6878c12bda25e6c10ac3e19fec6b82c9901940861443aefc4639cec0bebc7347"
+      "implementationFingerprint": "14858687775d3c51cb1770221c612f01fcf5c27e1449c5ac8e22779730a8e957",
+      "verificationFingerprint": "76d47e07aed63e316949b115ad60d4d590e25dff6bd400163ae699ce5420c12d"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -344,7 +348,7 @@
       "caseInputFingerprints": [
         "df26e3dc506f51991195da703480c424714d54e659b8b0b1cdc1d466730e916a"
       ],
-      "definitionFingerprint": "e9fde992e6855a64ca8d4eac334a55f394b237bf2494bac0b38f215a78d2f0dc",
+      "definitionFingerprint": "d53e1cb98056662d776523866e4c50c4daede27fcafe04f10e3b6399a84386d4",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -405,7 +409,8 @@
       "groundTruthFingerprints": [
         "3189903be3a6be85ca63e1843fa98cd9094a604f871d72a116a4efa97ad6f247"
       ],
-      "implementationFingerprint": "3a52d7d94766826d80bf80e54a8260bc73f925453ddf3d3458e2bf963ad8b443"
+      "implementationFingerprint": "504b696c836fae8dbdb0f29a9b3510cbe8fb2fcc1ba00a38e04929ca7ed96afa",
+      "verificationFingerprint": "d80a382dd0b6fea61f21e5c813f439da85483dee740ba4a6244a3d8448043e54"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -419,7 +424,7 @@
         "e70abcb8e7c064ab416a852eeaa074c708aa4f70643e2adf112241404c8c913a",
         "5d01fb2986f9e14d46c227a0777c247aeb181587fa52bc49b7630d148be64c94"
       ],
-      "definitionFingerprint": "f2bd0a7e926d2ed0c0508b6713de4e29e9351080cf75ca9d98febab73d00cfd9",
+      "definitionFingerprint": "e2af738ca62efff9c42ea0fd858e130e3b642272bfa1537150f19933449418c1",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -474,7 +479,8 @@
         "a1165932ff8fb1e5a1c9cbd316ff137da3ec6e07e1f94564be7b641cf7a9d04b",
         "8e591a3aa5f98391611b1ebe70c9f1354c7099c2ff44c4613c09303ca6e61cd3"
       ],
-      "implementationFingerprint": "9184fa410bf90ea02d1aa801ce2eb32ae25442875a6b1dc5836b4353eaa1e7d0"
+      "implementationFingerprint": "a38a679621cd0c73d532947f87c0cbf82cd7e2a4ec33d3ee6365a9b705e7dd97",
+      "verificationFingerprint": "b5e9962895f84bf911eef053678b8cd06e2448c509644da49baab61275105971"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -540,7 +546,7 @@
         "cc8a24e91d12a15f76149fe3caf680e4c1f96feba9a2da626b6374068c52128b",
         "a11864d901393675e743819bcb430361b6d01d3e4b985406c1e0b781cabb9233"
       ],
-      "definitionFingerprint": "fae041adc73e2f3dbc3ad1eb4f5c8c087ce70262636250d8ac5bf5644b161803",
+      "definitionFingerprint": "73b9638a3e7bdee2f7ea7cef4fce1ff2b184b456be4d72e5050ddaf959cc2a72",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -621,7 +627,8 @@
         "d38b31514d69f340c598573a70d73e08fac9023424e850bf4a9b902f276c7675",
         "997fe7af7fcc57c6c0d910af56a9dd8bc50d235b17b6cd3b3da53b02d71471e1"
       ],
-      "implementationFingerprint": "445480a490461b90d945bd40cf91dbbbb92fda83240a1044930f77fb6b4be184"
+      "implementationFingerprint": "3c8c1b34b4b0a0ffc1c1bcdb167b692af49bcfd776d9c33b936e6d568a7c3999",
+      "verificationFingerprint": "a6e68dbc4dca5168ece41f44506415a587cbcf8fdc02f51fd0d3b43b02f23bc2"
     },
     {
       "acceptedAt": "2026-09-13T12:55:24.299675Z",
@@ -647,7 +654,7 @@
         "a88b6157961e2549ee85fefac2e0d4f73ecff7eda3c083c682b75bd8aa91caae",
         "64b9e6d38aa937bc279c9144ae978e44f1b871b56014791a5a722666c0b9671f"
       ],
-      "definitionFingerprint": "70c15adf6258ef92c53996101a528efa3488c72574215eb08216afff273f1c24",
+      "definitionFingerprint": "a3c22999bbb4b43a043e5a53617cc632606fcdfbd2a0dd0588962cfb34f684dc",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -758,7 +765,8 @@
         "9465893b944b6ca22525b30f778d85680cbae4316626f495845e9e1d33f9cfc8",
         "e71c25816d42d1e045146b1f730cdc03f8f5ce13ceeb538247883abde48d4348"
       ],
-      "implementationFingerprint": "ac0db8ede5f39f9063b95e4b2c6f0d4e4cfaa82910b18acfb6eb41309f6d69f3"
+      "implementationFingerprint": "b2ae9be8338f2fd9b44562c7dd54cf88162e3eefab767acab94252b83924a238",
+      "verificationFingerprint": "0449773c8e31539b51ac0fc324753d4a5653105384f1b1a7b33d8028e901bce5"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -786,7 +794,7 @@
         "866e1b336610912af2df317f758b86970ee52d82242e4d11fc0681aab0dd7381",
         "9589c1a44948cd558b3babfc51be26703341e1e7c9c0981d8b32e77bf0f69dfa"
       ],
-      "definitionFingerprint": "606509c46ce4398038afe45228173faa9969a83bcbd223bdcc8e85500d6ec68f",
+      "definitionFingerprint": "912dd3529ba441017d001d9af33d8b881ac0ac3e2e75aa3fa19ecc5155a4f742",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -848,7 +856,8 @@
         "7c2b24e5737f3aa79c4ecaba2a192bca38b2c2ce9e6c042cc96dfa2bccd7829c",
         "61b36ab48767092cb35fab493af037d6d31f3b5996f0d82f7a4e1c4c4f79886f"
       ],
-      "implementationFingerprint": "45909af92d4c385d84caefcfa5321d2e41f26e8c8437ef6d59559ca6d4ccfd4a"
+      "implementationFingerprint": "f81b52ad14f64f154bbc1c31cd24e96f91887242255372bb013d9009e0a75173",
+      "verificationFingerprint": "5d5247c6d9318cddad8ae3fe463b14be6c50cdb5b3632393f34794729ca08f3b"
     },
     {
       "acceptedAt": "2026-09-11T17:31:50.975273Z",
@@ -866,7 +875,7 @@
         "20cd883efc019e054dea8b6810f533e0b99f6a019759de80e70cf96a769f187e",
         "d1760a39298a56409f8f9ecf8062a67fc143b81d4bd4827606b112294b95a326"
       ],
-      "definitionFingerprint": "4435b4fd0b342d54b138a01fdbbad45109b29668481d2a90fe2ddac3bf49c779",
+      "definitionFingerprint": "d8a13309098a5e1199daac38ded3412aa18d1477875590ab780049ab941d255d",
       "environment": {
         "browser": {
           "name": "chrome",
@@ -923,8 +932,9 @@
         "8dbd857e5b23e3796b5a5f12cda4074de0e6b729e5e6ee0091f504ef47b02550",
         "19d220fde4155e42d8fb9cde939176baeff18ca79a00502f954348e6bf3d0557"
       ],
-      "implementationFingerprint": "3a1c0552e8e066c1bdbde9740c8a769539ef9657ce0321285a9d38a5323da5ed"
+      "implementationFingerprint": "81d897921617f4bdac468b5270534543fe72ef8ca4aef415eb5955eb00c3ebee",
+      "verificationFingerprint": "c767df01678490b11eb6858aa9f2c53cd575e50c1ecdfc1e9e10e2ac2b86c0a0"
     }
   ],
-  "schemaVersion": 1
+  "schemaVersion": 2
 }

@@ -38,6 +38,7 @@ def capability(
         "scope": {"presets": ["rect"]},
         "fallback": fallback,
         "implementationPaths": ["src/shapes/presets.ts"],
+        "verificationPaths": ["test/unit/shapes/presets.test.ts"],
         "requiredGates": required_gates or ["source", "unit", "browser", "docs"],
         "issueUrls": [],
     }
@@ -47,7 +48,7 @@ def test_registry_rejects_duplicate_capability_ids(tmp_path: Path):
     entry = capability("drawingml.shape.geometry.duplicate")
     path = write_json(
         tmp_path / "capabilities.json",
-        {"schemaVersion": 1, "capabilities": [entry, entry]},
+        {"schemaVersion": 2, "capabilities": [entry, entry]},
     )
 
     with pytest.raises(ValueError, match="duplicate capability id"):
@@ -62,7 +63,7 @@ def test_native_mode_requires_native_powerpoint_gate(tmp_path: Path):
     )
     path = write_json(
         tmp_path / "capabilities.json",
-        {"schemaVersion": 1, "capabilities": [entry]},
+        {"schemaVersion": 2, "capabilities": [entry]},
     )
 
     with pytest.raises(ValueError, match="native-powerpoint"):
@@ -73,7 +74,7 @@ def test_non_native_mode_requires_a_fallback_description(tmp_path: Path):
     entry = capability(render_mode="approximate", fallback="")
     path = write_json(
         tmp_path / "capabilities.json",
-        {"schemaVersion": 1, "capabilities": [entry]},
+        {"schemaVersion": 2, "capabilities": [entry]},
     )
 
     with pytest.raises(ValueError, match="fallback"):
@@ -90,7 +91,7 @@ def test_capability_planning_mode_defaults_to_ranked_and_accepts_observation_onl
         write_json(
             tmp_path / "capabilities.json",
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "capabilities": [ranked_entry, observation_entry],
             },
         )
@@ -106,7 +107,7 @@ def test_capability_rejects_unknown_planning_mode(tmp_path: Path):
     entry["planningMode"] = "background-maybe"
     path = write_json(
         tmp_path / "capabilities.json",
-        {"schemaVersion": 1, "capabilities": [entry]},
+        {"schemaVersion": 2, "capabilities": [entry]},
     )
 
     with pytest.raises(ValueError, match="planningMode"):
@@ -118,7 +119,7 @@ def test_registry_rejects_unknown_keys_and_unsafe_paths(tmp_path: Path):
     entry["renderMdoe"] = entry["renderMode"]
     typo_path = write_json(
         tmp_path / "typo.json",
-        {"schemaVersion": 1, "capabilities": [entry]},
+        {"schemaVersion": 2, "capabilities": [entry]},
     )
     with pytest.raises(ValueError, match="unknown keys.*renderMdoe"):
         load_capability_registry(typo_path)
@@ -127,10 +128,69 @@ def test_registry_rejects_unknown_keys_and_unsafe_paths(tmp_path: Path):
     unsafe_entry["implementationPaths"] = ["../outside.ts"]
     unsafe_path = write_json(
         tmp_path / "unsafe.json",
-        {"schemaVersion": 1, "capabilities": [unsafe_entry]},
+        {"schemaVersion": 2, "capabilities": [unsafe_entry]},
     )
     with pytest.raises(ValueError, match="repository-relative"):
         load_capability_registry(unsafe_path)
+
+    unsafe_verification_entry = capability()
+    unsafe_verification_entry["verificationPaths"] = ["../outside.test.ts"]
+    unsafe_verification_path = write_json(
+        tmp_path / "unsafe-verification.json",
+        {"schemaVersion": 2, "capabilities": [unsafe_verification_entry]},
+    )
+    with pytest.raises(ValueError, match="repository-relative"):
+        load_capability_registry(unsafe_verification_path)
+
+
+def test_verification_paths_are_immutable_and_change_definition_fingerprint(tmp_path: Path):
+    first = capability()
+    second = capability()
+    second["verificationPaths"] = ["test/unit/shapes/other.test.ts"]
+    first_capability = load_capability_registry(
+        write_json(
+            tmp_path / "first.json",
+            {"schemaVersion": 2, "capabilities": [first]},
+        )
+    ).capabilities[0]
+    second_capability = load_capability_registry(
+        write_json(
+            tmp_path / "second.json",
+            {"schemaVersion": 2, "capabilities": [second]},
+        )
+    ).capabilities[0]
+
+    assert first_capability.verification_paths == ("test/unit/shapes/presets.test.ts",)
+    assert capability_definition_fingerprint(first_capability) != (
+        capability_definition_fingerprint(second_capability)
+    )
+
+
+@pytest.mark.parametrize("field", ["implementationPaths", "verificationPaths"])
+def test_capability_fingerprints_reject_documentation_paths(tmp_path: Path, field: str):
+    entry = capability()
+    entry[field] = ["docs/TESTING.md"]
+
+    with pytest.raises(ValueError, match="documentation paths cannot be fingerprinted"):
+        load_capability_registry(
+            write_json(
+                tmp_path / "documentation-path.json",
+                {"schemaVersion": 2, "capabilities": [entry]},
+            )
+        )
+
+
+def test_capability_path_roles_cannot_overlap(tmp_path: Path):
+    entry = capability()
+    entry["verificationPaths"] = list(entry["implementationPaths"])
+
+    with pytest.raises(ValueError, match="path roles overlap"):
+        load_capability_registry(
+            write_json(
+                tmp_path / "overlapping-paths.json",
+                {"schemaVersion": 2, "capabilities": [entry]},
+            )
+        )
 
 
 def test_selector_parent_scope_is_parsed_immutably_and_changes_its_fingerprint(tmp_path: Path):
@@ -143,13 +203,13 @@ def test_selector_parent_scope_is_parsed_immutably_and_changes_its_fingerprint(t
     unscoped_registry = load_capability_registry(
         write_json(
             tmp_path / "unscoped.json",
-            {"schemaVersion": 1, "capabilities": [unscoped_entry]},
+            {"schemaVersion": 2, "capabilities": [unscoped_entry]},
         )
     )
     scoped_registry = load_capability_registry(
         write_json(
             tmp_path / "scoped.json",
-            {"schemaVersion": 1, "capabilities": [scoped_entry]},
+            {"schemaVersion": 2, "capabilities": [scoped_entry]},
         )
     )
 
@@ -168,7 +228,7 @@ def test_selector_parent_scope_rejects_incomplete_or_duplicate_names(tmp_path: P
         load_capability_registry(
             write_json(
                 tmp_path / "incomplete-parent.json",
-                {"schemaVersion": 1, "capabilities": [incomplete]},
+                {"schemaVersion": 2, "capabilities": [incomplete]},
             )
         )
 
@@ -181,7 +241,7 @@ def test_selector_parent_scope_rejects_incomplete_or_duplicate_names(tmp_path: P
         load_capability_registry(
             write_json(
                 tmp_path / "duplicate-parent.json",
-                {"schemaVersion": 1, "capabilities": [duplicate]},
+                {"schemaVersion": 2, "capabilities": [duplicate]},
             )
         )
 
@@ -204,13 +264,13 @@ def test_selector_ancestor_path_is_parsed_immutably_and_changes_its_fingerprint(
     unscoped_registry = load_capability_registry(
         write_json(
             tmp_path / "unscoped.json",
-            {"schemaVersion": 1, "capabilities": [unscoped_entry]},
+            {"schemaVersion": 2, "capabilities": [unscoped_entry]},
         )
     )
     scoped_registry = load_capability_registry(
         write_json(
             tmp_path / "scoped.json",
-            {"schemaVersion": 1, "capabilities": [scoped_entry]},
+            {"schemaVersion": 2, "capabilities": [scoped_entry]},
         )
     )
 
@@ -239,7 +299,7 @@ def test_selector_ancestor_path_rejects_empty_steps_and_parent_combination(tmp_p
         load_capability_registry(
             write_json(
                 tmp_path / "empty-ancestor-path.json",
-                {"schemaVersion": 1, "capabilities": [empty]},
+                {"schemaVersion": 2, "capabilities": [empty]},
             )
         )
 
@@ -255,7 +315,7 @@ def test_selector_ancestor_path_rejects_empty_steps_and_parent_combination(tmp_p
         load_capability_registry(
             write_json(
                 tmp_path / "combined-ancestor-parent.json",
-                {"schemaVersion": 1, "capabilities": [combined]},
+                {"schemaVersion": 2, "capabilities": [combined]},
             )
         )
 
@@ -263,20 +323,21 @@ def test_selector_ancestor_path_rejects_empty_steps_and_parent_combination(tmp_p
 def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Path):
     registry_path = write_json(
         tmp_path / "capabilities.json",
-        {"schemaVersion": 1, "capabilities": [capability()]},
+        {"schemaVersion": 2, "capabilities": [capability()]},
     )
     registry = load_capability_registry(registry_path)
 
     unknown_path = write_json(
         tmp_path / "unknown-acceptance.json",
         {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "receipts": [
                 {
                     "capabilityId": "drawingml.shape.geometry.unknown",
                     "definitionFingerprint": "d" * 64,
                     "acceptedRevision": "a" * 40,
                     "implementationFingerprint": "b" * 64,
+                    "verificationFingerprint": "e" * 64,
                     "caseIds": ["oracle-shape-0001"],
                     "caseInputFingerprints": ["c" * 64],
                     "groundTruthFingerprints": ["d" * 64],
@@ -293,13 +354,14 @@ def test_acceptance_history_requires_known_capabilities_and_sha256(tmp_path: Pat
     invalid_hash_path = write_json(
         tmp_path / "invalid-hash-acceptance.json",
         {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "receipts": [
                 {
                     "capabilityId": "drawingml.shape.geometry.rect",
                     "definitionFingerprint": "d" * 64,
                     "acceptedRevision": "a" * 40,
                     "implementationFingerprint": "not-a-sha256",
+                    "verificationFingerprint": "e" * 64,
                     "caseIds": ["oracle-shape-0001"],
                     "caseInputFingerprints": ["c" * 64],
                     "groundTruthFingerprints": ["d" * 64],
@@ -320,6 +382,7 @@ def test_acceptance_history_keeps_only_one_receipt_per_capability(tmp_path: Path
         "definitionFingerprint": "a" * 64,
         "acceptedRevision": "b" * 40,
         "implementationFingerprint": "c" * 64,
+        "verificationFingerprint": "f" * 64,
         "caseIds": ["oracle-shape-0001"],
         "caseInputFingerprints": ["d" * 64],
         "groundTruthFingerprints": ["e" * 64],
@@ -330,7 +393,7 @@ def test_acceptance_history_keeps_only_one_receipt_per_capability(tmp_path: Path
     duplicate_capability_path = write_json(
         tmp_path / "duplicate-capability-acceptance.json",
         {
-            "schemaVersion": 1,
+            "schemaVersion": 2,
             "receipts": [
                 receipt,
                 {
@@ -355,14 +418,14 @@ def test_valid_registry_and_acceptance_history_are_immutable(tmp_path: Path):
     registry = load_capability_registry(
         write_json(
             tmp_path / "capabilities.json",
-            {"schemaVersion": 1, "capabilities": [entry]},
+            {"schemaVersion": 2, "capabilities": [entry]},
         )
     )
     history = load_acceptance_history(
         write_json(
             tmp_path / "capability-acceptance.json",
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "receipts": [
                     {
                         "capabilityId": entry["id"],
@@ -371,6 +434,7 @@ def test_valid_registry_and_acceptance_history_are_immutable(tmp_path: Path):
                         ),
                         "acceptedRevision": "a" * 40,
                         "implementationFingerprint": "b" * 64,
+                        "verificationFingerprint": "e" * 64,
                         "caseIds": ["oracle-shape-0001"],
                         "caseInputFingerprints": ["c" * 64],
                         "groundTruthFingerprints": ["d" * 64],
@@ -409,7 +473,10 @@ def test_tracked_capability_contract_is_valid():
         "neutral-axis-grid",
         "neutral-or-solid-plot-background",
     )
-    assert "test/e2e/oracle/chart_metrics.py" in chart_2d.implementation_paths
+    assert "src/renderer/ChartRenderer.ts" in chart_2d.implementation_paths
+    assert "test/e2e/oracle/chart_metrics.py" in chart_2d.verification_paths
+    assert all(not path.lower().endswith(".md") for path in chart_2d.implementation_paths)
+    assert all(not path.lower().endswith(".md") for path in chart_2d.verification_paths)
     assert common_table.render_mode == "native"
     assert formula.render_mode == "approximate"
     assert formula.scope["output"] == ("Presentation MathML",)
@@ -519,7 +586,7 @@ def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path:
         write_json(
             tmp_path / "capabilities.json",
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "capabilities": [
                     capability(
                         render_mode="native",
@@ -534,13 +601,14 @@ def test_historical_receipt_may_retain_an_older_definition_fingerprint(tmp_path:
         write_json(
             tmp_path / "acceptance.json",
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "receipts": [
                     {
                         "capabilityId": registry.capabilities[0].id,
                         "definitionFingerprint": "e" * 64,
                         "acceptedRevision": "a" * 40,
                         "implementationFingerprint": "b" * 64,
+                        "verificationFingerprint": "e" * 64,
                         "caseIds": ["oracle-shape-0001"],
                         "caseInputFingerprints": ["c" * 64],
                         "groundTruthFingerprints": ["d" * 64],

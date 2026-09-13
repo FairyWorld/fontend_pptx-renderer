@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "capabilities": [
     {
       "id": "drawingml.chart.2d.common",
@@ -60,7 +60,8 @@
         "cartesianLocalEvidence": ["single-chart", "bar-column-line-area", "one-to-eight-series", "direct-chart-frame-roi", "chromatic-series", "neutral-axis-grid", "neutral-or-solid-plot-background"]
       },
       "fallback": "Render supported chart families through ECharts while retaining an explicit approximation status for Office plot-area, axis, label, and legend layout differences.",
-      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/ChartNode.ts", "src/renderer/ChartRenderer.ts", "src/renderer/chart/echartsRuntime.ts", "src/utils/e2eCompare.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-chart-*.json", "test/e2e/oracle/chart_metrics.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/server.py", "test/e2e/test_cartesian_chart_metrics.py", "test/pages/e2e-compare.html", "test/unit/renderer/ChartRenderer.test.ts", "test/unit/utils/e2eCompare.test.ts"],
+      "implementationPaths": ["src/model/nodes/ChartNode.ts", "src/renderer/ChartRenderer.ts", "src/renderer/chart/echartsRuntime.ts"],
+      "verificationPaths": ["src/utils/e2eCompare.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/cases-pypptx/oracle-pypptx-chart-*.json", "test/e2e/oracle/chart_metrics.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/server.py", "test/e2e/test_cartesian_chart_metrics.py", "test/pages/e2e-compare.html", "test/unit/renderer/ChartRenderer.test.ts", "test/unit/utils/e2eCompare.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },
@@ -81,6 +82,7 @@
       },
       "fallback": "Render the chart series as a two-dimensional bar chart and record omitted depth and scene semantics.",
       "implementationPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
     },
@@ -101,6 +103,7 @@
       },
       "fallback": "Render the chart series as a two-dimensional pie chart and record omitted depth and scene semantics.",
       "implementationPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
     },
@@ -121,6 +124,7 @@
       },
       "fallback": "Ignore the three-dimensional chart camera while preserving the chart's two-dimensional series.",
       "implementationPaths": ["src/renderer/ChartRenderer.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
     },
@@ -141,6 +145,7 @@
       },
       "fallback": "Render an available poster or raster preview; otherwise retain slide layout and report the omitted model.",
       "implementationPaths": ["src/model/Slide.ts", "src/renderer/SlideRenderer.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "structural", "unit", "browser", "security", "performance", "native-powerpoint", "manual-visual", "package-size", "docs"],
       "issueUrls": []
     },
@@ -183,7 +188,8 @@
         "zPosition": ["absent-or-zero"]
       },
       "fallback": "Keep the existing flat two-dimensional shape and report the first unsupported camera, light, geometry, aspect, parent container, paint, text-body, bevel, material, contour, depth, or effect reason outside the verified front-face tuple.",
-      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/Shape3D.ts", "src/renderer/GroupRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/SlideRenderer.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_verification.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/shape3d_camera_metrics.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_shape3d_camera_metrics.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
+      "implementationPaths": ["src/model/nodes/Shape3D.ts", "src/renderer/GroupRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/SlideRenderer.ts"],
+      "verificationPaths": ["test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_verification.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/shape3d_camera_metrics.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_shape3d_camera_metrics.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "camera-local", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
       "issueUrls": []
     },
@@ -249,7 +255,8 @@
         "shapeTransform": ["rotation-0", "flipH-false", "flipV-false"]
       },
       "fallback": "Render the existing flat two-dimensional shape, picture, or group, or retain a bounded diagnostic composition path, when camera, light, preset/custom geometry profile, group child profile or coordinate space, physical bounds, paint, text-body, style-reference, stroke, transform, depth, bevel, contour, material, source-crop, stretch, blip-effect, or effect values fall outside the verified matrix.",
-      "implementationPaths": ["AGENTS.md", "README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/export/serializePresentation.ts", "src/model/nodes/GroupNode.ts", "src/model/nodes/Shape3D.ts", "src/renderer/GroupRenderer.ts", "src/renderer/ImageRenderer.ts", "src/renderer/pathData.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/shape3d/CameraProjection.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_verification.py", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0013-camera-projection-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0014-scene-only-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0020-perspective-left-picture-group-matrix.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/scripts/shape3d_camera_metrics.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_shape3d_camera_metrics.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/GroupNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/shape3d/CameraProjection.test.ts"],
+      "implementationPaths": ["src/export/serializePresentation.ts", "src/model/nodes/GroupNode.ts", "src/model/nodes/Shape3D.ts", "src/renderer/GroupRenderer.ts", "src/renderer/ImageRenderer.ts", "src/renderer/pathData.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/shape3d/CameraProjection.ts"],
+      "verificationPaths": ["test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_verification.py", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0013-camera-projection-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0014-scene-only-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0015-perspective-left-text-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0016-perspective-right-picture-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0019-perspective-custom-geometry-plane-matrix.json", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-0020-perspective-left-picture-group-matrix.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/scripts/shape3d_camera_metrics.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_shape3d_camera_metrics.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/GroupNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/shape3d/CameraProjection.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "camera-local", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
       "issueUrls": []
     },
@@ -275,6 +282,7 @@
       },
       "fallback": "Render the existing flat two-dimensional shape and report omitted extrusion or perspective semantics.",
       "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "structural", "unit", "browser", "security", "performance", "native-powerpoint", "manual-visual", "package-size", "docs"],
       "issueUrls": []
     },
@@ -300,7 +308,8 @@
         "role": ["residual-scene-detection-including-values-outside-bounded-native-capabilities"]
       },
       "fallback": "Render child shapes in two dimensions and report omitted scene camera and lighting semantics outside any separately verified bounded capability.",
-      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md"],
+      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
     },
@@ -352,7 +361,8 @@
         "zPosition": [0]
       },
       "fallback": "Render the existing flat two-dimensional shape or picture when any camera, light, bevel, material, extrusion, effect, geometry, paint, or source-crop value falls outside this bounded tuple.",
-      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/export/serializePresentation.ts", "src/index.ts", "src/model/nodes/PicNode.ts", "src/model/nodes/Shape3D.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/GroupRenderer.ts", "src/renderer/ImageRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/shape3d/*.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_verification.py", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/scripts/shape3d_bevel_metrics.py", "test/e2e/server.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/e2e/test_shape3d_bevel_metrics.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/model/nodes/ShapeNode.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/shape3d/*.test.ts"],
+      "implementationPaths": ["src/export/serializePresentation.ts", "src/index.ts", "src/model/nodes/PicNode.ts", "src/model/nodes/Shape3D.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/GroupRenderer.ts", "src/renderer/ImageRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/Shape3DRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/shape3d/*.ts"],
+      "verificationPaths": ["test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_verification.py", "test/e2e/oracle/cases-pypptx/oracle-pypptx-shape3d-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/scripts/shape3d_bevel_metrics.py", "test/e2e/server.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/e2e/test_shape3d_bevel_metrics.py", "test/unit/export/serializePresentation.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/model/nodes/Shape3D.test.ts", "test/unit/model/nodes/ShapeNode.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/renderer/Shape3DRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/shape3d/*.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "bevel-local", "native-powerpoint", "manual-visual", "regression", "performance", "package-size", "docs"],
       "issueUrls": []
     },
@@ -415,7 +425,8 @@
         ]
       },
       "fallback": "Use the existing SVG/CSS approximation outside the verified matrix bounds; keep other alignments, directions, blur/distance/scale values, text-bearing or stroked shapes, picture fills, custom geometry, nested or differently scaled groups, rotation/flip, skew, 3D, effect DAGs, and compound effects as separate follow-on lanes.",
-      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/GroupRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/StyleResolver.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_inventory.py", "test/e2e/oracle/capability_verification.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/outer_shadow_metrics.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_verification.py", "test/e2e/test_outer_shadow_metrics.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
+      "implementationPaths": ["src/renderer/GroupRenderer.ts", "src/renderer/RenderContext.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/StyleResolver.ts"],
+      "verificationPaths": ["test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_inventory.py", "test/e2e/oracle/capability_verification.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/outer_shadow_metrics.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_verification.py", "test/e2e/test_outer_shadow_metrics.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "shadow-local", "performance", "package", "package-size", "typecheck", "lint", "build", "docs"],
       "issueUrls": []
     },
@@ -556,32 +567,8 @@
         ]
       },
       "fallback": "Use the explicit cloned-layer approximation outside the verified matrix bounds; keep live text without a visible surface, pictures, group-level effects, other alignment/direction/fade/scale/skew tuples, nested or non-uniform groups, rotation/flip, 3D, effect DAGs, and compound effects as separate follow-on lanes.",
-      "implementationPaths": [
-        "README.md",
-        "CHANGELOG.md",
-        "docs/ARCHITECTURE.md",
-        "docs/TESTING.md",
-        "src/renderer/GroupRenderer.ts",
-        "src/renderer/ReflectionRenderer.ts",
-        "src/renderer/ShapeRenderer.ts",
-        "test/browser/rendering-coverage.spec.ts",
-        "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md",
-        "test/e2e/oracle/README.md",
-        "test/e2e/oracle/capabilities.json",
-        "test/e2e/oracle/capability_contract.py",
-        "test/e2e/oracle/capability_inventory.py",
-        "test/e2e/oracle/capability_verification.py",
-        "test/e2e/scripts/generate_pypptx_cases.py",
-        "test/e2e/scripts/reflection_metrics.py",
-        "test/e2e/scripts/run_capability_loop.py",
-        "test/e2e/test_capability_contract.py",
-        "test/e2e/test_capability_inventory.py",
-        "test/e2e/test_capability_verification.py",
-        "test/e2e/test_pypptx_generator_cases.py",
-        "test/e2e/test_reflection_metrics.py",
-        "test/unit/renderer/GroupRenderer.test.ts",
-        "test/unit/renderer/ShapeRenderer.test.ts"
-      ],
+      "implementationPaths": ["src/renderer/GroupRenderer.ts", "src/renderer/ReflectionRenderer.ts", "src/renderer/ShapeRenderer.ts"],
+      "verificationPaths": ["test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_contract.py", "test/e2e/oracle/capability_inventory.py", "test/e2e/oracle/capability_verification.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/scripts/reflection_metrics.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_verification.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_reflection_metrics.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts"],
       "requiredGates": [
         "source",
         "structural",
@@ -623,7 +610,8 @@
         "presets": ["donut"]
       },
       "fallback": "Use the existing handwritten donut geometry for invalid or degenerate generated-runtime inputs.",
-      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "scripts/ooxml-geometry/README.md", "scripts/ooxml-geometry/formula-contract.mjs", "scripts/ooxml-geometry/formula-evaluator.mjs", "scripts/ooxml-geometry/generate.mjs", "scripts/ooxml-geometry/geometry-ir.mjs", "scripts/ooxml-geometry/path-emitter.mjs", "src/model/nodes/PicNode.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/ImageRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/browser/rendering-coverage.spec.ts", "test/unit/build/ooxmlGeometryPathEmitter.test.ts", "test/unit/docs/geometryDocs.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
+      "implementationPaths": ["src/model/nodes/PicNode.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/ImageRenderer.ts", "src/renderer/ShapeRenderer.ts", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts"],
+      "verificationPaths": ["scripts/ooxml-geometry/formula-contract.mjs", "scripts/ooxml-geometry/formula-evaluator.mjs", "scripts/ooxml-geometry/generate.mjs", "scripts/ooxml-geometry/geometry-ir.mjs", "scripts/ooxml-geometry/path-emitter.mjs", "test/browser/rendering-coverage.spec.ts", "test/unit/build/ooxmlGeometryPathEmitter.test.ts", "test/unit/model/nodes/PicNode.test.ts", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ImageRenderer.test.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },
@@ -650,7 +638,8 @@
         "presetCount": [28]
       },
       "fallback": "Use the handwritten preset implementation when generated runtime evaluation rejects invalid dimensions.",
-      "implementationPaths": ["CHANGELOG.md", "README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "scripts/ooxml-geometry/README.md", "scripts/ooxml-geometry/generate.mjs", "src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-flowchart-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
+      "implementationPaths": ["src/shapes/generated/ooxmlPresetGeometrySubset.ts", "src/shapes/ooxmlGeometryRuntime.ts", "src/shapes/presets.ts"],
+      "verificationPaths": ["scripts/ooxml-geometry/generate.mjs", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/cases-pypptx/oracle-pypptx-flowchart-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/GroupRenderer.test.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/shapes/ooxmlGeometryRuntime.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },
@@ -675,7 +664,8 @@
         "text": ["latin", "cjk", "mixed-script"]
       },
       "fallback": "Render combinations outside the native matrix through the same HTML table path without extending the verified fidelity claim.",
-      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/nodes/TableNode.ts", "src/renderer/TableRenderer.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-table-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/ChartTableCoverage.test.ts", "test/unit/renderer/TableRenderer.test.ts"],
+      "implementationPaths": ["src/model/nodes/TableNode.ts", "src/renderer/TableRenderer.ts"],
+      "verificationPaths": ["test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/cases-pypptx/oracle-pypptx-table-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/ChartTableCoverage.test.ts", "test/unit/renderer/TableRenderer.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },
@@ -701,7 +691,8 @@
         "target": ["text-body"]
       },
       "fallback": "Preserve the two-dimensional text layout while omitting text-body camera and lighting semantics.",
-      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md"],
+      "implementationPaths": ["src/model/nodes/ShapeNode.ts", "src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
     },
@@ -727,7 +718,8 @@
         "spAutoFitGrowthExclusions": ["non-square-wrap", "center-or-bottom-anchor", "explicit-overflow-axis", "vertical-text", "diagram-text-bounds", "non-textbox-shape", "inherited-compact-label"]
       },
       "fallback": "Use explicit inline text-container styles so host white-space rules cannot replace PowerPoint wrapping semantics; unsupported spAutoFit growth contexts retain the bounded measurement path.",
-      "implementationPaths": ["README.md", "CHANGELOG.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts", "test/browser/browser-package.spec.ts", "test/browser/rendering-coverage.spec.ts", "test/browser/text-line-break.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-text-00*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/fixtures/text-coverage.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/TextRenderer.branches.test.ts"],
+      "implementationPaths": ["src/renderer/ShapeRenderer.ts", "src/renderer/TextRenderer.ts"],
+      "verificationPaths": ["test/browser/browser-package.spec.ts", "test/browser/rendering-coverage.spec.ts", "test/browser/text-line-break.spec.ts", "test/e2e/oracle/cases-pypptx/oracle-pypptx-text-00*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/fixtures/text-coverage.ts", "test/unit/renderer/ShapeRenderer.test.ts", "test/unit/renderer/TextRenderer.branches.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/17", "https://github.com/aiden0z/pptx-renderer/issues/23"]
     },
@@ -753,7 +745,8 @@
         "styleBoundary": ["single-inherited-formula-run-style"]
       },
       "fallback": "Render a fully recognized math subtree as Presentation MathML; if any semantic OMML construct is unknown, select the package-authored MCE fallback shape or graphic frame. Formulas without a usable fallback remain unrendered.",
-      "implementationPaths": ["README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/model/RenderableChild.ts", "src/model/nodes/MathNode.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/MathRenderer.ts", "src/renderer/TextRenderer.ts", "test/browser/compatible-content-package.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-formula-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/server.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/unit/model/RenderableChild.test.ts", "test/unit/model/nodes/MathNode.test.ts", "test/unit/renderer/MathRenderer.test.ts"],
+      "implementationPaths": ["src/model/RenderableChild.ts", "src/model/nodes/MathNode.ts", "src/model/nodes/ShapeNode.ts", "src/renderer/MathRenderer.ts", "src/renderer/TextRenderer.ts"],
+      "verificationPaths": ["test/browser/compatible-content-package.spec.ts", "test/e2e/oracle/cases-pypptx/oracle-pypptx-formula-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/server.py", "test/e2e/test_pypptx_generator_cases.py", "test/e2e/test_server_provenance.py", "test/unit/model/RenderableChild.test.ts", "test/unit/model/nodes/MathNode.test.ts", "test/unit/renderer/MathRenderer.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
     },
@@ -779,7 +772,8 @@
         "properties": ["solidFill", "schemeClr", "srgbClr"]
       },
       "fallback": "Use the shape fontRef only when neither the run nor paragraph defRPr declares a local text fill.",
-      "implementationPaths": ["CHANGELOG.md", "README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/renderer/StyleResolver.ts", "src/renderer/TextRenderer.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/README.md", "test/e2e/oracle/cases-pypptx/oracle-pypptx-text-005[6-9]-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/TextRenderer.branches.test.ts"],
+      "implementationPaths": ["src/renderer/StyleResolver.ts", "src/renderer/TextRenderer.ts"],
+      "verificationPaths": ["test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/cases-pypptx/oracle-pypptx-text-005[6-9]-*.json", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/test_pypptx_generator_cases.py", "test/unit/renderer/TextRenderer.branches.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/21", "https://github.com/aiden0z/pptx-renderer/issues/23"]
     },
@@ -815,7 +809,8 @@
         "exclusions": ["afterEffect", "group-target", "picture-target", "paragraph-range", "non-fade-effect", "unsupported-timing-tree"]
       },
       "fallback": "Render the shape in its static final visible state when the timing tree, target, trigger, effect, or duration falls outside the verified fade-in matrix.",
-      "implementationPaths": ["CHANGELOG.md", "README.md", "docs/ARCHITECTURE.md", "docs/TESTING.md", "src/core/Viewer.ts", "src/model/Slide.ts", "src/renderer/SlideRenderer.ts", "test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/CAPABILITY_SELECTOR_SCHEMA.md", "test/e2e/oracle/README.md", "test/e2e/oracle/capabilities.json", "test/e2e/oracle/capability_ranking.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_ranking.py"],
+      "implementationPaths": ["src/core/Viewer.ts", "src/model/Slide.ts", "src/renderer/SlideRenderer.ts"],
+      "verificationPaths": ["test/browser/rendering-coverage.spec.ts", "test/e2e/oracle/capability_ranking.py", "test/e2e/scripts/run_capability_loop.py", "test/e2e/test_capability_contract.py", "test/e2e/test_capability_inventory.py", "test/e2e/test_capability_ranking.py"],
       "requiredGates": ["source", "structural", "unit", "browser", "performance", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/18", "https://github.com/aiden0z/pptx-renderer/issues/23"]
     },
@@ -839,6 +834,7 @@
       },
       "fallback": "Render the slide's static object state without animation playback.",
       "implementationPaths": ["src/model/Slide.ts", "src/renderer/SlideRenderer.ts"],
+      "verificationPaths": [],
       "requiredGates": ["source", "structural", "unit", "browser", "performance", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": ["https://github.com/aiden0z/pptx-renderer/issues/18"]
     }

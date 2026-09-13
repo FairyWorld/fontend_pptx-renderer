@@ -13,7 +13,10 @@ from oracle.capability_contract import (
     CapabilityDefinition,
     capability_definition_fingerprint,
 )
-from oracle.capability_evidence import compute_implementation_fingerprint
+from oracle.capability_evidence import (
+    compute_implementation_fingerprint,
+    compute_verification_fingerprint,
+)
 
 
 DERIVED_GATES = frozenset(
@@ -2491,7 +2494,7 @@ def normalize_native_evaluation_reports(
         "fontProfile": runtime.get("fontProfile"),
     }
     return {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "capabilityId": capability.id,
         "definitionFingerprint": capability_definition_fingerprint(capability),
         "renderer": {
@@ -2499,6 +2502,9 @@ def normalize_native_evaluation_reports(
             "dirty": False,
             "implementationFingerprint": compute_implementation_fingerprint(
                 repo, capability.implementation_paths
+            ),
+            "verificationFingerprint": compute_verification_fingerprint(
+                repo, capability.verification_paths
             ),
         },
         "environment": environment,

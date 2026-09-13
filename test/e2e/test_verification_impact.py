@@ -16,11 +16,13 @@ def _capability(
     capability_id: str,
     *,
     implementation_paths: list[str],
+    verification_paths: list[str] | None = None,
     required_gates: list[str],
 ) -> dict:
     return {
         "id": capability_id,
         "implementationPaths": implementation_paths,
+        "verificationPaths": verification_paths or [],
         "requiredGates": required_gates,
     }
 
@@ -35,11 +37,8 @@ def test_docs_only_change_skips_runtime_and_native_verification():
         capabilities=[
             _capability(
                 "drawingml.chart.2d.common",
-                implementation_paths=[
-                    "README.md",
-                    "src/renderer/ChartRenderer.ts",
-                    "test/unit/renderer/ChartRenderer.test.ts",
-                ],
+                implementation_paths=["src/renderer/ChartRenderer.ts"],
+                verification_paths=["test/unit/renderer/ChartRenderer.test.ts"],
                 required_gates=["unit", "browser", "native-powerpoint", "docs"],
             )
         ],
@@ -99,8 +98,8 @@ def test_renderer_change_selects_only_claiming_capabilities_and_their_tests_and_
         capabilities=[
             _capability(
                 "drawingml.chart.2d.common",
-                implementation_paths=[
-                    "src/renderer/ChartRenderer.ts",
+                implementation_paths=["src/renderer/ChartRenderer.ts"],
+                verification_paths=[
                     "test/unit/renderer/ChartRenderer.test.ts",
                     "test/e2e/test_chart_metrics.py",
                 ],
@@ -108,8 +107,8 @@ def test_renderer_change_selects_only_claiming_capabilities_and_their_tests_and_
             ),
             _capability(
                 "drawingml.shape.3d.camera-projected-plane",
-                implementation_paths=[
-                    "src/renderer/Shape3DRenderer.ts",
+                implementation_paths=["src/renderer/Shape3DRenderer.ts"],
+                verification_paths=[
                     "test/unit/renderer/Shape3DRenderer.test.ts",
                 ],
                 required_gates=["unit", "browser", "native-powerpoint"],
@@ -134,6 +133,26 @@ def test_renderer_change_selects_only_claiming_capabilities_and_their_tests_and_
         _cmd("python-for-test", "-m", "pytest", "test_chart_metrics.py", "-q", cwd="test/e2e"),
         _cmd("pnpm", "typecheck"),
     ]
+
+
+def test_verification_change_selects_the_capability_and_runs_the_changed_test():
+    plan = build_verification_plan(
+        changed_paths=["test/unit/renderer/ChartRenderer.test.ts"],
+        capabilities=[
+            _capability(
+                "drawingml.chart.2d.common",
+                implementation_paths=["src/renderer/ChartRenderer.ts"],
+                verification_paths=["test/unit/renderer/ChartRenderer.test.ts"],
+                required_gates=["unit", "browser", "native-powerpoint"],
+            )
+        ],
+        latest_case_ids={"drawingml.chart.2d.common": ["oracle-chart-0001"]},
+    )
+
+    assert plan["mode"] == "targeted"
+    assert plan["impactedCapabilityIds"] == ["drawingml.chart.2d.common"]
+    assert plan["unitTestPaths"] == ["test/unit/renderer/ChartRenderer.test.ts"]
+    assert plan["nativeCaseIds"] == ["oracle-chart-0001"]
 
 
 def test_native_gate_without_accepted_cases_is_reported_instead_of_silently_skipped():

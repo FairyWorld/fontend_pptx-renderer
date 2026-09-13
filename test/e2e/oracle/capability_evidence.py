@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable, Mapping
@@ -27,39 +28,39 @@ class EvidenceState:
     reasons: tuple[str, ...]
 
 
-def _validate_relative_pattern(pattern: str) -> None:
+def _validate_relative_pattern(pattern: str, role: str) -> None:
     if not pattern or "\x00" in pattern or "\\" in pattern:
-        raise CapabilityEvidenceError(f"implementation path must be repository-relative: {pattern}")
+        raise CapabilityEvidenceError(f"{role} path must be repository-relative: {pattern}")
     path = PurePosixPath(pattern)
     if path.is_absolute() or ".." in path.parts:
-        raise CapabilityEvidenceError(f"implementation path must be repository-relative: {pattern}")
+        raise CapabilityEvidenceError(f"{role} path must be repository-relative: {pattern}")
 
 
-def _expand_implementation_paths(repo: Path, patterns: Iterable[str]) -> tuple[Path, ...]:
+def _expand_paths(repo: Path, patterns: Iterable[str], role: str) -> tuple[Path, ...]:
     root = repo.resolve()
     paths: dict[str, Path] = {}
     for pattern in patterns:
-        _validate_relative_pattern(pattern)
+        _validate_relative_pattern(pattern, role)
         matches = sorted(path for path in repo.glob(pattern) if path.is_file())
         if not matches:
-            raise CapabilityEvidenceError(f"implementation path has no file matches: {pattern}")
+            raise CapabilityEvidenceError(f"{role} path has no file matches: {pattern}")
         for path in matches:
             resolved = path.resolve()
             try:
                 relative = resolved.relative_to(root).as_posix()
             except ValueError as error:
                 raise CapabilityEvidenceError(
-                    f"implementation path resolves outside repository: {pattern}"
+                    f"{role} path resolves outside repository: {pattern}"
                 ) from error
             paths[relative] = resolved
     return tuple(paths[name] for name in sorted(paths))
 
 
-def compute_implementation_fingerprint(repo: Path, patterns: Iterable[str]) -> str:
+def _compute_fingerprint(repo: Path, patterns: Iterable[str], role: str) -> str:
     repo = Path(repo)
     root = repo.resolve()
     digest = hashlib.sha256()
-    for path in _expand_implementation_paths(repo, patterns):
+    for path in _expand_paths(repo, patterns, role):
         relative = path.relative_to(root).as_posix()
         digest.update(relative.encode("utf-8"))
         digest.update(b"\0")
@@ -68,6 +69,82 @@ def compute_implementation_fingerprint(repo: Path, patterns: Iterable[str]) -> s
                 digest.update(chunk)
         digest.update(b"\0")
     return digest.hexdigest()
+
+
+def _compute_fingerprint_at_revision(
+    repo: Path,
+    patterns: Iterable[str],
+    revision: str,
+    role: str,
+) -> str:
+    repo = Path(repo)
+    revision_check = subprocess.run(
+        ["git", "cat-file", "-e", f"{revision}^{{commit}}"],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+    )
+    if revision_check.returncode != 0:
+        raise CapabilityEvidenceError(f"Git revision cannot be read: {revision}")
+    tree = subprocess.run(
+        ["git", "ls-tree", "-rz", "--name-only", revision],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+    )
+    if tree.returncode != 0:
+        raise CapabilityEvidenceError(f"Git revision cannot be read: {revision}")
+    repository_paths = tuple(
+        item.decode("utf-8") for item in tree.stdout.split(b"\0") if item
+    )
+    selected: set[str] = set()
+    for pattern in patterns:
+        _validate_relative_pattern(pattern, role)
+        matches = tuple(
+            path for path in repository_paths if PurePosixPath(path).match(pattern)
+        )
+        if not matches:
+            raise CapabilityEvidenceError(
+                f"{role} path has no file matches at Git revision {revision}: {pattern}"
+            )
+        selected.update(matches)
+    digest = hashlib.sha256()
+    for relative in sorted(selected):
+        blob = subprocess.run(
+            ["git", "show", f"{revision}:{relative}"],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+        )
+        if blob.returncode != 0:
+            raise CapabilityEvidenceError(
+                f"{role} path cannot be read at Git revision {revision}: {relative}"
+            )
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(blob.stdout)
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def compute_implementation_fingerprint(repo: Path, patterns: Iterable[str]) -> str:
+    return _compute_fingerprint(repo, patterns, "implementation")
+
+
+def compute_implementation_fingerprint_at_revision(
+    repo: Path, patterns: Iterable[str], revision: str
+) -> str:
+    return _compute_fingerprint_at_revision(repo, patterns, revision, "implementation")
+
+
+def compute_verification_fingerprint(repo: Path, patterns: Iterable[str]) -> str:
+    return _compute_fingerprint(repo, patterns, "verification")
+
+
+def compute_verification_fingerprint_at_revision(
+    repo: Path, patterns: Iterable[str], revision: str
+) -> str:
+    return _compute_fingerprint_at_revision(repo, patterns, revision, "verification")
 
 
 def _is_sha256(value: Any) -> bool:
@@ -116,10 +193,11 @@ def _case_fingerprints(
 def _verification_reasons(
     capability: CapabilityDefinition,
     report: Mapping[str, Any],
-    current_fingerprint: str,
+    current_implementation_fingerprint: str,
+    current_verification_fingerprint: str,
 ) -> tuple[str, ...]:
     reasons: list[str] = []
-    if report.get("schemaVersion") != 1:
+    if report.get("schemaVersion") != 2:
         return ("evidence:unsupported-schema",)
     if report.get("capabilityId") != capability.id:
         return ("evidence:capability-id-mismatch",)
@@ -127,8 +205,10 @@ def _verification_reasons(
         reasons.append("evidence:definition-fingerprint-drift")
 
     renderer = _report_mapping(report, "renderer")
-    if renderer.get("implementationFingerprint") != current_fingerprint:
+    if renderer.get("implementationFingerprint") != current_implementation_fingerprint:
         reasons.append("evidence:implementation-fingerprint-drift")
+    if renderer.get("verificationFingerprint") != current_verification_fingerprint:
+        reasons.append("evidence:verification-fingerprint-drift")
     if renderer.get("dirty") is not False:
         reasons.append("evidence:dirty-worktree")
     revision = renderer.get("revision")
@@ -165,15 +245,22 @@ def evaluate_evidence_state(
     report: Mapping[str, Any] | None,
     repo: Path,
 ) -> EvidenceState:
-    current_fingerprint = compute_implementation_fingerprint(repo, capability.implementation_paths)
+    current_implementation_fingerprint = compute_implementation_fingerprint(
+        repo, capability.implementation_paths
+    )
+    current_verification_fingerprint = compute_verification_fingerprint(
+        repo, capability.verification_paths
+    )
     definition_fingerprint = capability_definition_fingerprint(capability)
     if receipt is not None:
         if receipt.capability_id != capability.id:
             return EvidenceState("regressed", ("evidence:receipt-capability-id-mismatch",))
         if receipt.definition_fingerprint != definition_fingerprint:
             return EvidenceState("regressed", ("evidence:definition-fingerprint-drift",))
-        if receipt.implementation_fingerprint != current_fingerprint:
+        if receipt.implementation_fingerprint != current_implementation_fingerprint:
             return EvidenceState("regressed", ("evidence:implementation-fingerprint-drift",))
+        if receipt.verification_fingerprint != current_verification_fingerprint:
+            return EvidenceState("regressed", ("evidence:verification-fingerprint-drift",))
 
     if report is None:
         if receipt is not None:
@@ -185,7 +272,14 @@ def evaluate_evidence_state(
     if fingerprints is None:
         return EvidenceState("reproducible", ("evidence:missing-input-hash",))
 
-    reasons = list(_verification_reasons(capability, report, current_fingerprint))
+    reasons = list(
+        _verification_reasons(
+            capability,
+            report,
+            current_implementation_fingerprint,
+            current_verification_fingerprint,
+        )
+    )
     if receipt is not None:
         case_ids, source_hashes, ground_truth_hashes = fingerprints
         if receipt.case_ids != case_ids:
@@ -208,8 +302,20 @@ def build_promotion_receipt(
     repo: Path,
     accepted_at: str,
 ) -> PromotionReceipt:
-    current_fingerprint = compute_implementation_fingerprint(repo, capability.implementation_paths)
-    reasons = list(_verification_reasons(capability, report, current_fingerprint))
+    current_implementation_fingerprint = compute_implementation_fingerprint(
+        repo, capability.implementation_paths
+    )
+    current_verification_fingerprint = compute_verification_fingerprint(
+        repo, capability.verification_paths
+    )
+    reasons = list(
+        _verification_reasons(
+            capability,
+            report,
+            current_implementation_fingerprint,
+            current_verification_fingerprint,
+        )
+    )
     cases = _report_cases(report)
     fingerprints = _case_fingerprints(cases)
     if fingerprints is None:
@@ -230,7 +336,8 @@ def build_promotion_receipt(
         capability_id=capability.id,
         definition_fingerprint=capability_definition_fingerprint(capability),
         accepted_revision=revision,
-        implementation_fingerprint=current_fingerprint,
+        implementation_fingerprint=current_implementation_fingerprint,
+        verification_fingerprint=current_verification_fingerprint,
         case_ids=case_ids,
         case_input_fingerprints=source_hashes,
         ground_truth_fingerprints=ground_truth_hashes,
@@ -277,6 +384,7 @@ def sanitize_receipt_for_tracking(receipt: PromotionReceipt) -> dict[str, Any]:
         "definitionFingerprint": receipt.definition_fingerprint,
         "acceptedRevision": receipt.accepted_revision,
         "implementationFingerprint": receipt.implementation_fingerprint,
+        "verificationFingerprint": receipt.verification_fingerprint,
         "caseIds": list(receipt.case_ids),
         "caseInputFingerprints": list(receipt.case_input_fingerprints),
         "groundTruthFingerprints": list(receipt.ground_truth_fingerprints),

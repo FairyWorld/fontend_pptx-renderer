@@ -117,16 +117,22 @@ def _is_documentation_contract_test(path: str) -> bool:
     )
 
 
-def _capability_fields(capability: Any) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+def _capability_fields(
+    capability: Any,
+) -> tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     capability_id = str(_value(capability, "id", "id"))
     implementation_paths = tuple(
         str(path)
         for path in _value(capability, "implementationPaths", "implementation_paths")
     )
+    verification_paths = tuple(
+        str(path)
+        for path in (_value(capability, "verificationPaths", "verification_paths") or ())
+    )
     required_gates = tuple(
         str(gate) for gate in _value(capability, "requiredGates", "required_gates")
     )
-    return capability_id, implementation_paths, required_gates
+    return capability_id, implementation_paths, verification_paths, required_gates
 
 
 def _commands_for_targeted_plan(
@@ -258,16 +264,19 @@ def build_verification_plan(
         return plan
 
     claimed_paths: set[str] = set()
-    impacted: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
+    impacted: list[
+        tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]
+    ] = []
     behavior_set = set(behavior_changes)
     for fields in capability_fields:
-        _, implementation_paths, _ = fields
+        _, implementation_paths, verification_paths, _ = fields
+        capability_paths = (*implementation_paths, *verification_paths)
         matching_paths = {
             changed_path
             for changed_path in behavior_set
             if any(
-                fnmatch.fnmatchcase(changed_path, implementation_path)
-                for implementation_path in implementation_paths
+                fnmatch.fnmatchcase(changed_path, capability_path)
+                for capability_path in capability_paths
             )
         }
         if matching_paths:
@@ -322,32 +331,33 @@ def build_verification_plan(
         full_reason = None
 
     impacted_ids = sorted(fields[0] for fields in impacted)
-    implementation_paths: set[str] = set()
-    for _, patterns, _ in impacted:
+    owned_paths: set[str] = set()
+    for _, implementation_patterns, verification_patterns, _ in impacted:
+        patterns = (*implementation_patterns, *verification_patterns)
         for pattern in patterns:
             if _is_documentation(pattern):
                 continue
             if glob.has_magic(pattern):
-                implementation_paths.update(
+                owned_paths.update(
                     path for path in available_paths if fnmatch.fnmatchcase(path, pattern)
                 )
             else:
-                implementation_paths.add(pattern)
+                owned_paths.add(pattern)
     unit_tests = sorted(
         {
             path
-            for path in (*behavior_changes, *implementation_paths, *self_tests)
+            for path in (*behavior_changes, *owned_paths, *self_tests)
             if _is_unit_test(path)
         }
     )
     python_tests = sorted(
         {
             path
-            for path in (*behavior_changes, *implementation_paths, *self_tests)
+            for path in (*behavior_changes, *owned_paths, *self_tests)
             if _is_python_test(path)
         }
     )
-    required_gates = sorted({gate for _, _, gates in impacted for gate in gates})
+    required_gates = sorted({gate for _, _, _, gates in impacted for gate in gates})
     if force_full:
         required_gates = sorted(
             set(required_gates).union({"unit", "regression", "typecheck", "browser"})
@@ -364,7 +374,7 @@ def build_verification_plan(
     )
     native_capabilities_without_cases = sorted(
         capability_id
-        for capability_id, _, gates in impacted
+        for capability_id, _, _, gates in impacted
         if (
             "native-powerpoint" in gates or bool(LOCAL_VISUAL_GATES.intersection(gates))
         )
@@ -372,7 +382,7 @@ def build_verification_plan(
     )
 
     artifact_issues: list[dict[str, str]] = []
-    for capability_id, _, gates in impacted:
+    for capability_id, _, _, gates in impacted:
         if not (
             "native-powerpoint" in gates or bool(LOCAL_VISUAL_GATES.intersection(gates))
         ):
@@ -416,7 +426,7 @@ def build_verification_plan(
             expected_cases = sorted(
                 {
                     case_id
-                    for capability_id, _, gates in impacted
+                    for capability_id, _, _, gates in impacted
                     if gate in gates
                     for case_id in latest_case_ids.get(capability_id, ())
                 }

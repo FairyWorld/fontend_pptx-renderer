@@ -8,7 +8,10 @@ from oracle.capability_contract import (
     capability_definition_fingerprint,
     load_capability_registry,
 )
-from oracle.capability_evidence import compute_implementation_fingerprint
+from oracle.capability_evidence import (
+    compute_implementation_fingerprint,
+    compute_verification_fingerprint,
+)
 
 
 SCRIPT = Path(__file__).resolve().parent / "scripts" / "run_capability_loop.py"
@@ -33,7 +36,7 @@ def write_contract(repo: Path, *, render_mode: str = "fallback") -> tuple[Path, 
     registry.write_text(
         json.dumps(
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "capabilities": [
                     {
                         "id": "drawingml.shape.geometry.donut",
@@ -50,8 +53,8 @@ def write_contract(repo: Path, *, render_mode: str = "fallback") -> tuple[Path, 
                         ],
                         "scope": {"presets": ["donut"]},
                         "fallback": "none" if render_mode == "native" else "Render flat geometry.",
-                        "implementationPaths": [
-                            "src/renderer/ShapeRenderer.ts",
+                        "implementationPaths": ["src/renderer/ShapeRenderer.ts"],
+                        "verificationPaths": [
                             "test/ShapeRenderer.test.ts",
                         ],
                         "requiredGates": required_gates,
@@ -63,7 +66,7 @@ def write_contract(repo: Path, *, render_mode: str = "fallback") -> tuple[Path, 
         encoding="utf-8",
     )
     acceptance.write_text(
-        json.dumps({"schemaVersion": 1, "receipts": []}),
+        json.dumps({"schemaVersion": 2, "receipts": []}),
         encoding="utf-8",
     )
     return registry, acceptance
@@ -373,14 +376,19 @@ def test_accept_writes_fresh_receipt_and_rejects_dirty_repo(tmp_path: Path):
         repo,
         capability.implementation_paths,
     )
+    verification_fingerprint = compute_verification_fingerprint(
+        repo,
+        capability.verification_paths,
+    )
     report = {
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "capabilityId": capability.id,
         "definitionFingerprint": capability_definition_fingerprint(capability),
         "renderer": {
             "revision": revision,
             "dirty": False,
             "implementationFingerprint": implementation_fingerprint,
+            "verificationFingerprint": verification_fingerprint,
         },
         "environment": {"oracle": "powerpoint-macos"},
         "gates": {gate: "passed" for gate in capability.required_gates},
@@ -448,13 +456,14 @@ def test_accept_replaces_the_previous_receipt_for_the_same_capability(tmp_path: 
     acceptance.write_text(
         json.dumps(
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "receipts": [
                     {
                         "capabilityId": capability.id,
                         "definitionFingerprint": capability_definition_fingerprint(capability),
                         "acceptedRevision": "a" * 40,
                         "implementationFingerprint": "b" * 64,
+                        "verificationFingerprint": "e" * 64,
                         "caseIds": ["oracle-shape-0001"],
                         "caseInputFingerprints": ["c" * 64],
                         "groundTruthFingerprints": ["d" * 64],
@@ -483,17 +492,22 @@ def test_accept_replaces_the_previous_receipt_for_the_same_capability(tmp_path: 
         repo,
         capability.implementation_paths,
     )
+    verification_fingerprint = compute_verification_fingerprint(
+        repo,
+        capability.verification_paths,
+    )
     verification = tmp_path / "verification.json"
     verification.write_text(
         json.dumps(
             {
-                "schemaVersion": 1,
+                "schemaVersion": 2,
                 "capabilityId": capability.id,
                 "definitionFingerprint": capability_definition_fingerprint(capability),
                 "renderer": {
                     "revision": revision,
                     "dirty": False,
                     "implementationFingerprint": implementation_fingerprint,
+                    "verificationFingerprint": verification_fingerprint,
                 },
                 "environment": {"oracle": "powerpoint-macos"},
                 "gates": {gate: "passed" for gate in capability.required_gates},
@@ -589,4 +603,4 @@ def test_tracked_cli_contract_validates_current_repository():
     result = run_cli("validate", "--repo-root", project_root)
 
     assert result.returncode == 0, result.stderr
-    assert "validated 18 capabilities" in result.stdout
+    assert "validated 21 capabilities" in result.stdout
