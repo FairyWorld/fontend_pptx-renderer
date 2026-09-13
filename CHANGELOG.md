@@ -7,56 +7,26 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
-This release improves rendering fidelity through standards-based geometry, bounded native
-PowerPoint validation, and stricter evidence tracking. Detailed supported tuples and oracle gates
-remain in [`README.md`](README.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), and
-[`docs/TESTING.md`](docs/TESTING.md).
-
 ### Added
 
-- Added a pinned ECMA-376 preset-geometry toolchain that validates the source, evaluates the full
-  guide-formula contract, emits deterministic SVG paths, and ships a generated runtime subset.
-- Added an evidence-driven capability loop with a tracked OOXML registry, bounded corpus inventory,
-  transparent ranking, generated work packets, and revision-bound native PowerPoint reports.
-- Added native PowerPoint matrices and local visual gates for CJK text, common tables, 2D charts,
-  bounded OMML formula rendering and fallbacks, text-color precedence, flowchart geometry, bounded static 3D,
-  ordinary-shape shadows, and reflections.
-- Added bounded embedded EOT/MTX font loading, host-provided font faces, and reproducible font/browser
-  provenance for visual evaluation.
+- Added a pinned ECMA-376 geometry runtime for all zero-adjustment flowcharts and bounded `donut`
+  adjustments, plus browser-native rendering for a bounded OMML equation subset.
+- Added bounded static DrawingML 3D, ordinary-shape outer shadows and reflections, and embedded
+  EOT/MTX font loading without adding a 3D runtime dependency.
 
 ### Changed
 
-- Routed all 28 zero-adjustment flowcharts and bounded-adjustment `donut` through the generated
-  OOXML geometry runtime; other presets retain their compatible handwritten paths.
-- Expanded bounded static DrawingML 3D across top bevels, selected bottom-bevel materials, zero-depth
-  camera projection, source-cropped pictures, editable text, custom geometry, and a two-picture group.
-- Promoted verified ordinary-shape outer-shadow and reflection combinations while retaining stable
-  approximation or flat fallbacks outside their declared matrices.
-- Aligned CJK wrapping, Office percentage spacing, paragraph edges, text-color precedence, and
-  selected `spAutoFit` growth behavior more closely with native PowerPoint.
-- Improved compatible-content selection, color-map and placeholder inheritance, chart defaults,
-  sparse/literal chart data, conditional table borders, and clipped media/effect lifecycle handling.
-- Hardened native-oracle execution, matched PDF/browser raster density, provenance, per-slide
-  review, local fault-detection and Cartesian chart evidence, and representative-versus-validation
-  corpus classification.
-- Added fail-closed impact-based verification planning with testcase-bound native artifacts, so edit
-  loops run affected deterministic checks first and defer explicit browser/native evidence to the
-  pre-commit or pre-merge gates.
-- Added `planningMode` so broad residual features remain observable without repeatedly entering the
-  implementation queue.
+- Expanded native-validated fidelity for CJK text and autofit, common tables, 2D charts, shape
+  effects, groups, compatible content, SVG/OLE previews, and generated geometry.
+- Made visual regression evidence reproducible across renderer revision, PowerPoint source,
+  ground truth, browser, and optional font profile.
 
 ### Fixed
 
-- Prevented host CSS and browser text metrics from changing PowerPoint wrapping, causing unwanted
-  scrollbars, or collapsing bounded CJK `spAutoFit` text.
-- Preserved paragraph `defRPr` colors over shape `fontRef` fallback colors and generated native soft
-  line breaks without visible escape text.
-- Corrected bounded 3D bevel defaults, picture crops, camera-plane shadows, material response, and
-  donut lighting across aspect ratios, adjustments, and group transforms.
-- Stabilized chart layout/screenshots, group coordinate remapping, Google Slides table sizing,
-  compatible SVG/OLE fallbacks, and asynchronous media cleanup.
-- Made macOS PowerPoint export and macro automation path-safe, bounded, and explicit about locked or
-  permission-blocked environments.
+- Fixed text wrapping, overflow, spacing, color inheritance, autofit, and styled soft-break behavior
+  across browser containers and Office-authored CJK content.
+- Fixed chart literal/sparse data handling and layout defaults, conditional and merged table borders,
+  bounded 3D lighting/projection, clipped media effects, and asynchronous fallback cleanup.
 
 ## [1.2.4] - 2026-07-10
 

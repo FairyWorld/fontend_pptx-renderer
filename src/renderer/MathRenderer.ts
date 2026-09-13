@@ -85,7 +85,7 @@ function renderNary(node: Extract<MathNode, { kind: 'nary' }>): Element {
   return append(mathElement('mrow'), decorated, node.body ? renderMathNode(node.body) : undefined);
 }
 
-export function renderMathNode(node: MathNode): Element {
+function renderMathNode(node: MathNode): Element {
   switch (node.kind) {
     case 'row':
       return append(mathElement('mrow'), ...node.children.map(renderMathNode));

@@ -343,7 +343,7 @@ export function firstMathRunProperties(wrapper: SafeXmlNode): SafeXmlNode | unde
   return undefined;
 }
 
-export function mathNodeText(node: MathNode): string {
+function mathNodeText(node: MathNode): string {
   switch (node.kind) {
     case 'row':
       return node.children.map(mathNodeText).join('');
