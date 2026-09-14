@@ -2289,6 +2289,7 @@ function applyCategoryLabelZeroOffset(
   categoryAxis: MutableAxisOption,
   valueAxis: MutableAxisOption | undefined,
   plotSpan: number,
+  labelGapScale = 1,
 ): boolean {
   if (!valueAxis || categoryAxis.type !== 'category' || valueAxis.type !== 'value') return false;
   if (categoryAxis.axisLine?.onZero !== true || !axisCrossesZero(valueAxis)) return false;
@@ -2296,7 +2297,7 @@ function applyCategoryLabelZeroOffset(
 
   const zeroOffsetFromMin = plotSpan * ((0 - valueAxis.min!) / (valueAxis.max! - valueAxis.min!));
   const axisLabel = categoryAxis.axisLabel ?? (categoryAxis.axisLabel = {});
-  const labelGap = Math.max(6, Math.round(axisLabel.fontSize ?? 10));
+  const labelGap = Math.max(6, Math.round((axisLabel.fontSize ?? 10) * labelGapScale));
   axisLabel.margin = -Math.round(Math.max(0, zeroOffsetFromMin - labelGap));
   categoryAxis.z = Math.max(categoryAxis.z ?? 0, 20);
   return true;
@@ -2316,17 +2317,21 @@ export function applyZeroCrossingAxisLabelLayout(
     option.yAxis as MutableAxisOption | MutableAxisOption[],
   );
   const gridHeight = plotSpanPx(grid, chartSize.h, 'top', 'bottom');
-  let applied = false;
-
+  const gridWidth = plotSpanPx(grid, chartSize.w, 'left', 'right');
+  let horizontalCategoryApplied = false;
   xAxes.forEach((xAxis, index) => {
-    applied = applyCategoryLabelZeroOffset(xAxis, yAxes[index] ?? yAxes[0], gridHeight) || applied;
+    horizontalCategoryApplied =
+      applyCategoryLabelZeroOffset(xAxis, yAxes[index] ?? yAxes[0], gridHeight) ||
+      horizontalCategoryApplied;
+  });
+  yAxes.forEach((yAxis, index) => {
+    // PowerPoint leaves roughly two label-font units between horizontal-bar
+    // category text and the zero axis. ECharts otherwise lets the text cross
+    // the axis after applying the plot-relative negative margin.
+    applyCategoryLabelZeroOffset(yAxis, xAxes[index] ?? xAxes[0], gridWidth, 2);
   });
 
-  // ECharts keeps horizontal-bar category labels at the plot edge even when
-  // their y-axis line crosses zero. Applying the x-axis compensation here
-  // would move those labels into negative bars and their data labels.
-
-  if (applied && grid) {
+  if (horizontalCategoryApplied && grid) {
     grid.containLabel = false;
     grid.left = Math.max(
       gridEdgePx(grid.left, chartSize.w, 0),

@@ -159,13 +159,14 @@ for (const invert of [
   });
 }
 
-test('horizontal negative bars keep category labels outside the zero-crossing plot', async ({
+test('horizontal negative bars keep category labels next to the zero-crossing value axis', async ({
   page,
 }) => {
   await page.goto('/test/browser/blank.html');
   const result = await page.evaluate(async () => {
     const { parseXml } = await import('/src/parser/XmlParser.ts');
-    const { parseChartXml } = await import('/src/renderer/ChartRenderer.ts');
+    const { applyZeroCrossingAxisLabelLayout, parseChartXml } =
+      await import('/src/renderer/ChartRenderer.ts');
     const { echarts } = await import('/src/renderer/chart/echartsRuntime.ts');
     const { createMockRenderContext } = await import('/test/unit/helpers/mockContext.ts');
     const xml = `<c:chartSpace
@@ -186,6 +187,7 @@ test('horizontal negative bars keep category labels outside the zero-crossing pl
       w: 640,
       h: 360,
     }).option;
+    applyZeroCrossingAxisLabelLayout(option, { w: 640, h: 360 });
     const host = document.createElement('div');
     Object.assign(host.style, { width: '640px', height: '360px' });
     document.body.append(host);
@@ -212,12 +214,9 @@ test('horizontal negative bars keep category labels outside the zero-crossing pl
   });
 
   expect(result.labels).toHaveLength(2);
-  // ECharts paints the glyph box a few pixels beyond the grid edge. The
-  // labels must remain by that edge, with a clear gap to the interior zero axis.
-  expect(Math.max(...result.labels.map((label) => label.right))).toBeLessThanOrEqual(
-    result.gridLeft + 8,
-  );
-  expect(Math.max(...result.labels.map((label) => label.right))).toBeLessThan(result.zeroX - 40);
+  const rightmostLabel = Math.max(...result.labels.map((label) => label.right));
+  expect(rightmostLabel).toBeLessThan(result.zeroX);
+  expect(rightmostLabel).toBeGreaterThan(result.zeroX - 40);
   expect(result.zeroX).toBeGreaterThan(result.gridLeft + 40);
-  expect(result.configuredMargin).toBeUndefined();
+  expect(result.configuredMargin).toBeLessThan(0);
 });
