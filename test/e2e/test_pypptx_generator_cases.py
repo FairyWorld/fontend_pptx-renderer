@@ -347,6 +347,69 @@ def test_horizontal_negative_literal_chart_case_serializes_target_matrix(tmp_pat
     assert float(root.xpath("string(.//c:valAx/c:scaling/c:max/@val)", namespaces=ns)) == 6
 
 
+def test_3d_chart_fallback_matrix_is_registered():
+    generator = _load_generator_module()
+    chart_cases = [
+        case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-chart-")
+    ]
+
+    assert [case["name"] for case in chart_cases[-2:]] == [
+        "oracle-pypptx-chart-0023-column-3d-fallback-view",
+        "oracle-pypptx-chart-0024-pie-3d-fallback-view",
+    ]
+    assert all(case["coverage"]["oracle"] == "native-powerpoint" for case in chart_cases[-2:])
+
+
+def test_3d_chart_fallback_matrix_serializes_chart_and_view_ooxml(tmp_path: Path):
+    generator = _load_generator_module()
+    cases = {
+        case["name"]: case
+        for case in generator._build_all_case_defs()
+        if case["name"].startswith("oracle-pypptx-chart-002")
+    }
+    ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart"}
+
+    def generate(name: str):
+        path = tmp_path / name / "source.pptx"
+        generator._generate_pptx(cases[name], path)
+        with ZipFile(path) as zf:
+            chart_part = next(
+                item for item in zf.namelist() if item.startswith("ppt/charts/chart")
+            )
+            return etree.fromstring(zf.read(chart_part))
+
+    column = generate("oracle-pypptx-chart-0023-column-3d-fallback-view")
+    assert column.xpath(
+        "boolean(.//c:view3D/c:rotX[@val='20']"
+        " and .//c:view3D/c:hPercent[@val='100']"
+        " and .//c:view3D/c:rotY[@val='30']"
+        " and .//c:view3D/c:depthPercent[@val='150']"
+        " and .//c:view3D/c:rAngAx[@val='1']"
+        " and .//c:view3D/c:perspective[@val='30'])",
+        namespaces=ns,
+    )
+    assert column.xpath(
+        "boolean(.//c:bar3DChart/c:barDir[@val='col']"
+        " and .//c:bar3DChart/c:grouping[@val='clustered']"
+        " and .//c:bar3DChart/c:gapDepth[@val='150'])",
+        namespaces=ns,
+    )
+    assert not column.xpath(".//c:barChart", namespaces=ns)
+
+    pie = generate("oracle-pypptx-chart-0024-pie-3d-fallback-view")
+    assert pie.xpath(
+        "boolean(.//c:view3D/c:rotX[@val='30']"
+        " and .//c:view3D/c:rotY[@val='0']"
+        " and .//c:view3D/c:rAngAx[@val='0']"
+        " and .//c:view3D/c:perspective[@val='30'])",
+        namespaces=ns,
+    )
+    assert pie.xpath("boolean(.//c:pie3DChart/c:ser)", namespaces=ns)
+    assert not pie.xpath(".//c:pieChart", namespaces=ns)
+
+
 def test_case_pattern_selection_supports_exact_and_glob_filters():
     generator = _load_generator_module()
     case_defs = generator._build_all_case_defs()

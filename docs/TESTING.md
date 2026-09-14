@@ -280,8 +280,10 @@ This generates/reuses ground truth for all SmartArt layouts available on the loc
 
 For text, shape-adjustment, zero-adjustment flowchart, ordinary-shape and text effects, bounded
 static DrawingML 3D, table, composite, and chart interaction cases, use the python-pptx generator.
-It currently defines 198 cases: 60 text, 31 shape-adjustment, 28 flowchart, 2 shape-effect, 1
-text-effect, 20 static 3D, 8 table, 8 formula, 20 composite, and 21 chart cases.
+It currently defines 202 cases: 60 text, 31 shape-adjustment, 28 flowchart, 2 shape-effect, 1
+text-effect, 20 static 3D, 8 table, 8 formula, 20 composite, and 24 chart cases. Chart cases 23–24
+exercise readable two-dimensional fallbacks for native 3D column and pie charts; they do not claim
+three-dimensional parity.
 
 The eight isolated table cases cover a default grid, header and row banding, first/last-column
 styles, horizontal and vertical merges, variable grid sizes, cell margins and vertical anchors,

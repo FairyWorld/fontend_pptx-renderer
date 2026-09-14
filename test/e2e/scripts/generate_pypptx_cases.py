@@ -4396,7 +4396,7 @@ def _build_composite_cases() -> list[CaseDef]:
 
 
 # ---------------------------------------------------------------------------
-# P4: Chart data variants (2D types only — ECharts renderable)
+# P4: ECharts-renderable 2D charts plus bounded native 3D fallback probes
 # ---------------------------------------------------------------------------
 
 
@@ -4442,6 +4442,84 @@ def _patch_horizontal_negative_literal_chart_case(pptx_path: Path) -> None:
         entries,
         {chart_part: etree.tostring(root, encoding="UTF-8", xml_declaration=True)},
     )
+
+
+def _patch_3d_chart_case(
+    pptx_path: Path,
+    *,
+    source_tag: str,
+    target_tag: str,
+    view: tuple[tuple[str, str], ...],
+    gap_depth: str | None = None,
+) -> None:
+    """Convert one python-pptx 2D chart into its schema-compatible 3D variant."""
+    entries, data_by_name = _read_pptx_entries(pptx_path)
+    chart_parts = sorted(name for name in data_by_name if name.startswith("ppt/charts/chart"))
+    if len(chart_parts) != 1:
+        raise RuntimeError(f"expected one chart part, found {len(chart_parts)}")
+
+    chart_part = chart_parts[0]
+    root = etree.fromstring(data_by_name[chart_part])
+    ns = {"c": "http://schemas.openxmlformats.org/drawingml/2006/chart"}
+    chart_nodes = root.xpath("./c:chart", namespaces=ns)
+    plot_areas = root.xpath(".//c:plotArea", namespaces=ns)
+    chart_type_nodes = root.xpath(f".//c:plotArea/c:{source_tag}", namespaces=ns)
+    if len(chart_nodes) != 1 or len(plot_areas) != 1 or len(chart_type_nodes) != 1:
+        raise RuntimeError(f"expected one c:{source_tag} chart")
+
+    chart = chart_nodes[0]
+    plot_area = plot_areas[0]
+    chart_type = chart_type_nodes[0]
+    chart_type.tag = qn(f"c:{target_tag}")
+
+    if gap_depth is not None:
+        gap_depth_node = etree.Element(qn("c:gapDepth"), val=gap_depth)
+        axis_ids = chart_type.findall(qn("c:axId"))
+        insert_at = chart_type.index(axis_ids[0]) if axis_ids else len(chart_type)
+        chart_type.insert(insert_at, gap_depth_node)
+
+    view_3d = etree.Element(qn("c:view3D"))
+    for name, value in view:
+        etree.SubElement(view_3d, qn(f"c:{name}"), val=value)
+    chart.insert(chart.index(plot_area), view_3d)
+
+    _replace_pptx_entries(
+        pptx_path,
+        entries,
+        {chart_part: etree.tostring(root, encoding="UTF-8", xml_declaration=True)},
+    )
+
+
+def _patch_column_3d_chart_case(pptx_path: Path) -> None:
+    _patch_3d_chart_case(
+        pptx_path,
+        source_tag="barChart",
+        target_tag="bar3DChart",
+        view=(
+            ("rotX", "20"),
+            ("hPercent", "100"),
+            ("rotY", "30"),
+            ("depthPercent", "150"),
+            ("rAngAx", "1"),
+            ("perspective", "30"),
+        ),
+        gap_depth="150",
+    )
+
+
+def _patch_pie_3d_chart_case(pptx_path: Path) -> None:
+    _patch_3d_chart_case(
+        pptx_path,
+        source_tag="pieChart",
+        target_tag="pie3DChart",
+        view=(
+            ("rotX", "30"),
+            ("rotY", "0"),
+            ("rAngAx", "0"),
+            ("perspective", "30"),
+        ),
+    )
+
 
 def _build_chart_cases() -> list[CaseDef]:
     cases: list[CaseDef] = []
@@ -4696,7 +4774,72 @@ def _build_chart_cases() -> list[CaseDef]:
                 "chart.series.numLit",
                 "chart.invertIfNegative=false",
                 "chart.value-axis.crosses-zero",
-                "chart.category-labels.plot-edge",
+                "chart.category-labels.zero-crossing",
+            ],
+        },
+    )
+
+    def _build_column_3d_fallback(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        data = CategoryChartData()
+        data.categories = ["Q1", "Q2", "Q3", "Q4"]
+        data.add_series("North", (18, 27, 23, 34))
+        data.add_series("South", (14, 22, 30, 26))
+        slide.shapes.add_chart(
+            XL_CHART_TYPE.COLUMN_CLUSTERED,
+            _emu(1),
+            _emu(0.5),
+            _emu(10),
+            _emu(6),
+            data,
+        )
+
+    _add(
+        "column-3d-fallback-view",
+        _build_column_3d_fallback,
+        _patch_column_3d_chart_case,
+        coverage={
+            "oracle": "native-powerpoint",
+            "features": [
+                "chart.bar3DChart",
+                "chart.view3D.rotX",
+                "chart.view3D.hPercent",
+                "chart.view3D.rotY",
+                "chart.view3D.depthPercent",
+                "chart.view3D.rAngAx",
+                "chart.view3D.perspective",
+                "chart.fallback.2d-readable",
+            ],
+        },
+    )
+
+    def _build_pie_3d_fallback(prs):
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        data = CategoryChartData()
+        data.categories = ["Product", "Services", "Support", "Other"]
+        data.add_series("Revenue", (45, 30, 15, 10))
+        slide.shapes.add_chart(
+            XL_CHART_TYPE.PIE,
+            _emu(2),
+            _emu(0.5),
+            _emu(8),
+            _emu(6),
+            data,
+        )
+
+    _add(
+        "pie-3d-fallback-view",
+        _build_pie_3d_fallback,
+        _patch_pie_3d_chart_case,
+        coverage={
+            "oracle": "native-powerpoint",
+            "features": [
+                "chart.pie3DChart",
+                "chart.view3D.rotX",
+                "chart.view3D.rotY",
+                "chart.view3D.rAngAx",
+                "chart.view3D.perspective",
+                "chart.fallback.2d-readable",
             ],
         },
     )

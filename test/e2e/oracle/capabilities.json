@@ -55,7 +55,7 @@
       ],
       "scope": {
         "families": ["area", "bar-column", "bubble", "doughnut", "line", "pie", "radar", "scatter", "stock"],
-        "matrix": ["oracle-pypptx-chart-0001-through-0021"],
+        "matrix": ["oracle-pypptx-chart-0001-through-0022"],
         "runtime": ["echarts-canvas"],
         "cartesianLocalEvidence": ["single-chart", "bar-column-line-area", "one-to-eight-series", "direct-chart-frame-roi", "chromatic-series", "neutral-axis-grid", "neutral-or-solid-plot-background"]
       },
@@ -77,7 +77,8 @@
         }
       ],
       "scope": {
-        "families": ["bar3DChart"]
+        "families": ["bar3DChart"],
+        "matrix": ["oracle-pypptx-chart-0023-column-3d-fallback-view"]
       },
       "fallback": "Render the chart series as a two-dimensional bar chart and record omitted depth and scene semantics.",
       "affectedPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
@@ -97,7 +98,8 @@
         }
       ],
       "scope": {
-        "families": ["pie3DChart"]
+        "families": ["pie3DChart"],
+        "matrix": ["oracle-pypptx-chart-0024-pie-3d-fallback-view"]
       },
       "fallback": "Render the chart series as a two-dimensional pie chart and record omitted depth and scene semantics.",
       "affectedPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
@@ -117,7 +119,8 @@
         }
       ],
       "scope": {
-        "properties": ["rotX", "rotY", "rAngAx", "perspective", "depthPercent", "heightPercent"]
+        "properties": ["rotX", "rotY", "rAngAx", "perspective", "depthPercent", "hPercent"],
+        "matrix": ["oracle-pypptx-chart-0023-column-3d-fallback-view", "oracle-pypptx-chart-0024-pie-3d-fallback-view"]
       },
       "fallback": "Ignore the three-dimensional chart camera while preserving the chart's two-dimensional series.",
       "affectedPaths": ["src/renderer/ChartRenderer.ts"],
