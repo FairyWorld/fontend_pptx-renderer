@@ -30,7 +30,8 @@ pnpm verify:plan -- --changed-path src/renderer/Shape3DRenderer.ts \
 
 The planner maps changed files through exact or declared-glob `affectedPaths` in
 `capabilities.json`, de-duplicates their unit and Python tests, and lists the native PowerPoint case
-IDs recorded by the latest historical verification records. A targeted run executes only those
+IDs recorded by the latest historical verification record or, when no such record can exist for a
+non-native render mode, its explicit `verificationCases`. A targeted run executes only those
 unit/Python checks plus TypeScript type checking when runtime TypeScript changed. Browser checks
 and native rendering stay visible as deferred pre-commit and pre-merge gates. Direct unit, Python,
 and browser test edits run their own gate without expanding the production native scope; the shared
@@ -42,9 +43,10 @@ remains global. Any unclassified non-documentation path fails closed to the full
 Python, typecheck, and browser plan. A capability-registry or unclassified global
 runtime/control change expands the native scope to every registered capability. Shared evaluation,
 provenance, evidence, and capability-loop control changes do the same and add `capability:check`.
-Native artifacts count as available only when their source and selected ground-truth SHA-256 values
-match the recorded testcase inputs exactly; same-stem cases from another local corpus cannot satisfy the
-check. Missing case sets, mismatched artifacts, and required local visual gates without a complete
+Accepted native artifacts count as available only when their source and selected ground-truth
+SHA-256 values match the recorded testcase inputs exactly; same-stem cases from another local
+corpus cannot satisfy the check. Declared non-native verification cases require current local PPTX
+and ground-truth artifacts but do not create a native support claim. Missing case sets, mismatched artifacts, and required local visual gates without a complete
 repeatable `--case-report` set are reported explicitly instead of silently passing. Targeted Python
 commands run from `test/e2e`, where the suite's fixture and testdata paths are defined.
 

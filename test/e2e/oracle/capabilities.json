@@ -60,6 +60,7 @@
         "cartesianLocalEvidence": ["single-chart", "bar-column-line-area", "one-to-eight-series", "direct-chart-frame-roi", "chromatic-series", "neutral-axis-grid", "neutral-or-solid-plot-background"]
       },
       "fallback": "Render supported chart families through ECharts while retaining an explicit approximation status for Office plot-area, axis, label, and legend layout differences.",
+      "verificationCases": ["oracle-pypptx-chart-0002-column-negative-values", "oracle-pypptx-chart-0022-bar-negative-literal-zero-crossing"],
       "affectedPaths": ["src/model/nodes/ChartNode.ts", "src/renderer/ChartRenderer.ts", "src/renderer/chart/echartsRuntime.ts", "src/utils/e2eCompare.ts", "test/browser/chart-table-coverage.spec.ts", "test/e2e/oracle/cases-pypptx/oracle-pypptx-chart-*.json", "test/e2e/oracle/chart_metrics.py", "test/e2e/scripts/generate_pypptx_cases.py", "test/e2e/server.py", "test/e2e/test_cartesian_chart_metrics.py", "test/pages/e2e-compare.html", "test/unit/renderer/ChartRenderer.test.ts", "test/unit/utils/e2eCompare.test.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "regression", "docs"],
       "issueUrls": []
@@ -81,6 +82,7 @@
         "matrix": ["oracle-pypptx-chart-0023-column-3d-fallback-view"]
       },
       "fallback": "Render the chart series as a two-dimensional bar chart and record omitted depth and scene semantics.",
+      "verificationCases": ["oracle-pypptx-chart-0023-column-3d-fallback-view"],
       "affectedPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
       "requiredGates": ["source", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
@@ -102,6 +104,7 @@
         "matrix": ["oracle-pypptx-chart-0024-pie-3d-fallback-view"]
       },
       "fallback": "Render the chart series as a two-dimensional pie chart and record omitted depth and scene semantics.",
+      "verificationCases": ["oracle-pypptx-chart-0024-pie-3d-fallback-view"],
       "affectedPaths": ["src/renderer/ChartRenderer.ts", "src/renderer/chart/types.ts"],
       "requiredGates": ["source", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []
@@ -123,6 +126,7 @@
         "matrix": ["oracle-pypptx-chart-0023-column-3d-fallback-view", "oracle-pypptx-chart-0024-pie-3d-fallback-view"]
       },
       "fallback": "Ignore the three-dimensional chart camera while preserving the chart's two-dimensional series.",
+      "verificationCases": ["oracle-pypptx-chart-0023-column-3d-fallback-view", "oracle-pypptx-chart-0024-pie-3d-fallback-view"],
       "affectedPaths": ["src/renderer/ChartRenderer.ts"],
       "requiredGates": ["source", "structural", "unit", "browser", "native-powerpoint", "manual-visual", "docs"],
       "issueUrls": []

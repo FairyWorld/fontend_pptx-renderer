@@ -79,6 +79,22 @@ def test_non_native_mode_requires_a_fallback_description(tmp_path: Path):
         load_capability_registry(path)
 
 
+def test_capability_accepts_explicit_verification_cases(tmp_path: Path):
+    entry = capability(required_gates=["source", "unit", "native-powerpoint"])
+    entry["verificationCases"] = ["oracle-chart-0001", "oracle-chart-0002"]
+    registry = load_capability_registry(
+        write_json(
+            tmp_path / "capabilities.json",
+            {"schemaVersion": 2, "capabilities": [entry]},
+        )
+    )
+
+    assert registry.capabilities[0].verification_cases == (
+        "oracle-chart-0001",
+        "oracle-chart-0002",
+    )
+
+
 def test_capability_planning_mode_defaults_to_ranked_and_accepts_observation_only(
     tmp_path: Path,
 ):
@@ -396,6 +412,10 @@ def test_tracked_capability_contract_is_valid():
     common_table = registry.by_id()["drawingml.table.common"]
     formula = registry.by_id()["drawingml.text.math.omml"]
     assert chart_2d.render_mode == "approximate"
+    assert chart_2d.verification_cases == (
+        "oracle-pypptx-chart-0002-column-negative-values",
+        "oracle-pypptx-chart-0022-bar-negative-literal-zero-crossing",
+    )
     assert chart_2d.scope["cartesianLocalEvidence"] == (
         "single-chart",
         "bar-column-line-area",

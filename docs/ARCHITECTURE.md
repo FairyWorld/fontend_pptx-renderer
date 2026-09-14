@@ -51,8 +51,9 @@ Render mode, planning mode, and evidence state are independent. Render modes are
 report for the current Git revision. Planning mode is `ranked` by default; `observation-only` keeps broad residual
 selectors visible in the ledger while excluding them from executable ranking and work packets. A
 historical verification record never establishes the state of a later revision. The edit-loop
-planner uses each capability's `affectedPaths` only to select tests; those paths are not an
-implementation signature or correctness proof.
+planner uses each capability's `affectedPaths` only to select tests and its `verificationCases` to
+select concrete non-native oracle probes; neither field is an implementation signature or
+correctness proof.
 
 ## 1) Parse Layer
 

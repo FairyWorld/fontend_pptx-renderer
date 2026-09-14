@@ -78,6 +78,7 @@ class CapabilityDefinition:
     affected_paths: tuple[str, ...]
     required_gates: tuple[str, ...]
     issue_urls: tuple[str, ...]
+    verification_cases: tuple[str, ...]
     planning_mode: str
 
 
@@ -275,7 +276,7 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
             "requiredGates",
             "issueUrls",
         },
-        optional={"planningMode"},
+        optional={"planningMode", "verificationCases"},
         label=label,
     )
     capability_id = _nonempty_string(value["id"], f"{label} id")
@@ -337,6 +338,11 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
         f"capability {capability_id} issueUrls",
         allow_empty=True,
     )
+    verification_cases = _unique_strings(
+        value.get("verificationCases", []),
+        f"capability {capability_id} verificationCases",
+        allow_empty=True,
+    )
     for issue_url in issue_urls:
         parsed = urlparse(issue_url)
         if parsed.scheme != "https" or parsed.netloc != "github.com":
@@ -352,6 +358,7 @@ def _parse_capability(value: Any, index: int) -> CapabilityDefinition:
         affected_paths=affected_paths,
         required_gates=required_gates,
         issue_urls=issue_urls,
+        verification_cases=verification_cases,
         planning_mode=planning_mode,
     )
 

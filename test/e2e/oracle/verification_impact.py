@@ -122,7 +122,9 @@ def _is_documentation_contract_test(path: str) -> bool:
     )
 
 
-def _capability_fields(capability: Any) -> tuple[str, tuple[str, ...], tuple[str, ...]]:
+def _capability_fields(
+    capability: Any,
+) -> tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     capability_id = str(_value(capability, "id", "id"))
     affected_paths = tuple(
         str(path)
@@ -131,7 +133,11 @@ def _capability_fields(capability: Any) -> tuple[str, tuple[str, ...], tuple[str
     required_gates = tuple(
         str(gate) for gate in _value(capability, "requiredGates", "required_gates")
     )
-    return capability_id, affected_paths, required_gates
+    verification_cases = tuple(
+        str(case_id)
+        for case_id in (_value(capability, "verificationCases", "verification_cases") or ())
+    )
+    return capability_id, affected_paths, required_gates, verification_cases
 
 
 def _commands_for_targeted_plan(
@@ -219,6 +225,11 @@ def build_verification_plan(
         None if available_native_case_ids is None else set(available_native_case_ids)
     )
     capability_fields = [_capability_fields(capability) for capability in capabilities]
+    effective_case_ids = {
+        capability_id: tuple(latest_case_ids.get(capability_id) or verification_cases)
+        for capability_id, _, _, verification_cases in capability_fields
+        if latest_case_ids.get(capability_id) or verification_cases
+    }
 
     def empty_plan(
         mode: str, *, commands: list[dict[str, Any]] | None = None
@@ -300,10 +311,12 @@ def build_verification_plan(
         direct_tests, self_test_sources
     )
     claimed_paths: set[str] = set()
-    impacted: list[tuple[str, tuple[str, ...], tuple[str, ...]]] = []
+    impacted: list[
+        tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]
+    ] = []
     behavior_set = set(behavior_changes)
     for fields in capability_fields:
-        _, affected_paths, _ = fields
+        _, affected_paths, _, _ = fields
         matching_paths = {
             changed_path
             for changed_path in capability_signal_paths
@@ -361,7 +374,7 @@ def build_verification_plan(
 
     impacted_ids = sorted(fields[0] for fields in impacted)
     affected_paths: set[str] = set()
-    for _, patterns, _ in impacted:
+    for _, patterns, _, _ in impacted:
         for pattern in patterns:
             if _is_documentation(pattern):
                 continue
@@ -385,7 +398,7 @@ def build_verification_plan(
             if _is_python_test(path)
         }
     )
-    required_gates = sorted({gate for _, _, gates in impacted for gate in gates})
+    required_gates = sorted({gate for _, _, gates, _ in impacted for gate in gates})
     if any(_is_browser_test(path) for path in direct_tests):
         required_gates = sorted(set(required_gates).union({"browser"}))
     if force_full:
@@ -396,7 +409,7 @@ def build_verification_plan(
         {
             case_id
             for capability_id in impacted_ids
-            for case_id in latest_case_ids.get(capability_id, ())
+            for case_id in effective_case_ids.get(capability_id, ())
         }
     )
     requires_native = "native-powerpoint" in required_gates or bool(
@@ -404,23 +417,28 @@ def build_verification_plan(
     )
     native_capabilities_without_cases = sorted(
         capability_id
-        for capability_id, _, gates in impacted
+        for capability_id, _, gates, _ in impacted
         if (
             "native-powerpoint" in gates or bool(LOCAL_VISUAL_GATES.intersection(gates))
         )
-        and not latest_case_ids.get(capability_id)
+        and not effective_case_ids.get(capability_id)
     )
 
     artifact_issues: list[dict[str, str]] = []
-    for capability_id, _, gates in impacted:
+    for capability_id, _, gates, _ in impacted:
         if not (
             "native-powerpoint" in gates or bool(LOCAL_VISUAL_GATES.intersection(gates))
         ):
             continue
-        for case_id in latest_case_ids.get(capability_id, ()):
+        for case_id in effective_case_ids.get(capability_id, ()):
             reason: str | None = None
-            if latest_case_hashes is not None:
-                expected = latest_case_hashes.get(capability_id, {}).get(case_id)
+            accepted_hashes = (
+                latest_case_hashes.get(capability_id)
+                if latest_case_hashes is not None
+                else None
+            )
+            if accepted_hashes is not None:
+                expected = accepted_hashes.get(case_id)
                 candidates = _artifact_candidates(
                     (available_native_case_hashes or {}).get(case_id)
                 )
@@ -430,6 +448,10 @@ def build_verification_plan(
                     reason = "missing-artifact"
                 elif tuple(expected) not in candidates:
                     reason = "input-hash-mismatch"
+            elif available_native_case_hashes is not None and not _artifact_candidates(
+                available_native_case_hashes.get(case_id)
+            ):
+                reason = "missing-artifact"
             elif available_native_cases is not None and case_id not in available_native_cases:
                 reason = "missing-artifact"
             if reason is not None:
@@ -456,9 +478,9 @@ def build_verification_plan(
             expected_cases = sorted(
                 {
                     case_id
-                    for capability_id, _, gates in impacted
+                    for capability_id, _, gates, _ in impacted
                     if gate in gates
-                    for case_id in latest_case_ids.get(capability_id, ())
+                    for case_id in effective_case_ids.get(capability_id, ())
                 }
             )
             missing_cases = sorted(

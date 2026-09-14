@@ -60,6 +60,9 @@ tracked separately. Inventory observation does not imply renderer support; the c
 `renderMode`, `planningMode`, bounded scope, gates, and a passing current-revision report determine
 the support claim. `planningMode` defaults to `ranked`. Set it to `observation-only` for an umbrella
 selector that must remain measurable but is too broad to become an executable work packet.
+`verificationCases` may list concrete oracle case IDs for pre-merge checks of `fallback` or
+`approximate` behavior. These cases keep validation testcase-driven without promoting the
+capability to `native` or creating an acceptance record.
 
 The inventory scanner enforces both constraint forms while streaming XML with a bounded ancestor
 stack. Contract and scanner behavior are covered by `test_capability_contract.py` and

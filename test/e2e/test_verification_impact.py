@@ -155,6 +155,27 @@ def test_native_gate_without_accepted_cases_is_reported_instead_of_silently_skip
     assert plan["nativeCapabilitiesWithoutCases"] == ["drawingml.chart.3d.view"]
 
 
+def test_declared_verification_cases_cover_non_native_capability_without_receipt():
+    case_id = "oracle-chart-3d-fallback"
+    capability = _capability(
+        "drawingml.chart.3d.view",
+        affected_paths=["src/renderer/ChartRenderer.ts"],
+        required_gates=["unit", "native-powerpoint"],
+    )
+    capability["verificationCases"] = [case_id]
+    plan = build_verification_plan(
+        changed_paths=["src/renderer/ChartRenderer.ts"],
+        capabilities=[capability],
+        latest_case_ids={},
+        latest_case_hashes={},
+        available_native_case_hashes={case_id: {("a" * 64, "b" * 64)}},
+    )
+
+    assert plan["nativeCaseIds"] == [case_id]
+    assert plan["nativeCapabilitiesWithoutCases"] == []
+    assert plan["nativeCasesMissingArtifacts"] == []
+
+
 def test_native_artifacts_and_local_metric_obligations_are_explicit():
     plan = build_verification_plan(
         changed_paths=["src/renderer/Shape3DRenderer.ts"],

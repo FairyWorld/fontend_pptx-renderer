@@ -51,7 +51,8 @@ work packet records the override instead of silently hiding the global ordering.
 
 `verify_affected.py` is the fast development-loop entry point. It uses exact or declared-glob
 `affectedPaths` hints to select affected capabilities, de-duplicates their tracked unit and Python
-tests, and reports the native case set from the latest historical record. It deliberately defers
+tests, and reports the native case set from the latest historical record or the capability's
+explicit `verificationCases` when its non-native render mode cannot have an acceptance record. It deliberately defers
 browser and native runs for targeted plans so they execute once at pre-commit or pre-merge rather
 than after every edit. Direct unit, Python, and browser test edits run their own gate without
 expanding the production native scope; the shared python-pptx generator runs its focused generator
