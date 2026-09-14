@@ -58,6 +58,67 @@ for (const family of ['scatter', 'bubble']) {
   }
 }
 
+for (const scenario of [
+  { chartTag: 'bar3DChart', expectedType: 'bar' },
+  { chartTag: 'pie3DChart', expectedType: 'pie' },
+]) {
+  test(`real ECharts ${scenario.chartTag} preserves readable fallback data`, async ({ page }) => {
+    await page.goto('/test/browser/blank.html');
+    const result = await page.evaluate(async ({ chartTag, expectedType }) => {
+      const { cacheXml, chartOption } = await import('/test/fixtures/chart-table-coverage.ts');
+      const { echarts } = await import('/src/renderer/chart/echartsRuntime.ts');
+      const axes = chartTag === 'bar3DChart' ? '<c:axId val="1"/><c:axId val="2"/>' : '';
+      const xml = `<c:chartSpace
+        xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"
+        xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
+        <c:chart>
+          <c:view3D><c:rotX val="20"/><c:rotY val="30"/><c:perspective val="30"/></c:view3D>
+          <c:plotArea>
+            <c:${chartTag}>
+              ${chartTag === 'bar3DChart' ? '<c:barDir val="col"/><c:grouping val="clustered"/>' : '<c:varyColors val="1"/>'}
+              <c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Revenue</c:v></c:tx>
+                <c:cat>${cacheXml('strLit', ['A', 'B', 'C'])}</c:cat>
+                <c:val>${cacheXml('numLit', [4, 7, 3])}</c:val>
+              </c:ser>${axes}
+            </c:${chartTag}>
+            <c:catAx><c:axId val="1"/><c:axPos val="b"/><c:crossAx val="2"/></c:catAx>
+            <c:valAx><c:axId val="2"/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx>
+          </c:plotArea>
+        </c:chart>
+      </c:chartSpace>`;
+      const option = chartOption(xml);
+      const optionSeries = (option.series as any[])[0];
+      const host = document.createElement('div');
+      Object.assign(host.style, { width: '640px', height: '360px' });
+      document.body.append(host);
+      const chart = echarts.init(host, undefined, { renderer: 'canvas' });
+      chart.setOption({ ...option, animation: false });
+      chart.getZr().flush();
+      const data = chart.getModel().getSeriesByIndex(0).getData();
+      const canvas = host.querySelector('canvas')!;
+      const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+      const answer = {
+        expectedType,
+        type: optionSeries.type,
+        name: optionSeries.name,
+        values: optionSeries.data.map((item: any) =>
+          typeof item === 'number' ? item : item.value,
+        ),
+        categories: Array.from({ length: data.count() }, (_, index) => data.getName(index)),
+        painted: pixels.some((value, index) => index % 4 === 3 && value > 0),
+      };
+      chart.dispose();
+      return answer;
+    }, scenario);
+
+    expect(result.type).toBe(result.expectedType);
+    expect(result.name).toBe('Revenue');
+    expect(result.values).toEqual([4, 7, 3]);
+    expect(result.categories).toEqual(['A', 'B', 'C']);
+    expect(result.painted).toBe(true);
+  });
+}
+
 test('browser table merged edges, explicit clearing, corners and direct precedence', async ({
   page,
 }) => {

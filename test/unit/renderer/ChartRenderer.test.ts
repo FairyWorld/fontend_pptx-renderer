@@ -2842,8 +2842,13 @@ describe('ChartRenderer', () => {
 
       const { option } = parseChartOption(xml);
       const series = option.series as any[];
-      expect(series.length).toBeGreaterThan(0);
+      expect(series).toHaveLength(1);
       expect(series[0].type).toBe('pie');
+      expect(series[0].name).toBe('Sales');
+      expect(series[0].data).toEqual([
+        expect.objectContaining({ name: 'East', value: 45 }),
+        expect.objectContaining({ name: 'West', value: 55 }),
+      ]);
     });
 
     it('should parse bar3DChart with 3D settings', () => {
@@ -2889,7 +2894,14 @@ describe('ChartRenderer', () => {
 
       const { option } = parseChartOption(xml);
       const series = option.series as any[];
-      expect(series.length).toBeGreaterThan(0);
+      expect(series).toHaveLength(1);
+      expect(series[0].type).toBe('bar');
+      expect(series[0].name).toBe('3D Data');
+      expect(series[0].data).toEqual([
+        expect.objectContaining({ value: 100 }),
+        expect.objectContaining({ value: 200 }),
+      ]);
+      expect((option.xAxis as any).data).toEqual(['Cat1', 'Cat2']);
     });
   });
 
