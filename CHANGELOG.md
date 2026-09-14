@@ -7,6 +7,8 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-14
+
 ### Added
 
 - Added a pinned ECMA-376 geometry runtime for all zero-adjustment flowcharts and bounded `donut`
