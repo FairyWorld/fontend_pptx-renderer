@@ -12,7 +12,8 @@ import { resolveColor, resolveColorToCss, resolveFill } from './StyleResolver';
 import { emuToPx, pctToDecimal, angleToDeg } from '../parser/units';
 import { parseOoxmlBool } from '../parser/booleans';
 import { isExternalTargetMode } from '../parser/RelParser';
-import { isAllowedExternalUrl } from '../utils/urlSafety';
+import { isAllowedExternalMediaUrl, isAllowedExternalUrl } from '../utils/urlSafety';
+import { findMediaByTarget, findMediaByTargetAsync, getOrCreateBlobUrl } from '../utils/media';
 import { getEffectiveBodyPrChild, parseTextPercentage } from './TextBodyProperties';
 import { cssFontFamilyStack, resolveThemeFontStack } from './fontResolver';
 import { resolveSlideNavigationIndex, slideJumpTitle } from './navigation';
@@ -163,6 +164,7 @@ interface MergedParagraphStyle {
   marginLeft?: number;
   textIndent?: number;
   defaultTabSize?: number;
+  tabStops?: { position: number; align: string }[];
   lineHeight?: string;
   /** OOXML spcPct as a 0-1 ratio. One Office line is approximately 1.19 CSS em. */
   lineHeightPercent?: number;
@@ -214,6 +216,19 @@ function mergeParagraphProps(target: MergedParagraphStyle, pPr: SafeXmlNode): vo
 
   const defTabSz = pPr.numAttr('defTabSz');
   if (defTabSz !== undefined) target.defaultTabSize = emuToPx(defTabSz);
+
+  const tabLst = pPr.child('tabLst');
+  if (tabLst.exists()) {
+    target.tabStops = tabLst
+      .children('tab')
+      .flatMap((tab) => {
+        const position = tab.numAttr('pos');
+        return position === undefined
+          ? []
+          : [{ position: emuToPx(position), align: tab.attr('algn') ?? 'l' }];
+      })
+      .sort((a, b) => a.position - b.position);
+  }
 
   // Line spacing
   // OOXML spcPct: 100000 = one Office line. PowerPoint's native baseline distance is
@@ -388,6 +403,8 @@ interface MergedRunStyle {
   textGradientCss?: string;
   /** CSS background for text fill (from rPr > pattFill). */
   textPatternCss?: string;
+  /** Picture fill node clipped to the run glyphs (from rPr > blipFill). */
+  textPictureFill?: SafeXmlNode;
   /** CSS background color for a:highlight. */
   highlightColor?: string;
   /** Explicit underline CSS color from a:uFill. */
@@ -408,7 +425,14 @@ interface MergedRunStyle {
 
 function getRunColorKind(rPr: SafeXmlNode | undefined): 'none' | 'defaultTextScheme' | 'explicit' {
   if (!rPr?.exists()) return 'none';
-  if (rPr.child('gradFill').exists()) return 'explicit';
+  if (
+    rPr.child('gradFill').exists() ||
+    rPr.child('pattFill').exists() ||
+    rPr.child('blipFill').exists() ||
+    rPr.child('noFill').exists()
+  ) {
+    return 'explicit';
+  }
   const solidFill = rPr.child('solidFill');
   if (!solidFill.exists()) return 'none';
   const scheme = solidFill.child('schemeClr').attr('val');
@@ -459,6 +483,7 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   if (solidFill.exists()) {
     delete target.textGradientCss;
     delete target.textPatternCss;
+    delete target.textPictureFill;
     delete target.textNoFill;
     const { color, alpha } = resolveColor(solidFill, ctx);
     const hex = color.startsWith('#') ? color : `#${color}`;
@@ -473,6 +498,7 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   if (gradFill.exists()) {
     delete target.color;
     delete target.textPatternCss;
+    delete target.textPictureFill;
     delete target.textNoFill;
     const css = resolveGradientForText(gradFill, ctx);
     if (css) target.textGradientCss = css;
@@ -481,9 +507,18 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
   if (pattFill.exists()) {
     delete target.color;
     delete target.textGradientCss;
+    delete target.textPictureFill;
     delete target.textNoFill;
     const css = resolveFill(rPr, ctx);
     if (css) target.textPatternCss = css;
+  }
+  const blipFill = rPr.child('blipFill');
+  if (blipFill.exists()) {
+    delete target.color;
+    delete target.textGradientCss;
+    delete target.textPatternCss;
+    delete target.textNoFill;
+    target.textPictureFill = blipFill;
   }
 
   // Font family. Office often writes separate Latin/East Asian typefaces in the
@@ -554,6 +589,7 @@ function mergeRunProps(target: MergedRunStyle, rPr: SafeXmlNode, ctx: RenderCont
     delete target.color;
     delete target.textGradientCss;
     delete target.textPatternCss;
+    delete target.textPictureFill;
     target.textNoFill = true;
   }
 
@@ -765,6 +801,308 @@ function applyClippedTextBackground(element: HTMLElement, css: string): void {
   element.style.color = 'transparent';
 }
 
+function resolveTextPictureUrl(blipFill: SafeXmlNode, ctx: RenderContext): string | undefined {
+  const blip = blipFill.child('blip');
+  const relId =
+    blip.attr('embed') ?? blip.attr('r:embed') ?? blip.attr('link') ?? blip.attr('r:link');
+  if (!relId) return undefined;
+  const rel = ctx.slide.rels.get(relId);
+  if (!rel) return undefined;
+  if (isExternalTargetMode(rel.targetMode)) {
+    return isAllowedExternalMediaUrl(rel.target) ? rel.target : undefined;
+  }
+  const resolved = findMediaByTarget(rel.target, ctx.presentation.media);
+  if (!resolved) return undefined;
+  return getOrCreateBlobUrl(resolved.mediaPath, resolved.data, ctx.mediaUrlCache);
+}
+
+async function resolveTextPictureUrlAsync(
+  blipFill: SafeXmlNode,
+  ctx: RenderContext,
+): Promise<string | undefined> {
+  const blip = blipFill.child('blip');
+  const relId =
+    blip.attr('embed') ?? blip.attr('r:embed') ?? blip.attr('link') ?? blip.attr('r:link');
+  if (!relId) return undefined;
+  const rel = ctx.slide.rels.get(relId);
+  if (!rel) return undefined;
+  if (isExternalTargetMode(rel.targetMode)) {
+    return isAllowedExternalMediaUrl(rel.target) ? rel.target : undefined;
+  }
+  const resolved = await findMediaByTargetAsync(
+    rel.target,
+    ctx.presentation.media,
+    ctx.presentation.mediaResolver,
+  );
+  if (!resolved) return undefined;
+  return getOrCreateBlobUrl(resolved.mediaPath, resolved.data, ctx.mediaUrlCache);
+}
+
+function applyClippedTextPicture(element: HTMLElement, blipFill: SafeXmlNode, url: string): void {
+  const escapedUrl = url.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  element.style.backgroundImage = `url("${escapedUrl}")`;
+  if (blipFill.child('tile').exists()) {
+    element.style.backgroundRepeat = 'repeat';
+  } else {
+    element.style.backgroundSize = '100% 100%';
+    element.style.backgroundPosition = 'center';
+    element.style.backgroundRepeat = 'no-repeat';
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (element.style as any).webkitBackgroundClip = 'text';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (element.style as any).backgroundClip = 'text';
+  element.style.color = 'transparent';
+}
+
+function applyTextPictureFill(
+  element: HTMLElement,
+  blipFill: SafeXmlNode,
+  ctx: RenderContext,
+): void {
+  const immediateUrl = resolveTextPictureUrl(blipFill, ctx);
+  if (immediateUrl) {
+    applyClippedTextPicture(element, blipFill, immediateUrl);
+    return;
+  }
+  if (!ctx.presentation.mediaResolver) return;
+
+  const task = resolveTextPictureUrlAsync(blipFill, ctx)
+    .then((url) => {
+      if (!url || ctx.signal?.aborted) return;
+      applyClippedTextPicture(element, blipFill, url);
+    })
+    .catch(() => {
+      // Preserve the normal text fallback when lazy package media cannot be loaded.
+    });
+  ctx.asyncTasks?.push(task);
+  if (!ctx.asyncTasks) void task;
+}
+
+type ExplicitTabAxis = 'horizontal' | 'vertical';
+
+function appendExplicitTabText(
+  element: HTMLElement,
+  text: string,
+  markers: HTMLElement[],
+  axis: ExplicitTabAxis,
+): void {
+  const parts = text.split('\t');
+  for (const [index, part] of parts.entries()) {
+    appendWhitespacePreservingText(element, part);
+    if (index === parts.length - 1) continue;
+    const marker = document.createElement('span');
+    marker.dataset.pptxTabStop = 'explicit';
+    marker.setAttribute('aria-hidden', 'true');
+    marker.style.display = 'inline-block';
+    marker.style.width = axis === 'vertical' ? '1px' : '0px';
+    marker.style.height = axis === 'vertical' ? '0px' : '1px';
+    marker.style.overflow = 'hidden';
+    element.appendChild(marker);
+    markers.push(marker);
+  }
+}
+
+function rangeInlineSize(range: Range, axis: ExplicitTabAxis, scale: number): number {
+  const rects = Array.from(range.getClientRects()).filter((rect) =>
+    axis === 'vertical' ? rect.height > 0 : rect.width > 0,
+  );
+  if (rects.length === 0) return 0;
+  if (axis === 'vertical') {
+    const firstColumnRight = rects[0].right;
+    const firstColumnRects = rects.filter((rect) => Math.abs(rect.right - firstColumnRight) < 1);
+    const top = Math.min(...firstColumnRects.map((rect) => rect.top));
+    const bottom = Math.max(...firstColumnRects.map((rect) => rect.bottom));
+    return (bottom - top) / scale;
+  }
+  const firstLineTop = rects[0].top;
+  const firstLineRects = rects.filter((rect) => Math.abs(rect.top - firstLineTop) < 1);
+  const left = Math.min(...firstLineRects.map((rect) => rect.left));
+  const right = Math.max(...firstLineRects.map((rect) => rect.right));
+  return (right - left) / scale;
+}
+
+function decimalFieldOffset(
+  paragraph: HTMLElement,
+  marker: HTMLElement,
+  nextMarker: HTMLElement | undefined,
+  axis: ExplicitTabAxis,
+  scale: number,
+  fallbackSize: number,
+): number {
+  const fieldRange = document.createRange();
+  fieldRange.setStartAfter(marker);
+  if (nextMarker) fieldRange.setEndBefore(nextMarker);
+  else fieldRange.setEnd(paragraph, paragraph.childNodes.length);
+
+  const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) {
+    const node = walker.currentNode as Text;
+    if (!fieldRange.intersectsNode(node)) continue;
+    const decimalIndex = node.data.search(/[.,\u066b\u066c]/);
+    if (decimalIndex < 0) continue;
+
+    const beforeDecimal = document.createRange();
+    beforeDecimal.setStartAfter(marker);
+    beforeDecimal.setEnd(node, decimalIndex);
+    const decimalGlyph = document.createRange();
+    decimalGlyph.setStart(node, decimalIndex);
+    decimalGlyph.setEnd(node, decimalIndex + 1);
+    return (
+      rangeInlineSize(beforeDecimal, axis, scale) + rangeInlineSize(decimalGlyph, axis, scale) / 2
+    );
+  }
+  return fallbackSize;
+}
+
+function nextTabCandidate(
+  cursor: number,
+  tabStops: NonNullable<MergedParagraphStyle['tabStops']>,
+  defaultTabSize: number,
+): { position: number; align: string } {
+  const explicit = tabStops.find((candidate) => candidate.position > cursor + 0.01);
+  if (explicit) return explicit;
+  return {
+    position: (Math.floor(cursor / defaultTabSize) + 1) * defaultTabSize,
+    align: 'l',
+  };
+}
+
+function applyExplicitTabLayout(
+  paragraph: HTMLElement,
+  markers: HTMLElement[],
+  tabStops: NonNullable<MergedParagraphStyle['tabStops']>,
+  defaultTabSize: number,
+  axis: ExplicitTabAxis,
+): void {
+  const offsetSize = axis === 'vertical' ? paragraph.offsetHeight : paragraph.offsetWidth;
+  if (!paragraph.isConnected || offsetSize <= 0) return;
+  const paragraphRect = paragraph.getBoundingClientRect();
+  const renderedSize = axis === 'vertical' ? paragraphRect.height : paragraphRect.width;
+  const scale = renderedSize / offsetSize;
+  if (!Number.isFinite(scale) || scale <= 0) return;
+
+  for (const [index, marker] of markers.entries()) {
+    if (axis === 'vertical') marker.style.height = '0px';
+    else marker.style.width = '0px';
+    const markerRect = marker.getBoundingClientRect();
+    const cursor =
+      axis === 'vertical'
+        ? (markerRect.top - paragraphRect.top) / scale
+        : (markerRect.left - paragraphRect.left) / scale;
+    const nextMarker = markers[index + 1];
+    const fieldRange = document.createRange();
+    fieldRange.setStartAfter(marker);
+    if (nextMarker) fieldRange.setEndBefore(nextMarker);
+    else fieldRange.setEnd(paragraph, paragraph.childNodes.length);
+    const fieldSize = rangeInlineSize(fieldRange, axis, scale);
+
+    let candidate = nextTabCandidate(cursor, tabStops, defaultTabSize);
+    const fieldOffset =
+      candidate.align === 'ctr'
+        ? fieldSize / 2
+        : candidate.align === 'r'
+          ? fieldSize
+          : candidate.align === 'dec'
+            ? decimalFieldOffset(paragraph, marker, nextMarker, axis, scale, fieldSize)
+            : 0;
+    let spacerSize = candidate.position - cursor - fieldOffset;
+
+    // If an aligned field would overlap the preceding content, advance to the
+    // next default interval rather than emitting a negative spacer.
+    if (spacerSize < 0) {
+      candidate = {
+        position: (Math.floor((cursor + fieldOffset) / defaultTabSize) + 1) * defaultTabSize,
+        align: candidate.align,
+      };
+      spacerSize = candidate.position - cursor - fieldOffset;
+    }
+
+    marker.dataset.pptxTabAlign = candidate.align;
+    marker.dataset.pptxTabPosition = String(candidate.position);
+    if (axis === 'vertical') marker.style.height = `${Math.max(0, spacerSize)}px`;
+    else marker.style.width = `${Math.max(0, spacerSize)}px`;
+  }
+}
+
+function withConnectedTabMeasurement(
+  paragraph: HTMLElement,
+  ctx: RenderContext,
+  measure: () => void,
+): void {
+  if (paragraph.isConnected) {
+    measure();
+    return;
+  }
+
+  const root = ctx.measurementRoot;
+  if (!root || root.isConnected || !root.contains(paragraph) || !document.body) return;
+  const originalParent = root.parentNode;
+  const originalNextSibling = root.nextSibling;
+  const previous = {
+    position: root.style.position,
+    left: root.style.left,
+    top: root.style.top,
+    visibility: root.style.visibility,
+    pointerEvents: root.style.pointerEvents,
+    contain: root.style.contain,
+  };
+  root.style.position = 'fixed';
+  root.style.left = '-100000px';
+  root.style.top = '0';
+  root.style.visibility = 'hidden';
+  root.style.pointerEvents = 'none';
+  root.style.contain = 'layout style paint';
+  document.body.appendChild(root);
+  try {
+    measure();
+  } finally {
+    if (originalParent) originalParent.insertBefore(root, originalNextSibling);
+    else root.remove();
+    root.style.position = previous.position;
+    root.style.left = previous.left;
+    root.style.top = previous.top;
+    root.style.visibility = previous.visibility;
+    root.style.pointerEvents = previous.pointerEvents;
+    root.style.contain = previous.contain;
+  }
+}
+
+function scheduleExplicitTabLayout(
+  paragraph: HTMLElement,
+  markers: HTMLElement[],
+  tabStops: NonNullable<MergedParagraphStyle['tabStops']>,
+  defaultTabSize: number,
+  ctx: RenderContext,
+  axis: ExplicitTabAxis,
+): void {
+  const nextFrame = () =>
+    new Promise<void>((resolve) => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve());
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+  const measure = () => {
+    if (ctx.signal?.aborted) return;
+    withConnectedTabMeasurement(paragraph, ctx, () =>
+      applyExplicitTabLayout(paragraph, markers, tabStops, defaultTabSize, axis),
+    );
+  };
+  const task = nextFrame()
+    .then(() => {
+      measure();
+      return document.fonts?.ready;
+    })
+    .then(() => {
+      if (ctx.signal?.aborted) return;
+      measure();
+    });
+  ctx.asyncTasks?.push(task);
+  if (!ctx.asyncTasks) void task;
+}
+
 // ---------------------------------------------------------------------------
 // Bullet Generation
 // ---------------------------------------------------------------------------
@@ -828,6 +1166,14 @@ function toRoman(num: number): string {
  * 8. run rPr
  */
 /** Optional overrides when rendering text (e.g. table cell style text properties from tcTxStyle). */
+export type DrawingMLVerticalTextMode =
+  | 'eaVert'
+  | 'mongolianVert'
+  | 'vert'
+  | 'vert270'
+  | 'wordArtVert'
+  | 'wordArtVertRtl';
+
 interface RenderTextBodyOptions {
   /** When set, used as text color when the run has no explicit color (e.g. table style tcTxStyle). */
   cellTextColor?: string;
@@ -841,6 +1187,8 @@ interface RenderTextBodyOptions {
   fontRefColor?: string;
   /** True when the text container uses vertical writing mode. */
   isVerticalText?: boolean;
+  /** Effective DrawingML bodyPr@vert mode for mode-specific layout semantics. */
+  verticalTextMode?: DrawingMLVerticalTextMode;
   /** Fallback CSS line-height when OOXML inheritance does not specify one. */
   defaultLineHeight?: string;
   /** Collapse paragraph spacing outside the first/last visible paragraph. */
@@ -929,7 +1277,10 @@ export function renderTextBody(
     paraDiv.style.boxSizing = 'border-box';
     paraDiv.style.overflowWrap = 'anywhere';
     const level = paragraph.level;
-    if (options?.isVerticalText) {
+    if (
+      options?.verticalTextMode === 'wordArtVert' ||
+      options?.verticalTextMode === 'wordArtVertRtl'
+    ) {
       paraDiv.style.wordBreak = 'keep-all';
     }
     const hasLineBreaks = paragraph.runs.some((r) => r.text === '\n');
@@ -1173,6 +1524,25 @@ export function renderTextBody(
     // ---- Render runs ----
     const compactNumericRunGroups = findCompactNumericRunGroups(paragraph.runs);
     const compactNumericGroupElements = new Map<number, HTMLElement>();
+    const explicitTabMarkers: HTMLElement[] = [];
+    const hasSupportedVerticalTabAlignment =
+      !options?.isVerticalText || merged.tabStops?.every((tab) => tab.align === 'l');
+    const canResolveExplicitTabs =
+      !!merged.tabStops?.length &&
+      merged.rtl !== true &&
+      hasSupportedVerticalTabAlignment &&
+      (merged.align === undefined || merged.align === 'l');
+    const explicitTabAxis: ExplicitTabAxis = options?.isVerticalText ? 'vertical' : 'horizontal';
+    if (options?.isVerticalText) {
+      // Vertical DrawingML advances on the physical Y axis. Give each paragraph
+      // the text-frame height for wrapping and let its column shrink to content
+      // so the parent flex container can place the column horizontally.
+      paraDiv.style.width = 'auto';
+      paraDiv.style.maxWidth = 'none';
+      paraDiv.style.height = '100%';
+      paraDiv.style.minHeight = '0px';
+      paraDiv.style.maxHeight = '100%';
+    }
     if (!hasVisibleRuns) {
       // Empty paragraph — still need to maintain spacing
       paraDiv.appendChild(document.createElement('br'));
@@ -1276,6 +1646,7 @@ export function renderTextBody(
       const usesElementLevelTextPaint =
         !!runStyle.textGradientCss ||
         !!runStyle.textPatternCss ||
+        !!runStyle.textPictureFill ||
         !!runStyle.textNoFill ||
         runStyle.textOutlineWidth !== undefined ||
         !!runStyle.textOutlineColor ||
@@ -1289,6 +1660,8 @@ export function renderTextBody(
         element.appendChild(document.createElement('br'));
       } else if (run.math) {
         // The MathML subtree already carries the formula text and topology.
+      } else if (canResolveExplicitTabs && run.text?.includes('\t')) {
+        appendExplicitTabText(element, run.text, explicitTabMarkers, explicitTabAxis);
       } else if (run.text && run.text.includes('\t')) {
         element.textContent = run.text;
         element.style.whiteSpace = 'pre';
@@ -1405,6 +1778,9 @@ export function renderTextBody(
       if (runStyle.textPatternCss) {
         applyClippedTextBackground(element, runStyle.textPatternCss);
       }
+      if (runStyle.textPictureFill) {
+        applyTextPictureFill(element, runStyle.textPictureFill, ctx);
+      }
 
       // Text outline (a:ln on rPr) and noFill handling
       if (runStyle.textNoFill || runStyle.textOutlineWidth) {
@@ -1470,8 +1846,17 @@ export function renderTextBody(
       }
 
       // Character spacing (a:spc) — compact/tracking in points
+      const usesWordArtVerticalAdvance =
+        options?.verticalTextMode === 'wordArtVert' ||
+        options?.verticalTextMode === 'wordArtVertRtl';
       if (runStyle.letterSpacingPt !== undefined) {
-        element.style.letterSpacing = `${runStyle.letterSpacingPt}pt`;
+        element.style.letterSpacing = usesWordArtVerticalAdvance
+          ? `calc(0.2em + ${runStyle.letterSpacingPt}pt)`
+          : `${runStyle.letterSpacingPt}pt`;
+      } else if (usesWordArtVerticalAdvance) {
+        // PowerPoint's stacked WordArt advances glyphs at 1.3x the font size.
+        // Chromium's upright glyph box supplies the remaining ~1.1em.
+        element.style.letterSpacing = '0.2em';
       }
       // Kerning (a:kern): val = min font size (pt) to kern; 0 = always kern
       if (runStyle.kern !== undefined) {
@@ -1534,5 +1919,15 @@ export function renderTextBody(
     }
 
     container.appendChild(paraDiv);
+    if (canResolveExplicitTabs && explicitTabMarkers.length > 0 && merged.tabStops) {
+      scheduleExplicitTabLayout(
+        paraDiv,
+        explicitTabMarkers,
+        merged.tabStops,
+        merged.defaultTabSize ?? 96,
+        ctx,
+        explicitTabAxis,
+      );
+    }
   }
 }

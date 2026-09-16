@@ -2208,21 +2208,15 @@ describe('TextRenderer — renderTextBody', () => {
       const body = makeTextBody({
         paragraphs: [
           {
-            properties: xmlNode(
-              '<pPr><lnSpc><spcPct val="100000"/></lnSpc></pPr>',
-            ),
+            properties: xmlNode('<pPr><lnSpc><spcPct val="100000"/></lnSpc></pPr>'),
             runs: [
               {
                 text: '\n',
-                properties: xmlNode(
-                  '<rPr sz="3000"><latin typeface="Arial"/></rPr>',
-                ),
+                properties: xmlNode('<rPr sz="3000"><latin typeface="Arial"/></rPr>'),
               },
               {
                 text: 'Visible',
-                properties: xmlNode(
-                  '<rPr sz="1000"><latin typeface="Courier New"/></rPr>',
-                ),
+                properties: xmlNode('<rPr sz="1000"><latin typeface="Courier New"/></rPr>'),
               },
             ],
             level: 0,
@@ -2253,15 +2247,11 @@ describe('TextRenderer — renderTextBody', () => {
             runs: [
               {
                 text: '\n',
-                properties: xmlNode(
-                  '<rPr><solidFill><srgbClr val="FF0000"/></solidFill></rPr>',
-                ),
+                properties: xmlNode('<rPr><solidFill><srgbClr val="FF0000"/></solidFill></rPr>'),
               },
               {
                 text: 'Visible',
-                properties: xmlNode(
-                  '<rPr><solidFill><srgbClr val="0000FF"/></solidFill></rPr>',
-                ),
+                properties: xmlNode('<rPr><solidFill><srgbClr val="0000FF"/></solidFill></rPr>'),
               },
             ],
             level: 0,
@@ -2423,6 +2413,128 @@ describe('TextRenderer — renderTextBody', () => {
       expect(paraDiv.style.tabSize).toBe('128px');
     });
 
+    it('marks a leading explicit OOXML tab for post-layout alignment (issue #23)', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              { text: '\t' },
+              { text: '配套保障：明确容错纠错、澄清正名机制，激励担当作为。' },
+            ],
+            properties: xmlNode(`
+              <pPr marL="424815">
+                <tabLst><tab pos="536575" algn="l"/></tabLst>
+              </pPr>
+            `),
+            level: 0,
+          },
+        ],
+      });
+
+      const container = renderToContainer(body);
+      const paraDiv = container.children[0] as HTMLElement;
+      const tabSpacer = paraDiv.querySelector('[data-pptx-tab-stop]') as HTMLElement | null;
+
+      expect(parseFloat(paraDiv.style.paddingLeft)).toBeCloseTo(424815 / 9525, 3);
+      expect(tabSpacer).not.toBeNull();
+      expect(tabSpacer!.getAttribute('aria-hidden')).toBe('true');
+    });
+
+    it('marks a non-leading explicit tab for post-layout alignment', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [{ text: 'Before' }, { text: '\t' }, { text: 'After' }],
+            properties: xmlNode('<pPr><tabLst><tab pos="536575" algn="l"/></tabLst></pPr>'),
+            level: 0,
+          },
+        ],
+      });
+
+      const container = renderToContainer(body);
+      expect(container.querySelectorAll('[data-pptx-tab-stop]')).toHaveLength(1);
+      expect(container.textContent).toBe('BeforeAfter');
+    });
+
+    it('marks an explicit tab after leading whitespace for post-layout alignment', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [{ text: ' ' }, { text: '\t' }, { text: 'After' }],
+            properties: xmlNode('<pPr><tabLst><tab pos="536575" algn="l"/></tabLst></pPr>'),
+            level: 0,
+          },
+        ],
+      });
+
+      const container = renderToContainer(body);
+      expect(container.querySelectorAll('[data-pptx-tab-stop]')).toHaveLength(1);
+      expect(container.textContent).toBe(' After');
+    });
+
+    it('keeps leading tabs in right-to-left text on the browser tab-size path', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [{ text: '\t' }, { text: 'After' }],
+            properties: xmlNode('<pPr rtl="1"><tabLst><tab pos="536575" algn="l"/></tabLst></pPr>'),
+            level: 0,
+          },
+        ],
+      });
+      const container = document.createElement('div');
+
+      renderTextBody(body, undefined, createMockRenderContext(), container);
+
+      expect(container.querySelector('[data-pptx-tab-stop]')).toBeNull();
+      expect(container.textContent).toContain('\t');
+    });
+
+    it('marks a vertical explicit tab for inline-axis post-layout alignment', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [{ text: '\t' }, { text: 'After' }],
+            properties: xmlNode('<pPr><tabLst><tab pos="1828800" algn="l"/></tabLst></pPr>'),
+            level: 0,
+          },
+        ],
+      });
+      const container = document.createElement('div');
+
+      renderTextBody(body, undefined, createMockRenderContext(), container, {
+        isVerticalText: true,
+      });
+
+      const marker = container.querySelector('[data-pptx-tab-stop]') as HTMLElement | null;
+      expect(marker).not.toBeNull();
+      expect(marker!.style.width).toBe('1px');
+      expect(marker!.style.height).toBe('0px');
+      expect(container.textContent).toBe('After');
+    });
+
+    it('keeps unverified vertical non-left tab alignment on the browser tab-size path', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [{ text: '\t' }, { text: 'After' }],
+            properties: xmlNode(
+              '<pPr><tabLst><tab pos="1828800" algn="ctr"/></tabLst></pPr>',
+            ),
+            level: 0,
+          },
+        ],
+      });
+      const container = document.createElement('div');
+
+      renderTextBody(body, undefined, createMockRenderContext(), container, {
+        isVerticalText: true,
+      });
+
+      expect(container.querySelector('[data-pptx-tab-stop]')).toBeNull();
+      expect(container.textContent).toContain('\t');
+    });
+
     it('renders tab characters between text with preserved whitespace', () => {
       const body = makeTextBody({
         paragraphs: [
@@ -2436,6 +2548,158 @@ describe('TextRenderer — renderTextBody', () => {
       const allText = container.textContent || '';
       // Tab character must be present in the output
       expect(allText).toContain('\t');
+    });
+  });
+
+  describe('picture text fill', () => {
+    it('clips an embedded stretched blipFill to the run glyphs (issue #23)', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: '一、权力观的核心内涵与要义',
+                properties: xmlNode(`
+                  <rPr xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                    <blipFill>
+                      <blip r:embed="rId8"/>
+                      <stretch><fillRect/></stretch>
+                    </blipFill>
+                  </rPr>
+                `),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const ctx = createMockRenderContext();
+      ctx.slide.rels.set('rId8', {
+        type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+        target: '../media/image3.jpeg',
+      });
+      ctx.presentation.media.set('ppt/media/image3.jpeg', new Uint8Array([0xff, 0xd8, 0xff]));
+      const container = document.createElement('div');
+
+      renderTextBody(body, undefined, ctx, container);
+      const span = container.querySelector('span') as HTMLElement & {
+        style: CSSStyleDeclaration & { webkitBackgroundClip?: string };
+      };
+
+      expect(span.style.backgroundImage).toContain('blob:');
+      expect(span.style.backgroundSize).toBe('100% 100%');
+      expect(span.style.backgroundRepeat).toBe('no-repeat');
+      expect(span.style.webkitBackgroundClip).toBe('text');
+      expect(span.style.color).toBe('transparent');
+    });
+
+    it('lets an explicit solidFill override an inherited picture text fill', () => {
+      const body = makeTextBody({
+        listStyle: `
+          <lstStyle xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+            <lvl1pPr><defRPr><blipFill><blip r:embed="rId8"/></blipFill></defRPr></lvl1pPr>
+          </lstStyle>
+        `,
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Solid',
+                properties: xmlNode('<rPr><solidFill><srgbClr val="B02020"/></solidFill></rPr>'),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const ctx = createMockRenderContext();
+      ctx.slide.rels.set('rId8', {
+        type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+        target: '../media/image3.jpeg',
+      });
+      ctx.presentation.media.set('ppt/media/image3.jpeg', new Uint8Array([0xff, 0xd8, 0xff]));
+      const container = document.createElement('div');
+
+      renderTextBody(body, undefined, ctx, container);
+      const span = container.querySelector('span') as HTMLElement;
+
+      expect(span.style.color).toBe('rgb(176, 32, 32)');
+      expect(span.style.backgroundImage).toBe('');
+    });
+
+    it('applies a lazily resolved blipFill before the slide-ready tasks settle', async () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Lazy picture fill',
+                properties: xmlNode(`
+                  <rPr xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                    <blipFill><blip r:embed="rIdLazy"/><stretch><fillRect/></stretch></blipFill>
+                  </rPr>
+                `),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const ctx = createMockRenderContext();
+      ctx.slide.rels.set('rIdLazy', {
+        type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+        target: '../media/lazy.jpeg',
+      });
+      ctx.presentation.mediaResolver = {
+        resolve: async () => ({
+          mediaPath: 'ppt/media/lazy.jpeg',
+          data: new Uint8Array([0xff, 0xd8, 0xff]),
+        }),
+      };
+      ctx.asyncTasks = [];
+      const container = document.createElement('div');
+
+      renderTextBody(body, undefined, ctx, container);
+      expect(ctx.asyncTasks).toHaveLength(1);
+      await Promise.all(ctx.asyncTasks);
+
+      const span = container.querySelector('span') as HTMLElement;
+      expect(span.style.backgroundImage).toContain('blob:');
+      expect(span.style.color).toBe('transparent');
+    });
+
+    it('does not use package media for a disallowed external picture fill target', () => {
+      const body = makeTextBody({
+        paragraphs: [
+          {
+            runs: [
+              {
+                text: 'Unsafe picture fill',
+                properties: xmlNode(`
+                  <rPr xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+                    <blipFill><blip r:link="rIdUnsafe"/></blipFill>
+                  </rPr>
+                `),
+              },
+            ],
+            level: 0,
+          },
+        ],
+      });
+      const ctx = createMockRenderContext();
+      ctx.slide.rels.set('rIdUnsafe', {
+        type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/image',
+        target: 'file:///tmp/image3.jpeg',
+        targetMode: 'External',
+      });
+      ctx.presentation.media.set('ppt/media/image3.jpeg', new Uint8Array([0xff, 0xd8, 0xff]));
+      const container = document.createElement('div');
+
+      renderTextBody(body, undefined, ctx, container);
+      const span = container.querySelector('span') as HTMLElement;
+
+      expect(span.style.backgroundImage).toBe('');
+      expect(ctx.mediaUrlCache.has('ppt/media/image3.jpeg')).toBe(false);
     });
   });
 });

@@ -15,7 +15,7 @@ Usage (from test/e2e/):
   pip install python-pptx
   python scripts/generate_pypptx_cases.py              # PDF on macOS; PDF+PNG on Windows
   python scripts/generate_pypptx_cases.py --pptx-only  # generate PPTX only (any platform)
-  python scripts/generate_pypptx_cases.py --case 'oracle-pypptx-text-00[45]*'
+  python scripts/generate_pypptx_cases.py --case 'oracle-pypptx-text-00[456]*'
   python scripts/generate_pypptx_cases.py --include-local-shape3d-matrix \
     --case 'oracle-local-shape3d-*'                     # ignored discovery corpus
 """
@@ -1212,6 +1212,351 @@ def _build_text_cases() -> list[CaseDef]:
             ],
         },
     )
+
+    def _build_tab_stop_matrix(prs):
+        probe_left = 1.0
+        probe_top = 2.1
+        probe_width = 11.2
+        probe_height = 2.0
+        configs = [
+            {
+                "title": "Leading left tab with paragraph margin",
+                "parts": ["\t", "段首目标文本"],
+                "paragraph_attrs": {"marL": "457200", "algn": "l"},
+                "tabs": [(1371600, "l")],
+                "extra_guides": [(1828800, "margin + stop")],
+            },
+            {
+                "title": "Inline left tab in a separate run",
+                "parts": ["前缀", "\t", "行中目标文本"],
+                "paragraph_attrs": {"algn": "l"},
+                "tabs": [(2743200, "l")],
+            },
+            {
+                "title": "Multiple left tabs",
+                "parts": ["A", "\t", "B", "\t", "C"],
+                "paragraph_attrs": {"algn": "l"},
+                "tabs": [(1828800, "l"), (3657600, "l")],
+            },
+            {
+                "title": "Bullet paragraph followed by a left tab",
+                "parts": ["\t", "项目符号后的目标文本"],
+                "paragraph_attrs": {"marL": "731520", "indent": "-274320", "algn": "l"},
+                "tabs": [(1371600, "l")],
+                "bullet": True,
+            },
+            {
+                "title": "Inline left tab inside one text run",
+                "parts": ["同一文本运行前缀\t目标文本"],
+                "paragraph_attrs": {"algn": "l"},
+                "tabs": [(2743200, "l")],
+            },
+            {
+                "title": "Default one-inch tab interval without tabLst",
+                "parts": ["前缀", "\t", "默认目标文本"],
+                "paragraph_attrs": {"defTabSz": "914400", "algn": "l"},
+                "tabs": [],
+                "extra_guides": [(914400, "1in"), (1828800, "2in"), (2743200, "3in")],
+            },
+            {
+                "title": "Center-aligned explicit tab",
+                "parts": ["前缀", "\t", "CENTER"],
+                "paragraph_attrs": {"algn": "l"},
+                "tabs": [(3657600, "ctr")],
+            },
+            {
+                "title": "Right-aligned explicit tab",
+                "parts": ["前缀", "\t", "RIGHT"],
+                "paragraph_attrs": {"algn": "l"},
+                "tabs": [(3657600, "r")],
+            },
+            {
+                "title": "Decimal-aligned explicit tab",
+                "parts": ["数值", "\t", "123.45"],
+                "paragraph_attrs": {"algn": "l"},
+                "tabs": [(3657600, "dec")],
+            },
+            {
+                "title": "Right-to-left explicit tab opt-out",
+                "parts": ["\t", "مرحبا بالعالم"],
+                "paragraph_attrs": {"rtl": "1", "algn": "l"},
+                "tabs": [(2743200, "l")],
+                "font_name": "Arial",
+            },
+            {
+                "title": "Vertical East Asian explicit left tab",
+                "parts": ["\t", "竖排制表目标"],
+                "paragraph_attrs": {"algn": "l"},
+                "tabs": [(1828800, "l")],
+                "vertical": True,
+            },
+        ]
+
+        for config in configs:
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+
+            title_box = slide.shapes.add_textbox(
+                _emu(0.7), _emu(0.35), _emu(11.9), _emu(0.65)
+            )
+            title_paragraph = title_box.text_frame.paragraphs[0]
+            _add_cjk_run(
+                title_paragraph,
+                config["title"],
+                font_name="Arial",
+                font_size_pt=24,
+                bold=True,
+            )
+
+            probe = slide.shapes.add_textbox(
+                _emu(probe_left),
+                _emu(probe_top),
+                _emu(probe_width),
+                _emu(probe_height),
+            )
+            probe.name = "Tab probe"
+            probe.line.color.rgb = RGBColor(0x80, 0x80, 0x80)
+            probe.line.width = Pt(1)
+            text_frame = probe.text_frame
+            text_frame.clear()
+            text_frame.word_wrap = False
+            text_frame.margin_left = 0
+            text_frame.margin_right = 0
+            text_frame.margin_top = 0
+            text_frame.margin_bottom = 0
+            _configure_text_body(text_frame, wrap="none", autofit="noAutofit", anchor="ctr")
+            if config.get("vertical"):
+                text_frame._txBody.find(qn("a:bodyPr")).set("vert", "eaVert")
+
+            paragraph = text_frame.paragraphs[0]
+            p_pr = paragraph._p.get_or_add_pPr()
+            for attr_name, attr_value in config["paragraph_attrs"].items():
+                p_pr.set(attr_name, attr_value)
+            if config.get("bullet"):
+                etree.SubElement(p_pr, qn("a:buChar"), char="•")
+            if config["tabs"]:
+                tab_list = etree.SubElement(p_pr, qn("a:tabLst"))
+                for position, alignment in config["tabs"]:
+                    etree.SubElement(
+                        tab_list,
+                        qn("a:tab"),
+                        pos=str(position),
+                        algn=alignment,
+                    )
+
+            font_name = config.get("font_name", "Microsoft YaHei")
+            for part in config["parts"]:
+                _add_cjk_run(
+                    paragraph,
+                    part,
+                    font_name=font_name,
+                    font_size_pt=28,
+                )
+
+            guides = [(position, alignment) for position, alignment in config["tabs"]]
+            guides.extend(config.get("extra_guides", []))
+            for guide_index, (position, label) in enumerate(guides):
+                if config.get("vertical"):
+                    y = probe_top + position / 914400
+                    line = slide.shapes.add_connector(
+                        MSO_CONNECTOR.STRAIGHT,
+                        _emu(probe_left - 0.3),
+                        _emu(y),
+                        _emu(probe_left + probe_width + 0.3),
+                        _emu(y),
+                    )
+                    label_left = probe_left + 0.03
+                    label_top = y + 0.03
+                else:
+                    x = probe_left + position / 914400
+                    line = slide.shapes.add_connector(
+                        MSO_CONNECTOR.STRAIGHT,
+                        _emu(x),
+                        _emu(1.45),
+                        _emu(x),
+                        _emu(4.65),
+                    )
+                    label_left = x + 0.03
+                    label_top = 1.45
+                line.line.color.rgb = (
+                    RGBColor(0x00, 0x80, 0x00)
+                    if guide_index == 0
+                    else RGBColor(0xC0, 0x00, 0x00)
+                )
+                line.line.width = Pt(1)
+                guide_label = slide.shapes.add_textbox(
+                    _emu(label_left), _emu(label_top), _emu(1.4), _emu(0.35)
+                )
+                guide_run = guide_label.text_frame.paragraphs[0].add_run()
+                guide_run.text = f"{position / 914400:g}in {label}"
+                guide_run.font.name = "Arial"
+                guide_run.font.size = Pt(9)
+
+    _add(
+        "tab-stop-matrix",
+        _build_tab_stop_matrix,
+        coverage={
+            "oracle": "native-powerpoint",
+            "requiredFonts": ["Microsoft YaHei", "Arial"],
+            "features": [
+                "text.tab.explicit-left-leading",
+                "text.tab.explicit-left-inline",
+                "text.tab.explicit-left-multiple",
+                "text.tab.bullet",
+                "text.tab.mixed-run",
+                "text.tab.default-size",
+                "text.tab.alignment=center|right|decimal",
+                "text.tab.rtl=observation-only",
+                "text.tab.vertical-left",
+            ],
+        },
+    )
+    cases[-1]["slide_count"] = 11
+
+    def _build_vertical_mode_matrix(prs):
+        def _add_title(slide, text: str) -> None:
+            title_box = slide.shapes.add_textbox(
+                _emu(0.65), _emu(0.25), _emu(12.0), _emu(0.55)
+            )
+            title_run = title_box.text_frame.paragraphs[0].add_run()
+            title_run.text = text
+            title_run.font.name = "Arial"
+            title_run.font.size = Pt(20)
+            title_run.font.bold = True
+
+        def _configure_vertical_probe(
+            shape,
+            *,
+            mode: str,
+            anchor: str = "t",
+            paragraphs: tuple[str, ...],
+            font_name: str,
+            font_size_pt: int,
+        ) -> None:
+            shape.line.color.rgb = RGBColor(0x80, 0x80, 0x80)
+            shape.line.width = Pt(1)
+            text_frame = shape.text_frame
+            text_frame.clear()
+            text_frame.word_wrap = True
+            text_frame.margin_left = 0
+            text_frame.margin_right = 0
+            text_frame.margin_top = 0
+            text_frame.margin_bottom = 0
+            _configure_text_body(
+                text_frame,
+                wrap="square",
+                autofit="noAutofit",
+                anchor=anchor,
+            )
+            text_frame._txBody.find(qn("a:bodyPr")).set("vert", mode)
+            for paragraph_index, text in enumerate(paragraphs):
+                paragraph = (
+                    text_frame.paragraphs[0]
+                    if paragraph_index == 0
+                    else text_frame.add_paragraph()
+                )
+                run = paragraph.add_run()
+                run.text = text
+                run.font.name = font_name
+                run.font.size = Pt(font_size_pt)
+
+        mode_rows = [
+            ("eaVert", "East Asian vertical", ("甲A수직", "乙B텍스트"), "Microsoft YaHei"),
+            (
+                "mongolianVert",
+                "Mongolian vertical column flow",
+                ("甲A수직", "乙B텍스트"),
+                "Microsoft YaHei",
+            ),
+            ("vert", "90-degree vertical lines", ("ALPHA中文", "BETA日本"), "Arial"),
+            ("vert270", "270-degree vertical lines", ("ALPHA中文", "BETA日本"), "Arial"),
+            ("wordArtVert", "Stacked WordArt", ("FIRST", "SECOND"), "Arial"),
+            (
+                "wordArtVertRtl",
+                "Stacked WordArt right-to-left columns",
+                ("FIRST", "SECOND"),
+                "Arial",
+            ),
+        ]
+        for mode, label, paragraphs, font_name in mode_rows:
+            slide = prs.slides.add_slide(prs.slide_layouts[6])
+            _add_title(slide, f"{mode}: {label}")
+            probe = slide.shapes.add_textbox(
+                _emu(4.65), _emu(1.0), _emu(4.0), _emu(5.8)
+            )
+            probe.name = "Vertical probe"
+            _configure_vertical_probe(
+                probe,
+                mode=mode,
+                paragraphs=paragraphs,
+                font_name=font_name,
+                font_size_pt=30,
+            )
+
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        _add_title(slide, "wordArtVert automatic character advance by font size")
+        for index, font_size_pt in enumerate((12, 24, 36)):
+            probe = slide.shapes.add_textbox(
+                _emu(0.9 + index * 4.15), _emu(1.15), _emu(3.0), _emu(5.6)
+            )
+            probe.name = f"Stacked size {font_size_pt}pt"
+            _configure_vertical_probe(
+                probe,
+                mode="wordArtVert",
+                paragraphs=("STACKED",),
+                font_name="Arial",
+                font_size_pt=font_size_pt,
+            )
+
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        _add_title(slide, "eaVert DrawingML anchor matrix")
+        for index, (anchor, label) in enumerate((("t", "top"), ("ctr", "center"), ("b", "bottom"))):
+            probe = slide.shapes.add_textbox(
+                _emu(0.9 + index * 4.15), _emu(1.15), _emu(3.0), _emu(5.6)
+            )
+            probe.name = f"EA anchor {label}"
+            _configure_vertical_probe(
+                probe,
+                mode="eaVert",
+                anchor=anchor,
+                paragraphs=("垂直锚点",),
+                font_name="Microsoft YaHei",
+                font_size_pt=28,
+            )
+
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        _add_title(slide, "eaVert mixed CJK and Hangul fallback advance")
+        probe = slide.shapes.add_textbox(
+            _emu(4.15), _emu(1.0), _emu(5.0), _emu(5.8)
+        )
+        probe.name = "Hangul fallback probe"
+        _configure_vertical_probe(
+            probe,
+            mode="eaVert",
+            paragraphs=("垂直文本테스트수직混合",),
+            font_name="Microsoft YaHei",
+            font_size_pt=24,
+        )
+
+    _add(
+        "vertical-mode-matrix",
+        _build_vertical_mode_matrix,
+        coverage={
+            "oracle": "native-powerpoint",
+            "requiredFonts": ["Microsoft YaHei", "Arial"],
+            "features": [
+                "text.vertical.eaVert",
+                "text.vertical.mongolianVert",
+                "text.vertical.vert",
+                "text.vertical.vert270",
+                "text.vertical.wordArtVert",
+                "text.vertical.wordArtVertRtl",
+                "text.vertical.anchor=t|ctr|b",
+                "text.vertical.wordArt-character-advance",
+                "text.vertical.east-asian-font-fallback",
+            ],
+        },
+    )
+    cases[-1]["slide_count"] = 9
 
     return cases
 

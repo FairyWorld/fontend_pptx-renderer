@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixed explicit text tabs, all DrawingML vertical text flows, stacked WordArt spacing, CJK/Korean
+  font fallback, and stretched picture-filled runs, including lazy package media.
+
 ## [1.3.0] - 2026-09-14
 
 ### Added

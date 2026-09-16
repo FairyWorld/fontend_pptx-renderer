@@ -228,6 +228,18 @@ host page's `white-space` rule cannot replace the presentation semantics. Explic
 `horzOverflow` and `vertOverflow` values are resolved independently. Paragraph `eaLnBrk="0"`
 uses the browser's unrestricted break opportunity, while the omitted/true default retains East
 Asian typographic rules; both values are explicit so inherited host CSS cannot change the result.
+For horizontal left-to-right paragraphs, explicit `a:tabLst/a:tab@pos` targets are resolved after
+fonts load from the current browser-laid-out cursor. This preserves the text-frame-relative OOXML
+position across paragraph margins, first-line indents, inline or mixed-run tabs, multiple stops,
+and bullet gutters. Left, center, right, and decimal alignments use the measured following field;
+paragraphs without `a:tabLst` retain the browser `tab-size` path. Right-to-left and vertical text
+also retain that fallback, except for the native-verified East Asian vertical left-tab lane, which
+measures the stop on the vertical inline axis.
+
+For `a:bodyPr@vert`, the renderer maps all six non-horizontal DrawingML values to their matching
+column direction and glyph orientation. Stacked WordArt adds PowerPoint's character advance, and
+the CJK sans fallback stack prefers Korean platform fonts before the generic Unicode fallback so
+mixed CJK/Hangul vertical text keeps native-like glyph metrics and column breaks.
 
 The three autofit choices remain mutually exclusive:
 
@@ -248,14 +260,15 @@ whose size comes only from inheritance remain on the bounded fit path. The nativ
 therefore a finite text-box cohort, not a claim of editor-level parity for every PowerPoint autofit
 context.
 
-### Text color precedence
+### Text fill precedence
 
 `TextRenderer` resolves run styles through the existing master/layout/shape/paragraph/run cascade,
-then applies container color options with an explicit local-precedence check. A color declared on
+then applies container color options with an explicit local-precedence check. A fill declared on
 the run wins first; otherwise a `solidFill` on paragraph `defRPr` wins over the shape's resolved
-`fontRef`. The shape `fontRef` is used only when both local levels omit a text fill. The same path
-handles direct `srgbClr` and theme-backed `schemeClr`, so theme lookup remains in `StyleResolver`
-instead of being duplicated by the precedence layer.
+`fontRef`. The shape `fontRef` is used only when both local levels omit a text fill. Solid, gradient,
+pattern, stretched-picture, and no-fill choices remain mutually exclusive. Stretched picture fills
+resolve embedded or lazy media through the current part's relationships and clip the image to the
+run glyphs. Direct `srgbClr` and theme-backed `schemeClr` still resolve in `StyleResolver`.
 
 The native matrix includes positive paragraph defaults, an explicit run override, the no-local-color
 inverse fallback, and square, wide, and tall containers. This boundary verifies color selection; it
