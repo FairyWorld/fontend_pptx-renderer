@@ -479,6 +479,14 @@ const presentation = buildPresentation(files); // PresentationData
 const lazyPresentation = buildPresentation(lazyFiles, { lazySlides: true }); // slide nodes parse on demand
 materializeAllSlideNodes(lazyPresentation); // optional: force full model materialization
 const json = serializePresentation(presentation); // SerializedPresentation (JSON-safe)
+// json.layouts / json.masters carry each template's non-placeholder shapes as typed
+// nodes; a slide names its own via layoutPath / masterPath. Draw order is master,
+// then layout, then the slide's own nodes, composed as the renderer does:
+//   - slide nodes: always
+//   - layout nodes: only when slide.showMasterSp is not false
+//   - master nodes: only when slide.showMasterSp and layout.showMasterSp are both not false
+// So slide.showMasterSp === false hides both layout and master shapes, while
+// layout.showMasterSp === false hides only the master's.
 const index = buildTextIndex(presentation); // TextIndexEntry[]
 const matches = searchText(index, '算力'); // TextSearchResult[]
 const directMatches = searchPresentation(presentation, /GPU|CPU/i); // TextSearchResult[]
@@ -532,6 +540,7 @@ import type {
   NodeType,
   SerializedPresentation,
   SerializedSlide,
+  SerializedTemplate,
   SerializedNode,
   PptxFiles,
   ZipParseLimits,
